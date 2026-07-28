@@ -221,9 +221,14 @@ const CÓDIGOS_PAÍSES_AMECO = Dict(
 # ----------------------------------------------------------------------------
 # Códigos de variáveis AMECO
 # ----------------------------------------------------------------------------
-# NOTA: estes códigos são os mnemónicos habituais da AMECO. Devem ser
-# validados contra a versão do ficheiro efetivamente descarregado, pois a
-# Comissão revê a nomenclatura periodicamente.
+# NOTA: usados apenas pelo parser TXT legado (`ler_ficheiro_ameco_txt`,
+# `src/ameco_download.jl`), hoje sem caminho automático (ver
+# docs/LIMITACOES.md item 3). Vários destes mnemónicos foram entretanto
+# confirmados ERRADOS contra a API SDMX real — não apenas por validar:
+# "receitas_governo"/"despesas_governo" tinham os códigos trocados, e
+# "consumo_privado"/"exportações"/"importações" usam aqui mnemónicos que já
+# não existem na API. Para os mnemónicos corretos e verificados, ver
+# `MAPA_AMECO_SDMX` em `src/ameco_sdmx.jl` (fonte de verdade atual).
 
 const CÓDIGOS_AMECO_VARIÁVEIS = Dict(
     "PIB_corrente" => "UVGD",
