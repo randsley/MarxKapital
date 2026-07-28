@@ -142,12 +142,13 @@ valorizado a preços de produção de Sraffa. `sistema_Ndept!` mantém-se como
 omissão. Falta ainda impor a condição de realização/consistência de reprodução
 (oferta = uso intermédio + final por setor) — ver `docs/LIMITACOES.md` item 1.
 
-### 3.2 Importante: `R_max` no choque salarial é ilustrativo
+### 3.2 Resolvido: `R_max` no choque salarial era ilustrativo
 
-Em `simular_choque_salarial`, o `R_max` reportado usa uma matriz auxiliar
+Em `simular_choque_salarial`, o `R_max` reportado usava uma matriz auxiliar
 `A_ref` e `l = ones(N)`, não a matriz nem os coeficientes de trabalho da
-simulação. Serve de referência grosseira de viabilidade, não de limite exato do
-cenário.
+simulação. **Corrigido:** passou a usar `p_base.A` (devolvida por
+`simular_Ndept_customizado`) e `l = [d.v for d in depts]`, refletindo o
+cenário simulado.
 
 ### 3.3 Importante: download e parsing AMECO são heurísticos
 
@@ -310,7 +311,7 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 
 - [x] Testes executados localmente sem erros
 - [x] CI headless configurada
-- [ ] `R_max` do choque calculado com A e l reais
+- [x] `R_max` do choque calculado com A e l reais
 - [x] `sistema_Ndept_io!` com acoplamento via A e mobilidade de capital (opcional, `acoplado=true`)
 - [ ] Convergência para `r̄` e fecho dos balanços validados (convergência de dispersão validada por teste; fecho de balanços setoriais ainda não)
 - [ ] Download AMECO com descoberta dinâmica do ficheiro

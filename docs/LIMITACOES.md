@@ -45,17 +45,23 @@ compensação de oferta/procura setorial dentro da EDO. Validado por teste
 (`test/runtests.jl`, "Simulação N-dept acoplada") que a dispersão das taxas de
 lucro entre setores diminui ao longo do tempo sob mobilidade de capital.
 
-## 2. R_max no choque salarial usa uma matriz auxiliar
+## 2. R_max no choque salarial usa uma matriz auxiliar (corrigido)
 
-Em `simular_choque_salarial` (`src/choques.jl`), o `R_max` reportado é
+Em `simular_choque_salarial` (`src/choques.jl`), o `R_max` reportado era
 calculado com uma matriz `A_ref` gerada só para dar uma referência de
-viabilidade e com `l = ones(N)`. Não é a matriz da simulação nem os
-coeficientes de trabalho reais dos departamentos. Trate o `R_max` do choque
-como **ilustrativo**, não como um limite exato do cenário simulado.
+viabilidade e com `l = ones(N)` — não a matriz da simulação nem os
+coeficientes de trabalho reais dos departamentos.
 
-Mitigação já aplicada: a mesma `seed` é passada aos dois cenários (base e
-choque), pelo que as matrizes técnicas das duas simulações são idênticas e a
-comparação base-vs-choque é reprodutível.
+**Corrigido:** `R_max` passou a usar `p_base.A` (a matriz técnica
+efetivamente devolvida por `simular_Ndept_customizado` para o cenário base)
+e `l = [d.v for d in depts]` (coeficientes de trabalho proporcionais a V,
+mesma convenção usada em `sistema_Ndept_io!`). O valor de viabilidade
+reportado corresponde agora ao cenário simulado, não a uma referência
+auxiliar.
+
+Mitigação já aplicada (mantida): a mesma `seed` é passada aos dois cenários
+(base e choque), pelo que as matrizes técnicas das duas simulações são
+idênticas e a comparação base-vs-choque é reprodutível.
 
 ## 3. Download AMECO: URLs e formato são heurísticos
 

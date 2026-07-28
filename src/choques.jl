@@ -9,10 +9,10 @@ Simula o impacto de um aumento salarial de fração `Δw` (ex.: 0.10 = +10%).
 V sobe (1+Δw); e desce proporcionalmente (s constante no curto prazo);
 r = e/(k+1) ajusta-se. Compara cenário base vs. choque.
 
-NOTA sobre R_max: o R_max reportado usa uma matriz técnica auxiliar apenas
-para dar uma referência de viabilidade; não é a matriz da simulação
-(ver docs/LIMITACOES.md, item 2). Passa a mesma `seed` a ambos os cenários
-para garantir comparabilidade das matrizes técnicas geradas.
+R_max é calculado com a matriz técnica e os coeficientes de trabalho reais
+da simulação (`p_base.A`, `l ∝ V`), não uma matriz auxiliar (ver
+docs/LIMITACOES.md, item 2 — corrigido). Passa a mesma `seed` a ambos os
+cenários para garantir comparabilidade das matrizes técnicas geradas.
 """
 function simular_choque_salarial(depts, Δw::Float64; T = 50.0, plotar = true, seed = 42)
     println("\n" * "="^70)
@@ -21,12 +21,12 @@ function simular_choque_salarial(depts, Δw::Float64; T = 50.0, plotar = true, s
 
     N = length(depts)
 
-    # Referência de viabilidade (matriz auxiliar; ver nota no docstring)
-    A_ref = criar_matriz_tecnica(N, seed = seed)
-    R_max = calcular_taxa_lucro_maxima(A_ref, ones(N))
-
     # Cenário base — mesma seed para reprodutibilidade/comparabilidade
     sol_base, _, p_base = simular_Ndept_customizado(depts, T = T, seed = seed)
+
+    # R_max com a matriz e os coeficientes de trabalho reais da simulação base
+    l = [d.v for d in depts]
+    R_max = calcular_taxa_lucro_maxima(p_base.A, l)
     r_base_inicial = mean([taxa_lucro(d) for d in depts])
     r_base_final = mean(calcular_taxas_lucro(sol_base, p_base.e)[:, end])
 

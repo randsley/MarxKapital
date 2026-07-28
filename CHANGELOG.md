@@ -18,6 +18,9 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 - `calcular_precos_producao` agora rejeita corretamente `r̄ ≥ R_max` (antes só
   detetava matriz literalmente singular, permitindo preços negativos silenciosos
   acima de R_max apesar do que a docstring prometia).
+- `simular_choque_salarial`: `R_max` reportado passa a usar a matriz técnica e
+  os coeficientes de trabalho reais da simulação (`p_base.A`, `l ∝ V`), em vez
+  de uma matriz auxiliar `A_ref` e `l = ones(N)`. Ver `docs/LIMITACOES.md` item 2.
 
 ## [0.3.0]
 
