@@ -83,16 +83,34 @@ remapear. Os códigos de país precisaram de um mapeamento próprio
 (`CÓDIGOS_PAÍSES_AMECO_SDMX`), maioritariamente ISO3 mas com irregularidades
 reais (GRC não EL, GBR não UK, ROM não ROU).
 
-**Trabalho pendente:** `MAPA_AMECO_SDMX` só mapeia, para já, as 6 variáveis
-que `calibrar_com_dados_ameco` efetivamente lê (PIB corrente/constante,
-emprego total, remunerações, FBCF, stock de capital líquido) — as restantes
-~17 variáveis de `CÓDIGOS_AMECO_VARIÁVEIS` (consumo, comércio externo,
-finanças públicas, preços) ainda não têm capítulo/item SDMX confirmado;
-ficam simplesmente ausentes do resultado (preenchidas a 0.0/NaN por
-`construir_dados_ameco`, sem erro) até serem verificadas e acrescentadas ao
-mapa. Corra `verificar_sdmx_ameco()` manualmente (não faz parte dos testes
-automáticos, para não depender de rede em CI) antes de confiar nos dados numa
-análise real.
+**Trabalho pendente (parcialmente resolvido):** `MAPA_AMECO_SDMX` mapeia
+agora 20 das 25 variáveis de `CÓDIGOS_AMECO_VARIÁVEIS`, verificadas com
+chamadas reais em 2026-07: além das 6 originais (PIB corrente/constante,
+emprego total, remunerações, FBCF, stock de capital líquido), acrescentaram-se
+consumo privado/público, exportações, importações, emprego assalariado, taxa
+de desemprego, população ativa, remunerações por assalariado, produtividade
+do trabalho, IPC, receitas/despesas do governo, saldo orçamental e balança
+corrente. Os valores obtidos para Portugal batem com figuras reais conhecidas
+(défice 2022 ≈ -0.3% do PIB, desemprego 2022 ≈ 6.2%).
+
+**Nota importante:** vários mnemónicos que estavam em `CÓDIGOS_AMECO_VARIÁVEIS`
+(nunca antes verificados) revelaram-se **incorretos** contra a API real —
+por exemplo `UUTG` estava atribuído a `receitas_governo` mas é na realidade
+`despesas_governo` (as duas trocadas), e `consumo_privado`/`exportações`/
+`importações` usavam mnemónicos (`UNCT`/`UXTG`/`UMTG`) que já não existem na
+API atual (os corretos são `UCPH`/`UXGS`/`UMGS`). `MAPA_AMECO_SDMX` usa os
+códigos corrigidos; `CÓDIGOS_AMECO_VARIÁVEIS` (`estruturas.jl`, usado só pelo
+parser TXT legado) não foi alterado — continua a ser heurístico, como sempre
+se avisou.
+
+Ainda por confirmar: custos unitários de trabalho (indexados — a API exige um
+ano de referência específico que não se identificou), deflator do PIB (não
+encontrado como item próprio no capítulo do PIB), dívida pública, balança
+comercial e stock de capital bruto. Ficam simplesmente ausentes do resultado
+(preenchidos a 0.0/NaN por `construir_dados_ameco`, sem erro) até serem
+confirmados. Corra `verificar_sdmx_ameco()` manualmente (não faz parte dos
+testes automáticos, para não depender de rede em CI) antes de confiar nos
+dados numa análise real.
 
 O antigo caminho TXT/CSV (`ler_ficheiro_ameco_txt`, `processar_csv_ameco`,
 métodos `:local`/`:csv`) mantém-se disponível para quem já tenha um ficheiro

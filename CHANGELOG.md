@@ -38,8 +38,21 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   - `verificar_eurostat_setorial()` faz uma verificação manual de sanidade.
   - Comportamento por omissão em ambos os caminhos inalterado (sintético /
     pesos fixos), suite de testes continua totalmente offline.
+- `MAPA_AMECO_SDMX` (`src/ameco_sdmx.jl`) alargado de 6 para 20 das 25
+  variáveis de `CÓDIGOS_AMECO_VARIÁVEIS` (consumo privado/público,
+  exportações, importações, emprego assalariado, taxa de desemprego,
+  população ativa, remunerações por assalariado, produtividade do
+  trabalho, IPC, receitas/despesas do governo, saldo orçamental, balança
+  corrente), todas verificadas com chamadas reais contra Portugal.
 
 ### Corrigido
+- `MAPA_AMECO_SDMX`: vários mnemónicos herdados de `CÓDIGOS_AMECO_VARIÁVEIS`
+  (nunca antes verificados contra a API) estavam errados — `receitas_governo`
+  e `despesas_governo` tinham os códigos trocados, e `consumo_privado`/
+  `exportações`/`importações` usavam mnemónicos já retirados da API
+  (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`). `_obter_série_sdmx` passa a
+  aceitar `transformação` (nem todos os capítulos AMECO usam
+  TRANSFORMATION=1).
 - `calcular_precos_producao` agora rejeita corretamente `r̄ ≥ R_max` (antes só
   detetava matriz literalmente singular, permitindo preços negativos silenciosos
   acima de R_max apesar do que a docstring prometia).

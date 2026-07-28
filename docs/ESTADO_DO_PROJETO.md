@@ -247,8 +247,12 @@ viabilidade reportado passa a corresponder ao cenário simulado.
   devolve dados estruturados diretamente, sem parsing de largura fixa. A
   verificação "valor conhecido" (PIB de Portugal) foi feita — ver
   `verificar_sdmx_ameco()` e `docs/LIMITACOES.md` item 3.
-- **Confirmar mnemónicos** — feito para as 6 variáveis críticas (PIB, emprego,
-  remunerações, FBCF, stock de capital); pendente para as restantes ~17.
+- **Confirmar mnemónicos** — feito para 20 das 25 variáveis (as 6 críticas
+  mais consumo, comércio externo, mercado de trabalho, IPC e finanças
+  públicas); pendente para 5 (custos unit. de trabalho indexados, deflator
+  do PIB, dívida pública, balança comercial, stock de capital bruto). Alguns
+  mnemónicos antigos (nunca verificados) revelaram-se incorretos — ver
+  `docs/LIMITACOES.md` item 3.
 - **Mapear capítulo SDMX por variável** — cada grupo de variáveis AMECO vive
   num dataflow "capítulo" próprio (`AMECO_CHAPTER06-01` = PIB, etc.); falta
   confirmar o capítulo das variáveis não-críticas em `MAPA_AMECO_SDMX`.
@@ -339,7 +343,7 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 - [ ] Convergência para `r̄` e fecho dos balanços validados (convergência de dispersão validada por teste; fecho de balanços setoriais ainda não)
 - [x] Download AMECO via API SDMX oficial (substitui o ficheiro TXT descontinuado)
 - [x] API SDMX validada com valor conhecido (`verificar_sdmx_ameco()`)
-- [x] Mnemónicos AMECO confirmados (6 variáveis críticas; ~17 restantes pendentes)
+- [x] Mnemónicos AMECO confirmados (20/25 variáveis; 5 restantes pendentes)
 - [x] Matriz A a partir de tabelas de recursos e empregos reais (INE/19 setores; não AMECO/3 setores — ver LIMITACOES item 4)
 - [x] Calibração setorial com contas nacionais por ramo (ambos os caminhos, opt-in)
 - [ ] Stock de capital por inventário perpétuo (usa-se o stock líquido reportado pelo Eurostat diretamente)

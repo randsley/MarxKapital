@@ -50,40 +50,67 @@ const CÓDIGOS_PAÍSES_AMECO_SDMX = Dict(
 
 """
 Nome interno da variável (mesmas chaves de `CÓDIGOS_AMECO_VARIÁVEIS`) →
-`(dataflow do capítulo, código ITEM, fator de escala)` na API SDMX. As
-entradas marcadas "verificado" foram confirmadas com uma chamada real durante
-o desenvolvimento (2026-07); as restantes ainda não têm capítulo confirmado —
-ficam por preencher aqui e `descarregar_ameco_sdmx` simplesmente não as
-inclui no resultado, sem erro (ver docstring dessa função e
-`docs/LIMITACOES.md` item 3).
+`(dataflow do capítulo, código ITEM, fator de escala, TRANSFORMATION)` na
+API SDMX. Todas as entradas foram confirmadas com uma chamada real durante o
+desenvolvimento (2026-07). Note-se que vários mnemónicos aqui **diferem**
+dos que estavam (nunca verificados) em `CÓDIGOS_AMECO_VARIÁVEIS`
+(`estruturas.jl`) — por exemplo `receitas_governo`/`despesas_governo`
+tinham os códigos trocados (`UUTG` era a despesa, não a receita), e
+`consumo_privado`/`exportações`/`importações` usavam mnemónicos que já não
+existem na API atual (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`). As
+variáveis ainda por confirmar (custos unitários de trabalho indexados,
+deflator do PIB, dívida pública, balança comercial, stock de capital bruto)
+ficam por preencher aqui; `descarregar_ameco_sdmx` simplesmente não as
+inclui no resultado, sem erro (ver `docs/LIMITACOES.md` item 3).
 
 O fator de escala converte a unidade devolvida pela API (confirmada via a
 coluna COMMENT/UNIT_MULT de cada resposta) para a convenção já usada no resto
 do código (dados sintéticos, `calibrar_com_dados_ameco`): milhões de euros
-para variáveis monetárias, milhares de pessoas para emprego. As variáveis
-monetárias verificadas vêm em "Mrd EURO" (mil milhões) — escala 1000 para
-milhões; o emprego já vem em milhares de pessoas — escala 1.
+para variáveis monetárias, milhares de pessoas para emprego, sem escala para
+índices/percentagens/valores per capita. As variáveis monetárias verificadas
+vêm em "Mrd EURO" (mil milhões) — escala 1000 para milhões (incluindo as do
+capítulo 16, rotuladas "National currency" mas na mesma ordem de grandeza —
+confirmado pela magnitude: ~107 bate com receita/despesa pública de ~44% de
+um PIB de ~244 mil M€, não com 107% do PIB).
 """
 const MAPA_AMECO_SDMX = Dict(
-    "PIB_corrente"          => ("AMECO_CHAPTER06-01", "UVGD", 1000.0),  # verificado
-    "PIB_constante"         => ("AMECO_CHAPTER06-01", "OVGD", 1000.0),  # verificado
-    "emprego_total"         => ("AMECO_CHAPTER01-04", "NETD", 1.0),     # verificado
-    "remunerações"          => ("AMECO_CHAPTER07-01", "UWCD", 1000.0),  # verificado
-    "FBCF"                  => ("AMECO_CHAPTER03-01", "UIGT", 1000.0),  # verificado
-    "stock_capital_líquido" => ("AMECO_CHAPTER08-01", "OKND", 1000.0),  # verificado
+    "PIB_corrente"                 => ("AMECO_CHAPTER06-01", "UVGD",  1000.0, 1),
+    "PIB_constante"                => ("AMECO_CHAPTER06-01", "OVGD",  1000.0, 1),
+    "emprego_total"                => ("AMECO_CHAPTER01-04", "NETD",  1.0,    1),
+    "remunerações"                 => ("AMECO_CHAPTER07-01", "UWCD",  1000.0, 1),
+    "FBCF"                         => ("AMECO_CHAPTER03-01", "UIGT",  1000.0, 1),
+    "stock_capital_líquido"        => ("AMECO_CHAPTER08-01", "OKND",  1000.0, 1),
+    "consumo_privado"              => ("AMECO_CHAPTER02-01", "UCPH",  1000.0, 1),
+    "consumo_público"              => ("AMECO_CHAPTER02-05", "UCTG",  1000.0, 1),
+    "exportações"                  => ("AMECO_CHAPTER09-01", "UXGS",  1000.0, 1),
+    "importações"                  => ("AMECO_CHAPTER09-02", "UMGS",  1000.0, 1),
+    "emprego_assalariado"          => ("AMECO_CHAPTER01-07", "NWTD",  1.0,    1),
+    "taxa_desemprego"              => ("AMECO_CHAPTER01-03", "ZUTN",  1.0,    1),
+    "população_ativa"              => ("AMECO_CHAPTER01-02", "NLTN",  1.0,    1),
+    "remunerações_por_assalariado" => ("AMECO_CHAPTER07-04", "HWCDW", 1.0,    1),
+    "produtividade_trabalho"       => ("AMECO_CHAPTER08-02", "ZVGDE", 1.0,    3),
+    "IPC"                          => ("AMECO_CHAPTER02-04", "ZCPIH", 1.0,    1),
+    "receitas_governo"             => ("AMECO_CHAPTER16-01", "URTG",  1000.0, 1),
+    "despesas_governo"             => ("AMECO_CHAPTER16-02", "UUTG",  1000.0, 1),
+    "saldo_orçamental"             => ("AMECO_CHAPTER16-03", "UBLG",  1000.0, 1),
+    "balança_corrente"             => ("AMECO_CHAPTER10-01", "UBCA",  1000.0, 1),
 )
 
 """
 Chama a API SDMX para um (dataflow, item, área) e devolve Dict{Int,Float64}
-ano→valor. A chave SDMX fixa TRANSFORMATION=1, UNIT=0 e REFERENCE=0 e deixa
-AGG_METHOD por preencher (`.`): sem isto, a API devolve várias séries por
-ano para o mesmo item (ex.: UVGD sem UNIT fixo devolve preços correntes,
-PPS e ECU/EUR em simultâneo) e o dicionário ano→valor ficaria dependente da
-ordem de chegada das linhas. Verificado com UVGD, OVGD, NETD, UWCD, UIGT e
-OKND (2026-07): cada um devolve exatamente uma linha por ano com esta chave.
+ano→valor. A chave SDMX fixa TRANSFORMATION (1 por omissão), UNIT=0 e
+REFERENCE=0 e deixa AGG_METHOD por preencher (`.`): sem isto, a API devolve
+várias séries por ano para o mesmo item (ex.: UVGD sem UNIT fixo devolve
+preços correntes, PPS e ECU/EUR em simultâneo) e o dicionário ano→valor
+ficaria dependente da ordem de chegada das linhas. A maioria dos capítulos
+usa TRANSFORMATION=1; alguns (ex. capítulo 07-07/08-02, custos unitários e
+produtividade) usam TRANSFORMATION=3 — passar explicitamente quando
+necessário (confirmado por tentativa: a API devolve "número de filtros
+incorreto" se o valor errado for wildcardeado em vez de fixo).
 """
-function _obter_série_sdmx(dataflow::String, código_área::String, item::String)
-    url = "$URL_BASE_SDMX_AMECO/data/ECFIN,$dataflow,1.0/A.$código_área.1..0.0.$item" *
+function _obter_série_sdmx(dataflow::String, código_área::String, item::String;
+                           transformação::Int = 1)
+    url = "$URL_BASE_SDMX_AMECO/data/ECFIN,$dataflow,1.0/A.$código_área.$transformação..0.0.$item" *
           "?format=SDMX-CSV"
     try
         resp = HTTP.get(url, retry = true, readtimeout = 30, status_exception = false)
@@ -112,8 +139,8 @@ function descarregar_ameco_sdmx(código_área::String, anos)
     println("\n🌐 A obter dados AMECO via API SDMX oficial ($código_área)...")
     anos_vec = collect(anos)
     resultado = Dict{String, Vector{Float64}}()
-    for (nome, (dataflow, item, escala)) in MAPA_AMECO_SDMX
-        série = _obter_série_sdmx(dataflow, código_área, item)
+    for (nome, (dataflow, item, escala, transformação)) in MAPA_AMECO_SDMX
+        série = _obter_série_sdmx(dataflow, código_área, item; transformação = transformação)
         if isempty(série)
             @warn "Sem dados AMECO SDMX para '$nome' ($dataflow, $item, $código_área)."
             continue
