@@ -198,6 +198,10 @@ e taxas de depreciação diferenciadas.
 
 ---
 
-Nada disto foi verificado por execução no ambiente onde o pacote foi montado
-(sem Julia instalado). Recomenda-se correr `julia install_deps.jl` seguido de
-`julia --project=. test/runtests.jl` antes do primeiro uso sério.
+A suite de testes (`test/runtests.jl`, 33 testes) corre localmente e em CI
+(GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
+`.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
+por omissão; os caminhos de dados reais (`fonte_dados=:eurostat`,
+`dados_setoriais=:eurostat`, `método=:sdmx`) exigem rede e não correm em CI —
+verifique-os manualmente com `verificar_sdmx_ameco()` e
+`verificar_eurostat_setorial()` antes de os usar numa análise real.

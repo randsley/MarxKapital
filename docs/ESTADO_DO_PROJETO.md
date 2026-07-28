@@ -1,8 +1,10 @@
 # MarxKapital — Estado do Projeto
 
-Documento de acompanhamento da versão **0.3.0**. Descreve o que está feito, o
-que falta resolver e recomendações concretas de implementação. Destina-se a
-ficar em `docs/ESTADO_DO_PROJETO.md`, ao lado de `docs/LIMITACOES.md`.
+Documento de acompanhamento, iniciado na versão **0.3.0** e atualizado desde
+então com o trabalho subsequente (ainda não lançado como nova versão em
+`Project.toml`). Descreve o que está feito, o que falta resolver e
+recomendações concretas de implementação. Destina-se a ficar em
+`docs/ESTADO_DO_PROJETO.md`, ao lado de `docs/LIMITACOES.md`.
 
 Data: julho de 2026. Autor do projeto: Nigel Randsley.
 
@@ -14,9 +16,11 @@ O MarxKapital é um sistema em Julia para modelação matemática da teoria
 económica marxista: acumulação de capital, exploração, composição orgânica,
 tendência da taxa de lucro, transformação de valores em preços de produção,
 fronteira distributiva salário-lucro, e calibração empírica com dados
-nacionais (INE) e europeus (AMECO). A versão 0.3.0 está funcional para
-demonstração e desenvolvimento metodológico. Os dados por omissão são
-sintéticos e não servem para análise empírica publicável.
+nacionais (INE) e europeus (AMECO). Funcional para demonstração e
+desenvolvimento metodológico, com testes automáticos em CI. Os dados por
+omissão continuam sintéticos/pesos fixos e não servem para análise empírica
+publicável nesse modo — dados setoriais e da AMECO **reais** estão
+disponíveis como opção, via APIs SDMX oficiais (ver `docs/LIMITACOES.md`).
 
 O código foi reorganizado de um ficheiro monolítico para um repositório
 modular, com testes, exemplos e documentação. A integração AMECO abrange todos
@@ -115,13 +119,17 @@ temporais.
   AMECO.
 - `seed` opcional e partilhada entre base e choque.
 
-### 2.9 Verificação estática realizada
+### 2.9 Verificação por execução (histórico: só estática até aqui)
 
-Como o ambiente de empacotamento não tinha Julia instalado, a verificação foi
-estática, não por compilação: delimitadores equilibrados em todos os ficheiros;
-nenhuma função chamada sem definição; contagem de argumentos confirmada em
-todos os construtores posicionais (`DadosAMECO` com 29 campos e 29 argumentos
-nas três chamadas; `ParâmetrosCalibrados` com 17 campos e 17 argumentos).
+Nas fases iniciais deste documento, sem Julia disponível no ambiente de
+empacotamento, a verificação era só estática (delimitadores equilibrados,
+nenhuma função chamada sem definição, contagem de argumentos nos
+construtores posicionais). Desde então, a suite de testes corre por
+compilação real — localmente e em CI (GitHub Actions, Julia 1.10 e 1, em
+cada push a `main`, ver `.github/workflows/test.yml`) — 33 testes, todos a
+passar. Os caminhos de dados reais (rede) são verificados manualmente com
+`verificar_sdmx_ameco()`/`verificar_eurostat_setorial()`, fora da suite
+automática por design (ver `docs/LIMITACOES.md`).
 
 ---
 
@@ -189,11 +197,12 @@ taxas de depreciação diferenciadas.
 Tanto o caminho INE como o AMECO usam, por omissão, dados gerados. Servem para
 demonstração e testes, não para análise empírica.
 
-### 3.8 Verificação: testes nunca executados
+### 3.8 Resolvido: testes agora executados em CI
 
-A suite `test/runtests.jl` foi escrita mas não foi corrida no ambiente de
-empacotamento (sem Julia). Falta uma execução local limpa e, idealmente,
-integração contínua.
+A suite `test/runtests.jl` (33 testes) corre localmente e em CI (GitHub
+Actions, Julia 1.10 e 1, `.github/workflows/test.yml`) em cada push a
+`main`. Cobre os caminhos sintéticos/opt-in por omissão; os caminhos de
+dados reais (rede) ficam de fora por design — ver §3.3/§4.3.
 
 ---
 
@@ -285,17 +294,21 @@ viabilidade reportado passa a corresponder ao cenário simulado.
 - Implementar de facto as agregações `:média` e `:macro` no caminho INE —
   ainda não feito (item independente do trabalho de dados reais).
 
-### 4.5 Testes e integração contínua
+### 4.5 Testes e integração contínua — feito
 
-- Correr localmente: `julia install_deps.jl` seguido de
-  `julia --project=. test/runtests.jl`.
-- Para execução sem ecrã (testes e CI), definir `ENV["GKSwstype"] = "100"`
-  antes de carregar `Plots`, evitando que as chamadas a `display` tentem abrir
-  uma janela. Em alternativa, adicionar um argumento `plotar=false` às funções
-  que hoje desenham sempre (`problema_transformacao`,
-  `validar_taxas_lucro_calibradas`), para as tornar silenciosas em teste.
-- Adicionar workflow de CI (por exemplo GitHub Actions) com matriz de versões
-  de Julia, cache de pacotes e execução dos testes em modo headless.
+- ~~Correr localmente~~ — feito, `julia install_deps.jl` seguido de
+  `julia --project=. test/runtests.jl`, 33 testes a passar.
+- ~~Execução sem ecrã~~ — feito, via `GKSwstype=100` (variável de ambiente,
+  não argumento por função) antes de carregar `Plots`; usado tanto localmente
+  como em CI.
+- ~~Adicionar workflow de CI~~ — feito, `.github/workflows/test.yml`
+  (GitHub Actions, matriz Julia 1.10/1, cache de pacotes, modo headless), em
+  cada push a `main`.
+
+Não coberto por CI (rede necessária, opt-in por design — ver
+`docs/LIMITACOES.md`): `método=:sdmx`, `fonte_dados=:eurostat`,
+`dados_setoriais=:eurostat`. Verificação manual via
+`verificar_sdmx_ameco()`/`verificar_eurostat_setorial()`.
 
 ### 4.6 Direções de médio prazo
 
@@ -317,20 +330,20 @@ o núcleo:
 
 Sequência proposta, do mais estruturante ao mais exploratório:
 
-1. Executar a suite localmente e corrigir o que a compilação revelar. Adicionar
-   CI headless.
-2. Corrigir o `R_max` do choque (baixo custo, remove uma inconsistência
-   reportada).
-3. Acoplar `A` à dinâmica N-dept com mobilidade de capital, validando os
-   balanços e a convergência para `r̄`. É a peça que falta para coerência
-   teórica.
-4. ~~Robustecer o acesso à AMECO~~ — feito (API SDMX oficial); falta mapear as
-   ~17 variáveis não-críticas restantes em `MAPA_AMECO_SDMX`.
-5. Ligar dados setoriais reais (Eurostat ou INE) e substituir os pesos fixos e
-   os dados sintéticos.
-6. Estimar stock de capital por inventário perpétuo.
+1. ~~Executar a suite localmente e corrigir o que a compilação revelar.
+   Adicionar CI headless.~~ — feito.
+2. ~~Corrigir o `R_max` do choque~~ — feito.
+3. ~~Acoplar `A` à dinâmica N-dept com mobilidade de capital~~ — feito
+   (opcional, `acoplado=true`); convergência de dispersão validada por
+   teste, fecho de balanços setoriais ainda não.
+4. ~~Robustecer o acesso à AMECO~~ — feito (API SDMX oficial, 20/25
+   variáveis mapeadas); faltam 5 (ver §4.3).
+5. ~~Ligar dados setoriais reais (Eurostat)~~ — feito, opt-in (INE 19
+   setores com matriz `A` real; AMECO 3 setores macro sem `A` real — ver
+   §4.4). Comportamento por omissão continua sintético/pesos fixos.
+6. Estimar stock de capital por inventário perpétuo — ainda por fazer.
 7. Extensões de médio prazo (financeirização, ecologia, troca desigual, agentes
-   heterogéneos).
+   heterogéneos) — ainda por fazer.
 
 ---
 
