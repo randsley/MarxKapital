@@ -2,7 +2,7 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
-## [Não lançado]
+## [0.5.0] — 2026-07-28
 
 ### Adicionado
 - `_resolver_racionamento` (`src/nucleo.jl`) e o kwarg `racionamento=true`
