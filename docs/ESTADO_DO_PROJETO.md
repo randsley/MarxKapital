@@ -129,15 +129,18 @@ nas três chamadas; `ParâmetrosCalibrados` com 17 campos e 17 argumentos).
 
 Ordenado por prioridade. O detalhe completo está em `docs/LIMITACOES.md`.
 
-### 3.1 Crítico: a matriz A não realimenta a dinâmica de N departamentos
+### 3.1 Parcialmente resolvido: a matriz A não realimenta a dinâmica de N departamentos
 
 Em `sistema_Ndept!`, a acumulação de cada setor depende apenas da sua própria
 mais-valia; a matriz `A` é transportada nos parâmetros mas não entra nas
 equações. Os setores comportam-se como independentes, o que contradiz a lógica
 da reprodução ampliada (o output de um setor é o capital constante de outro).
-Consequência: os ciclos e a convergência das taxas de lucro na simulação N-dept
-refletem apenas heterogeneidade de parâmetros iniciais, não interdependência
-setorial real.
+
+**Corrigido (opcional):** `sistema_Ndept_io!` (`acoplado=true`) acopla A à
+dinâmica via um termo de mobilidade de capital `μ·(rᵢ − r̄)·Cᵢ`, com `rᵢ`
+valorizado a preços de produção de Sraffa. `sistema_Ndept!` mantém-se como
+omissão. Falta ainda impor a condição de realização/consistência de reprodução
+(oferta = uso intermédio + final por setor) — ver `docs/LIMITACOES.md` item 1.
 
 ### 3.2 Importante: `R_max` no choque salarial é ilustrativo
 
@@ -305,11 +308,11 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 
 ## 6. Lista de verificação
 
-- [ ] Testes executados localmente sem erros
-- [ ] CI headless configurada
+- [x] Testes executados localmente sem erros
+- [x] CI headless configurada
 - [ ] `R_max` do choque calculado com A e l reais
-- [ ] `sistema_Ndept_io!` com acoplamento via A e mobilidade de capital
-- [ ] Convergência para `r̄` e fecho dos balanços validados
+- [x] `sistema_Ndept_io!` com acoplamento via A e mobilidade de capital (opcional, `acoplado=true`)
+- [ ] Convergência para `r̄` e fecho dos balanços validados (convergência de dispersão validada por teste; fecho de balanços setoriais ainda não)
 - [ ] Download AMECO com descoberta dinâmica do ficheiro
 - [ ] Parser AMECO validado por round-trip com valor conhecido
 - [ ] Mnemónicos AMECO confirmados

@@ -39,6 +39,18 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test size(r) == (7, length(sol.t))
     end
 
+    @testset "Simulação N-dept acoplada" begin
+        # `seed` em `simular_Ndept` só fixa a matriz técnica A; `criar_departamentos`
+        # usa `rand()` sem semente própria para e/σ_c/σ_v/δ. Fixar aqui o RNG global
+        # torna os parâmetros dos departamentos reprodutíveis também.
+        Random.seed!(5)
+        sol, depts, p = simular_Ndept(6, T = 200.0, seed = 5, acoplado = true, μ = 0.5)
+        @test all(isfinite.(sol[end]))
+        r = calcular_taxas_lucro_precos(sol, p)
+        @test size(r) == (6, length(sol.t))
+        @test std(r[:, end]) < std(r[:, 1])
+    end
+
     @testset "Valores e preços" begin
         A = criar_matriz_tecnica(4, seed = 2)
         l = [0.6, 0.5, 0.4, 0.3]

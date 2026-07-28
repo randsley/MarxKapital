@@ -20,6 +20,38 @@ function calcular_taxas_lucro(sol, e)
     return r
 end
 
+"""
+Taxas de lucro por setor ao longo do tempo, com capital constante valorizado
+a preços de produção de Sraffa (matriz N × T). Usa a mesma lógica de
+`sistema_Ndept_io!` (ver `src/nucleo.jl`) para reproduzir, fora da EDO, a taxa
+de lucro `rᵢ` que a dinâmica acoplada usa internamente. Requer `p` com os
+campos `e, A, l, R_max, w` (ver `simular_Ndept_customizado(..., acoplado=true)`).
+"""
+function calcular_taxas_lucro_precos(sol, p)
+    N = length(p.e)
+    T = length(sol.t)
+    r = zeros(N, T)
+    for idx in 1:T
+        C = sol[1:N, idx]
+        V = sol[N+1:2N, idx]
+        S = p.e .* V
+
+        r̄_naive = sum(S) / sum(C .+ V)
+        r_efetivo = clamp(r̄_naive, 0.0, 0.95 * p.R_max)
+
+        π = try
+            precos = calcular_precos_producao(p.A, p.l, p.w, r_efetivo)
+            λ = calcular_valores_trabalho(p.A, p.l)
+            precos ./ λ
+        catch
+            ones(N)
+        end
+
+        r[:, idx] = S ./ (π .* C .+ V)
+    end
+    return r
+end
+
 """Composições orgânicas por setor ao longo do tempo (matriz N × T)."""
 function calcular_composicoes_organicas(sol)
     N = Int(length(sol.u[1]) / 2)

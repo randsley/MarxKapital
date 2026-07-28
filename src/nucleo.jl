@@ -140,6 +140,52 @@ function sistema_Ndept!(dX, X, p, t)
     dX[N+1:2N]   = p.σ_v .* S
 end
 
+"""
+    sistema_Ndept_io!(dX, X, p, t)
+
+Sistema de EDOs para N departamentos, com a matriz técnica `p.A` a realimentar
+a dinâmica através de um termo de mobilidade de capital:
+
+    dCᵢ/dt = σ_c,ᵢ·Sᵢ − δᵢ·Cᵢ + μ·(rᵢ − r̄)·Cᵢ
+
+onde `rᵢ` é a taxa de lucro do setor i com o capital constante valorizado a
+preços de produção de Sraffa (que dependem de A), não pelo valor contabilístico
+nu. Para evitar a circularidade de usar r̄ para calcular preços que por sua vez
+definem r̄, a taxa de lucro que entra em `calcular_precos_producao` é a média
+não ponderada por preços (`r̄_naive`), fixada a um máximo de 95% de `p.R_max`
+para não colidir com a singularidade de Sraffa. Se mesmo assim o sistema de
+preços falhar (matriz mal condicionada), cai-se para preços = valores-trabalho
+(sem ajuste, π = 1).
+
+Ver `docs/LIMITACOES.md` (item 1): esta é a versão opcional acoplada,
+selecionável com `acoplado=true` em `simular_Ndept`/`simular_Ndept_customizado`.
+`sistema_Ndept!` mantém-se como a versão "setores independentes".
+"""
+function sistema_Ndept_io!(dX, X, p, t)
+    N = length(p.e)
+    C = @view X[1:N]
+    V = @view X[N+1:2N]
+    S = p.e .* V
+
+    r̄_naive = sum(S) / sum(C .+ V)
+    r_efetivo = clamp(r̄_naive, 0.0, 0.95 * p.R_max)
+
+    π = try
+        precos = calcular_precos_producao(p.A, p.l, p.w, r_efetivo)
+        λ = calcular_valores_trabalho(p.A, p.l)
+        precos ./ λ
+    catch
+        ones(N)
+    end
+
+    C_valorizado = π .* C
+    r = S ./ (C_valorizado .+ V)
+    r̄ = sum(S) / sum(C_valorizado .+ V)
+
+    dX[1:N]    = p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C
+    dX[N+1:2N] = p.σ_v .* S
+end
+
 # ----------------------------------------------------------------------------
 # Simulação
 # ----------------------------------------------------------------------------
@@ -157,24 +203,57 @@ function simular_2dept(; T = 100.0)
     return sol, depts, p
 end
 
-"""Simula o modelo de N departamentos com departamentos gerados aleatoriamente."""
-function simular_Ndept(N::Int; T = 100.0, nomes::Vector{String} = String[], seed = nothing)
+"""
+    simular_Ndept(N; T=100.0, nomes=String[], seed=nothing, acoplado=false, μ=0.3)
+
+Simula o modelo de N departamentos com departamentos gerados aleatoriamente.
+Com `acoplado=true`, usa `sistema_Ndept_io!` (mobilidade de capital via A e
+preços de produção); `μ` é o coeficiente de mobilidade nesse caso.
+"""
+function simular_Ndept(N::Int; T = 100.0, nomes::Vector{String} = String[],
+                       seed = nothing, acoplado = false, μ = 0.3)
     depts = criar_departamentos(N, nomes)
-    return simular_Ndept_customizado(depts, T = T, seed = seed)
+    return simular_Ndept_customizado(depts, T = T, seed = seed,
+                                     acoplado = acoplado, μ = μ)
 end
 
-"""Simula o modelo de N departamentos a partir de departamentos pré-configurados."""
-function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0, seed = nothing)
+"""
+    simular_Ndept_customizado(depts; T=100.0, seed=nothing, acoplado=false, μ=0.3)
+
+Simula o modelo de N departamentos a partir de departamentos pré-configurados.
+Com `acoplado=true`, usa `sistema_Ndept_io!` em vez de `sistema_Ndept!`.
+"""
+function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
+                                   seed = nothing, acoplado = false, μ = 0.3)
     N = length(depts)
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
-    p = (
-        e   = [d.e for d in depts],
-        σ_c = [d.σ_c for d in depts],
-        σ_v = [d.σ_v for d in depts],
-        δ   = [d.δ for d in depts],
-        A   = criar_matriz_tecnica(N, seed = seed),
-    )
-    prob = ODEProblem(sistema_Ndept!, X0, (0.0, T), p)
+    A = criar_matriz_tecnica(N, seed = seed)
+
+    if acoplado
+        l = [d.v for d in depts]
+        p = (
+            e     = [d.e for d in depts],
+            σ_c   = [d.σ_c for d in depts],
+            σ_v   = [d.σ_v for d in depts],
+            δ     = [d.δ for d in depts],
+            A     = A,
+            l     = l,
+            R_max = calcular_taxa_lucro_maxima(A, l),
+            μ     = μ,
+            w     = 1.0,
+        )
+        prob = ODEProblem(sistema_Ndept_io!, X0, (0.0, T), p)
+    else
+        p = (
+            e   = [d.e for d in depts],
+            σ_c = [d.σ_c for d in depts],
+            σ_v = [d.σ_v for d in depts],
+            δ   = [d.δ for d in depts],
+            A   = A,
+        )
+        prob = ODEProblem(sistema_Ndept!, X0, (0.0, T), p)
+    end
+
     sol = solve(prob, Tsit5(), saveat = 0.5)
     return sol, depts, p
 end

@@ -28,6 +28,23 @@ procura de capital constante do setor i (ΔCᵢ) seja satisfeita pelo output dos
 setores fornecedores (colunas/linhas de A), e introduzir um mecanismo de
 mobilidade de capital que desloque investimento para setores com r > r̄.
 
+**Parcialmente corrigido:** `sistema_Ndept_io!` (`src/nucleo.jl`), selecionável
+com `acoplado=true` em `simular_Ndept`/`simular_Ndept_customizado`, acopla A à
+dinâmica através de um termo de mobilidade de capital `μ·(rᵢ − r̄)·Cᵢ`, com `rᵢ`
+calculado sobre capital valorizado a preços de produção de Sraffa (que dependem
+de A), em vez do `e/(k+1)` nu. `sistema_Ndept!` mantém-se como versão por
+omissão ("setores independentes"), inalterada, por compatibilidade.
+
+O que **ainda não** está feito: a condição de realização/consistência de
+reprodução (a procura de capital constante do setor i ser satisfeita pelo
+output real dos fornecedores) não é imposta na dinâmica — só o efeito de
+mobilidade de capital sobre taxas de lucro díspares. À semelhança do modelo de
+2 departamentos (cujo `verificar_equilibrio_2dept` também só verifica a
+posteriori, sem realimentar `sistema_2dept!`), não existe ainda um mecanismo de
+compensação de oferta/procura setorial dentro da EDO. Validado por teste
+(`test/runtests.jl`, "Simulação N-dept acoplada") que a dispersão das taxas de
+lucro entre setores diminui ao longo do tempo sob mobilidade de capital.
+
 ## 2. R_max no choque salarial usa uma matriz auxiliar
 
 Em `simular_choque_salarial` (`src/choques.jl`), o `R_max` reportado é
