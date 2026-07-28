@@ -63,22 +63,44 @@ Mitigação já aplicada (mantida): a mesma `seed` é passada aos dois cenários
 (base e choque), pelo que as matrizes técnicas das duas simulações são
 idênticas e a comparação base-vs-choque é reprodutível.
 
-## 3. Download AMECO: URLs e formato são heurísticos
+## 3. Download AMECO (corrigido: API SDMX oficial substitui o ficheiro TXT)
 
-- A AMECO **não tem API REST oficial**. As URLs em `URLS_AMECO_TENTAR`
-  (`src/ameco_download.jl`) são tentativas e podem estar desatualizadas — a
-  Comissão muda a localização a cada atualização (Primavera/Outono).
-- O parser `ler_ficheiro_ameco_txt` assume um formato de **largura fixa**
-  (país 1-2, variável 4-8, sub 10-19, valores de 15 chars a partir da coluna
-  21, começando em 1960). Estes offsets são um palpite razoável mas **têm de
-  ser validados** contra o ficheiro real; use os parâmetros `ano_inicial`,
-  `largura_campo` e `pos_dados` para ajustar.
-- Os mnemónicos em `CÓDIGOS_AMECO_VARIÁVEIS` (UVGD, OVGD, etc.) seguem a
-  convenção habitual mas devem ser confirmados na nomenclatura vigente.
+**Contexto histórico:** esta secção descrevia as URLs heurísticas do antigo
+ficheiro TXT estático (`URLS_AMECO_TENTAR`, `src/ameco_download.jl`) e o
+parser de largura fixa (`ler_ficheiro_ameco_txt`). Confirmado em 2026-07 que
+essa distribuição foi **descontinuada pela Comissão Europeia** — todas as
+URLs devolvem 404 ou redirecionam para a página HTML do portal, nunca dados.
 
-Se o download ou o parsing falharem, `obter_dados_ameco(..., método=:auto)`
-recorre silenciosamente a **dados sintéticos** (com aviso). Verifique sempre
-o campo `fonte` do resultado.
+**Corrigido:** a AMECO passou a expor uma **API REST SDMX oficial**
+(`src/ameco_sdmx.jl`, `webgate.ec.europa.eu/ecfin/redisstat`, a mesma
+plataforma da nova ferramenta de dados do Eurostat). `obter_dados_ameco`
+(métodos `:auto`/`:sdmx`/`:download`) usa-a como caminho automático por
+omissão. Verificado com chamadas reais (2026-07): PIB, emprego, remunerações,
+FBCF e stock de capital líquido de Portugal, devolvidos corretamente desde
+1960. Os mnemónicos em `CÓDIGOS_AMECO_VARIÁVEIS` (UVGD, OVGD, etc.)
+confirmaram-se válidos como código `ITEM` nesta API, sem necessidade de
+remapear. Os códigos de país precisaram de um mapeamento próprio
+(`CÓDIGOS_PAÍSES_AMECO_SDMX`), maioritariamente ISO3 mas com irregularidades
+reais (GRC não EL, GBR não UK, ROM não ROU).
+
+**Trabalho pendente:** `MAPA_AMECO_SDMX` só mapeia, para já, as 6 variáveis
+que `calibrar_com_dados_ameco` efetivamente lê (PIB corrente/constante,
+emprego total, remunerações, FBCF, stock de capital líquido) — as restantes
+~17 variáveis de `CÓDIGOS_AMECO_VARIÁVEIS` (consumo, comércio externo,
+finanças públicas, preços) ainda não têm capítulo/item SDMX confirmado;
+ficam simplesmente ausentes do resultado (preenchidas a 0.0/NaN por
+`construir_dados_ameco`, sem erro) até serem verificadas e acrescentadas ao
+mapa. Corra `verificar_sdmx_ameco()` manualmente (não faz parte dos testes
+automáticos, para não depender de rede em CI) antes de confiar nos dados numa
+análise real.
+
+O antigo caminho TXT/CSV (`ler_ficheiro_ameco_txt`, `processar_csv_ameco`,
+métodos `:local`/`:csv`) mantém-se disponível para quem já tenha um ficheiro
+descarregado manualmente, mas deixou de ser o caminho automático.
+
+Se todas as vias falharem, `obter_dados_ameco(..., método=:auto)` recorre
+silenciosamente a **dados sintéticos** (com aviso). Verifique sempre o campo
+`fonte` do resultado.
 
 ## 4. Calibração AMECO é macro (3 setores) com pesos fixos
 

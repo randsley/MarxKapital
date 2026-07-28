@@ -93,10 +93,10 @@ function ajuda_modelo()
     AMECO (todos os países da UE + comparação)
       listar_países_ameco()                 Países disponíveis
       calibrar_com_ameco_v2("Portugal")     Calibrar via AMECO (:auto)
-      obter_dados_ameco("Alemanha")         Obter séries (auto/download/local/csv/sintético)
+      obter_dados_ameco("Alemanha")         Obter séries (auto/sdmx/local/csv/sintético)
       comparar_países_ameco([...])          Comparação internacional
       analisar_série_temporal_ameco("PT")   Evolução histórica
-      descarregar_ameco_automatico()        Descarregar base TXT completa
+      verificar_sdmx_ameco()                Verificar acesso à API SDMX oficial
 
     ANÁLISE
       curva_salario_lucro(A, l)             Fronteira distributiva w-r

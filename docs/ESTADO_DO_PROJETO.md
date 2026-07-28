@@ -150,14 +150,16 @@ simulação. **Corrigido:** passou a usar `p_base.A` (devolvida por
 `simular_Ndept_customizado`) e `l = [d.v for d in depts]`, refletindo o
 cenário simulado.
 
-### 3.3 Importante: download e parsing AMECO são heurísticos
+### 3.3 Resolvido: download AMECO passou a usar a API SDMX oficial
 
-A AMECO não tem API REST oficial. As URLs testadas podem estar desatualizadas;
-os offsets do parser de largura fixa (país, variável, sub, valores de 15
-caracteres a partir da coluna 21, a começar em 1960) são um palpite razoável,
-por confirmar contra o ficheiro real; os mnemónicos das variáveis seguem a
-convenção habitual, mas devem ser validados. Em caso de falha, o sistema recorre
-silenciosamente a dados sintéticos (verificar sempre o campo `fonte`).
+O antigo ficheiro TXT estático foi descontinuado pela Comissão (URLs
+confirmadas mortas em 2026-07). **Corrigido:** `src/ameco_sdmx.jl` usa a API
+REST SDMX oficial da AMECO (`webgate.ec.europa.eu/ecfin/redisstat`), agora o
+caminho automático por omissão (`obter_dados_ameco`, métodos `:auto`/`:sdmx`).
+Verificado com dados reais de Portugal (PIB, emprego, remunerações, FBCF,
+stock de capital). Falta ainda mapear as ~17 variáveis não-críticas para
+`calibrar_com_dados_ameco` (consumo, comércio externo, finanças públicas,
+preços) — ver `docs/LIMITACOES.md` item 3 para a lista e o estado exato.
 
 ### 3.4 Médio: calibração AMECO só macro, com pesos fixos
 
@@ -231,22 +233,23 @@ coeficientes de trabalho reais dos departamentos (por exemplo `l_i`
 proporcional ao emprego ou a `V_i`), em vez de `ones(N)`. Assim o limite de
 viabilidade reportado passa a corresponder ao cenário simulado.
 
-### 4.3 Robustecer o acesso à AMECO
+### 4.3 Robustecer o acesso à AMECO (parcialmente feito)
 
-- **Descoberta dinâmica do ficheiro.** Em vez de URLs fixas, descarregar a
-  página do portal e extrair por parsing o link atual do ficheiro (ZIP ou TXT).
-  Isto resiste às mudanças semestrais de localização.
-- **Preferir o ZIP oficial** de ficheiros TXT quando disponível, descomprimindo
-  localmente.
-- **Validar o parser** com um valor conhecido: escolher um par país-variável-ano
-  de referência (por exemplo PIB de Portugal num ano recente) e confirmar que o
-  valor extraído bate com o publicado, antes de confiar nos offsets. Parametrizar
-  largura de campo e ano inicial já está feito; falta o teste de round-trip.
-- **Confirmar mnemónicos** contra a lista de variáveis da versão vigente.
+- ~~Descoberta dinâmica do ficheiro / preferir ZIP oficial / validar parser
+  TXT por round-trip~~ — **obsoleto**: o ficheiro TXT foi descontinuado pela
+  Comissão; substituído pela API SDMX oficial (`src/ameco_sdmx.jl`), que
+  devolve dados estruturados diretamente, sem parsing de largura fixa. A
+  verificação "valor conhecido" (PIB de Portugal) foi feita — ver
+  `verificar_sdmx_ameco()` e `docs/LIMITACOES.md` item 3.
+- **Confirmar mnemónicos** — feito para as 6 variáveis críticas (PIB, emprego,
+  remunerações, FBCF, stock de capital); pendente para as restantes ~17.
+- **Mapear capítulo SDMX por variável** — cada grupo de variáveis AMECO vive
+  num dataflow "capítulo" próprio (`AMECO_CHAPTER06-01` = PIB, etc.); falta
+  confirmar o capítulo das variáveis não-críticas em `MAPA_AMECO_SDMX`.
 - **Alternativa via Eurostat.** Para séries setoriais reais, a API SDMX do
   Eurostat (`nama_10_a64` para contas por indústria, tabelas de recursos e
-  empregos para `A`, `nama_10_nfa` para stock de capital) é mais estável do que
-  a AMECO e tem interface programática.
+  empregos para `A`, `nama_10_nfa` para stock de capital) continua relevante
+  e ainda por explorar — não coberta por este trabalho.
 
 ### 4.4 Calibração setorial real
 
@@ -297,8 +300,8 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 3. Acoplar `A` à dinâmica N-dept com mobilidade de capital, validando os
    balanços e a convergência para `r̄`. É a peça que falta para coerência
    teórica.
-4. Robustecer o acesso à AMECO (descoberta dinâmica do ficheiro, teste de
-   round-trip do parser, confirmação de mnemónicos).
+4. ~~Robustecer o acesso à AMECO~~ — feito (API SDMX oficial); falta mapear as
+   ~17 variáveis não-críticas restantes em `MAPA_AMECO_SDMX`.
 5. Ligar dados setoriais reais (Eurostat ou INE) e substituir os pesos fixos e
    os dados sintéticos.
 6. Estimar stock de capital por inventário perpétuo.
@@ -314,9 +317,9 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 - [x] `R_max` do choque calculado com A e l reais
 - [x] `sistema_Ndept_io!` com acoplamento via A e mobilidade de capital (opcional, `acoplado=true`)
 - [ ] Convergência para `r̄` e fecho dos balanços validados (convergência de dispersão validada por teste; fecho de balanços setoriais ainda não)
-- [ ] Download AMECO com descoberta dinâmica do ficheiro
-- [ ] Parser AMECO validado por round-trip com valor conhecido
-- [ ] Mnemónicos AMECO confirmados
+- [x] Download AMECO via API SDMX oficial (substitui o ficheiro TXT descontinuado)
+- [x] API SDMX validada com valor conhecido (`verificar_sdmx_ameco()`)
+- [x] Mnemónicos AMECO confirmados (6 variáveis críticas; ~17 restantes pendentes)
 - [ ] Matriz A a partir de tabelas de recursos e empregos reais
 - [ ] Calibração setorial com contas nacionais por ramo
 - [ ] Stock de capital por inventário perpétuo

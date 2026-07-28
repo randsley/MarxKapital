@@ -1,12 +1,19 @@
 # ============================================================================
-# DOWNLOAD AUTOMÁTICO AMECO E PARSER DO FICHEIRO TXT
+# DOWNLOAD AUTOMÁTICO AMECO (LEGADO) E PARSER DO FICHEIRO TXT
 # ============================================================================
-# AVISO: a AMECO não tem API REST oficial e revê periodicamente a localização
-# e o formato dos ficheiros. As URLs abaixo são tentativas; se falharem, o
-# sistema recorre a dados sintéticos. Ver docs/LIMITACOES.md (item 3).
+# LEGADO: a Comissão Europeia retirou a distribuição do ficheiro TXT estático
+# que este ficheiro descarregava — as URLs abaixo já não devolvem dados reais
+# (confirmado 2026-07: 404 ou redireccionamento para a página HTML do portal).
+# O caminho automático por omissão passou a ser a API SDMX oficial, em
+# `src/ameco_sdmx.jl` (ver `obter_dados_ameco`, métodos `:auto`/`:sdmx`).
+# `ler_ficheiro_ameco_txt`/`processar_csv_ameco` mantêm-se aqui como fluxo
+# manual para quem já tenha um ficheiro TXT/CSV descarregado por outra via.
+# Ver docs/LIMITACOES.md (item 3).
 # ============================================================================
 
-"""URLs candidatas para o ficheiro TXT completo da AMECO (verificar/atualizar)."""
+"""URLs candidatas para o ficheiro TXT completo da AMECO — LEGADO, conhecidas como não
+funcionais desde 2026-07 (a Comissão descontinuou esta distribuição). Mantidas apenas
+como referência histórica/ponto de partida para quem procure um download manual."""
 const URLS_AMECO_TENTAR = [
     "https://ec.europa.eu/economy_finance/db_indicators/ameco/documents/ameco0.txt",
     "https://economy-finance.ec.europa.eu/system/files/2024-05/ameco0.txt",
@@ -176,16 +183,19 @@ end
     obter_dados_ameco(país; anos=1995:2023, método=:auto, diretório="./dados_ameco")
 
 Ponto de entrada unificado. `método`:
-- `:auto`      — usa ficheiro local recente; senão tenta download; senão sintético
-- `:download`  — força download automático
-- `:local`     — exige ficheiro TXT local
-- `:csv`       — processa CSV (requer `ficheiro`)
+- `:auto`      — tenta a API SDMX oficial; senão ficheiro local recente; senão sintético
+- `:sdmx`      — força a obtenção via API SDMX oficial (ver `src/ameco_sdmx.jl`)
+- `:download`  — alias de `:sdmx` (o download automático do TXT está descontinuado — a
+                 Comissão retirou essa distribuição; ver docs/LIMITACOES.md item 3)
+- `:local`     — exige ficheiro TXT local (fluxo legado, para quem já tem um ficheiro)
+- `:csv`       — processa CSV (requer `ficheiro`; fluxo legado)
 - `:sintético` — gera dados sintéticos
 - `:manual`    — mostra instruções e devolve dados sintéticos
 """
 function obter_dados_ameco(país::String; anos = 1995:2023, método = :auto,
                            diretório = "./dados_ameco", ficheiro = nothing)
     código = _resolver_código_país(país)
+    código_sdmx = get(CÓDIGOS_PAÍSES_AMECO_SDMX, país, código)
 
     if método == :sintético
         return gerar_dados_sintéticos_ameco(código, collect(anos))
@@ -196,34 +206,27 @@ function obter_dados_ameco(país::String; anos = 1995:2023, método = :auto,
     elseif método == :csv
         isnothing(ficheiro) && error("Método :csv requer o argumento ficheiro=...")
         return processar_csv_ameco(ficheiro, código, anos)
+    elseif método in (:sdmx, :download)
+        return construir_dados_ameco(código, collect(anos),
+            descarregar_ameco_sdmx(código_sdmx, anos), "AMECO SDMX (oficial)")
     end
 
     local_txt = joinpath(diretório, "ameco_completo.txt")
 
     if método == :local
-        isfile(local_txt) || error("Sem ficheiro local: $local_txt (use método=:download)")
+        isfile(local_txt) || error("Sem ficheiro local: $local_txt (use método=:sdmx)")
         return ler_ficheiro_ameco_txt(local_txt, código)
-    elseif método == :download
-        f = descarregar_ameco_automatico(força_redownload = true, diretório = diretório)
-        return ler_ficheiro_ameco_txt(f, código)
     end
 
-    # :auto
-    if isfile(local_txt)
-        idade = (now() - unix2datetime(mtime(local_txt))) / Day(1)
-        if idade < 90
-            println("📂 Ficheiro local recente ($(round(idade)) dias).")
-            return ler_ficheiro_ameco_txt(local_txt, código)
-        end
-        println("⚠️  Ficheiro local antigo ($(round(idade)) dias); a tentar atualizar...")
-    end
+    # :auto — API SDMX oficial primeiro; depois ficheiro local recente; depois sintético
     try
-        f = descarregar_ameco_automatico(diretório = diretório)
-        return ler_ficheiro_ameco_txt(f, código)
+        return construir_dados_ameco(código, collect(anos),
+            descarregar_ameco_sdmx(código_sdmx, anos), "AMECO SDMX (oficial)")
     catch e
-        @warn "Download falhou: $(sprint(showerror, e))"
+        @warn "API SDMX da AMECO falhou: $(sprint(showerror, e))"
         if isfile(local_txt)
-            println("📂 A usar ficheiro local antigo como recurso.")
+            idade = (now() - unix2datetime(mtime(local_txt))) / Day(1)
+            println("📂 A usar ficheiro local ($(round(idade)) dias) como recurso.")
             return ler_ficheiro_ameco_txt(local_txt, código)
         end
         @warn "A usar dados SINTÉTICOS como último recurso."

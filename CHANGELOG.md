@@ -13,6 +13,15 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   a versão "setores independentes" por omissão. Ver `docs/LIMITACOES.md` item 1.
 - `calcular_taxas_lucro_precos(sol, p)` em `src/analise.jl`, para reproduzir
   fora da EDO as taxas de lucro ponderadas por preços usadas pelo sistema acoplado.
+- `src/ameco_sdmx.jl`: cliente para a API REST SDMX oficial da AMECO
+  (`descarregar_ameco_sdmx`, `obter_dados_ameco(..., método=:sdmx)`),
+  substituindo o download do ficheiro TXT estático — descontinuado pela
+  Comissão Europeia (confirmado 2026-07). Verificado com dados reais de
+  Portugal (PIB, emprego, remunerações, FBCF, stock de capital líquido);
+  `verificar_sdmx_ameco()` faz uma verificação manual de sanidade. Métodos
+  `:auto`/`:download` passam a usar a API SDMX como caminho automático; os
+  fluxos `:local`/`:csv` (ficheiro TXT/CSV já descarregado) mantêm-se
+  disponíveis. Ver `docs/LIMITACOES.md` item 3.
 
 ### Corrigido
 - `calcular_precos_producao` agora rejeita corretamente `r̄ ≥ R_max` (antes só

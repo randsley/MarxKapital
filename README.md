@@ -62,18 +62,21 @@ julia --project=. examples/demo.jl
 
 | método       | comportamento                                                        |
 |--------------|----------------------------------------------------------------------|
-| `:auto`      | ficheiro local recente → download → sintético (fallback com aviso)   |
-| `:download`  | força o download da base TXT completa                                |
-| `:local`     | exige `dados_ameco/ameco_completo.txt` já descarregado               |
-| `:csv`       | processa um CSV exportado (`ficheiro="..."`)                          |
+| `:auto`      | API SDMX oficial → ficheiro local recente → sintético (fallback com aviso) |
+| `:sdmx`      | força a obtenção via API SDMX oficial da AMECO                       |
+| `:download`  | alias de `:sdmx` (o download do antigo TXT foi descontinuado)        |
+| `:local`     | exige `dados_ameco/ameco_completo.txt` já descarregado (fluxo legado) |
+| `:csv`       | processa um CSV exportado (`ficheiro="..."`, fluxo legado)            |
 | `:sintético` | gera séries sintéticas plausíveis                                    |
 | `:manual`    | mostra instruções de download e devolve sintético                    |
 
-O download automático tenta URLs conhecidas da Comissão Europeia; se falharem,
-descarregue manualmente a partir do
-[portal AMECO](https://economy-finance.ec.europa.eu/economic-research-and-databases/economic-databases/ameco-database_en)
-para `dados_ameco/` e use `método = :local`. **As URLs e o formato do parser
-são heurísticos — ver limitação 3.**
+Desde 2026-07 a AMECO expõe uma [API REST SDMX
+oficial](https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1)
+(a mesma plataforma da nova ferramenta de dados do Eurostat) — o ficheiro TXT
+estático que os métodos `:local`/`:csv` ainda suportam foi descontinuado pela
+Comissão. Corra `verificar_sdmx_ameco()` para confirmar o acesso antes de uma
+análise real; ver `docs/LIMITACOES.md` item 3 para o estado exato de cada
+variável.
 
 ## Estrutura do repositório
 
