@@ -1,0 +1,27 @@
+# Julia
+Manifest.toml
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/docs/build/
+.julia/
+
+# Dados descarregados (podem ser grandes; não versionar)
+/dados_ameco/
+data/*.txt
+data/*.csv
+data/*.xlsx
+!data/.gitkeep
+
+# Saídas / gráficos
+*.png
+*.pdf
+*.svg
+/output/
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
