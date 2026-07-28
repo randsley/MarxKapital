@@ -102,13 +102,50 @@ Se todas as vias falharem, `obter_dados_ameco(..., método=:auto)` recorre
 silenciosamente a **dados sintéticos** (com aviso). Verifique sempre o campo
 `fonte` do resultado.
 
-## 4. Calibração AMECO é macro (3 setores) com pesos fixos
+## 4. Calibração AMECO é macro (3 setores), com pesos fixos por omissão (parcialmente corrigido)
 
 `calibrar_com_dados_ameco` só implementa a agregação `:macro`
-(Primário/Secundário/Terciário). A repartição do PIB, do emprego e do stock
-de capital por setor usa **pesos fixos por país** codificados em
-`_dist_setorial_vab`, `_dist_setorial_emprego` e `[0.10, 0.35, 0.55]`. São
-aproximações; países sem perfil específico caem no perfil médio da UE.
+(Primário/Secundário/Terciário). Por omissão (`dados_setoriais=:fixo`), a
+repartição do PIB, do emprego e do stock de capital por setor usa **pesos
+fixos por país** codificados em `_dist_setorial_vab`,
+`_dist_setorial_emprego` e `[0.10, 0.35, 0.55]`. São aproximações; países
+sem perfil específico caem no perfil médio da UE.
+
+**Corrigido (opcional):** `dados_setoriais=:eurostat` usa VAB, remunerações,
+consumo de capital fixo, emprego, FBCF e stock de capital **reais** do
+Eurostat (`src/eurostat_sdmx.jl`, dataflows `NAMA_10_A64`, `NAMA_10_A64_E`,
+`NAMA_10_A64_P5`, `NAMA_10_NFA_ST`), agregados às 3 secções macro. Só cobre
+países da UE/EEE; fora dessa cobertura, ou se o pedido falhar, cai
+silenciosamente (com aviso) para os pesos fixos — nunca lança erro.
+
+**Ainda não corrigido:** a matriz técnica `A` desta via **mantém-se sempre
+aleatória** (`criar_matriz_tecnica`), mesmo com `dados_setoriais=:eurostat`.
+Tentou-se construir `A` a partir do IOT simétrico real do Eurostat
+(`NAIO_10_CP1620`) agregado aos 3 setores macro (mesma técnica usada com
+sucesso no caminho INE de 19 setores — ver item 4-bis abaixo), mas a
+agregação a apenas 3 grupos mistura de forma enganadora as margens de
+comércio/transporte (ver item 4-bis) com os restantes 11 setores de
+serviços: mesmo depois de tratar as margens negativas célula a célula (não
+apenas na matriz final), a linha do Terciário como fornecedor ficou
+implausivelmente pequena (ordens de grandeza abaixo do Secundário), sinal de
+que a maior parte do que a tabela regista sob comércio/transporte é margem,
+não fornecimento direto. Não se encontrou uma forma fiável de separar as
+duas coisas só com este dataflow — ficou documentado como trabalho pendente,
+não usado por não haver confiança suficiente na fidelidade do resultado.
+
+## 4-bis. Matriz técnica A real (Eurostat IOT) — implementada só para 19 setores
+
+`construir_matriz_io_eurostat` (`src/eurostat_sdmx.jl`) constrói `A` a
+partir do IOT simétrico do Eurostat (`NAIO_10_CP1620`), usado por
+`calibrar_modelo_portugal(..., fonte_dados=:eurostat)` (19 setores CAE —
+ver item 5). Verificado com dados reais de Portugal: matriz não-negativa,
+ρ(A)≈0.12-0.15 consoante o ano, estável em 2018/2020/2022. A tabela regista
+margens de comércio/transporte por vezes como fluxos negativos (convenção
+normal de contabilidade nacional, confirmada: 100% das ~300 células
+negativas de PT/2022 estão confinadas às secções de comércio/transporte
+como fornecedoras) — tratadas célula a célula (não na matriz agregada) antes
+de somar, para não apagar fluxos genuínos de outros setores. Ver item 4 para
+a razão por que isto não se generalizou à agregação de 3 setores macro.
 
 ## 5. `agregação` na calibração INE não está totalmente ligada
 
@@ -116,13 +153,23 @@ aproximações; países sem perfil específico caem no perfil médio da UE.
 `:detalhada` (19 setores). Os modos `:média` e `:macro` do INE não estão
 implementados nesta versão.
 
-## 6. Todos os dados por omissão são SINTÉTICOS
+## 6. Todos os dados por omissão são SINTÉTICOS (dados reais agora opcionais)
 
-Tanto o caminho INE como o AMECO usam, por omissão, dados **gerados** com
+Tanto o caminho INE como o AMECO usam, **por omissão**, dados **gerados** com
 padrões plausíveis. Servem para demonstração, testes e desenvolvimento
-metodológico — **não para análise empírica publicável**. Para resultados
-reais é necessário ligar dados oficiais (ficheiro AMECO TXT/CSV real, ou
-Quadros de Recursos e Empregos do INE).
+metodológico — **não para análise empírica publicável** nesse modo.
+
+**Dados reais disponíveis (opt-in):**
+- INE: `calibrar_modelo_portugal(fonte_dados=:eurostat)` — 19 setores CAE,
+  dados reais Eurostat, incluindo matriz técnica `A` real (ver item 4-bis).
+- AMECO: `calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` — 3 setores
+  macro, dados reais Eurostat (exceto `A`, ver item 4).
+
+Continua a ser necessário pedir explicitamente estes modos — o comportamento
+por omissão em ambos os caminhos mantém-se sintético/pesos fixos, por
+compatibilidade com o comportamento histórico e para manter a suite de
+testes totalmente offline (ver `verificar_eurostat_setorial()` para uma
+verificação manual, fora dos testes automáticos).
 
 ## 7. Stock de capital e depreciação são aproximados
 

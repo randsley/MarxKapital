@@ -32,10 +32,11 @@ exemplo_Ndept(10)
 # Valores → preços de produção
 exemplo_transformacao()
 
-# Calibração INE (Portugal, sintético)
+# Calibração INE (Portugal, sintético por omissão; fonte_dados=:eurostat para dados reais)
 params, validação = exemplo_portugal()
+params_real = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat)
 
-# AMECO — qualquer país da base
+# AMECO — qualquer país da base (dados_setoriais=:eurostat para dados setoriais reais, países UE/EEE)
 listar_países_ameco()
 params, dados = calibrar_com_ameco_v2("Alemanha", ano = 2022)   # método = :auto
 
@@ -78,6 +79,30 @@ Comissão. Corra `verificar_sdmx_ameco()` para confirmar o acesso antes de uma
 análise real; ver `docs/LIMITACOES.md` item 3 para o estado exato de cada
 variável.
 
+## Dados setoriais reais (Eurostat)
+
+Ambos os caminhos de calibração usam, por omissão, estrutura sintética ou
+pesos fixos por setor. Dados setoriais reais do Eurostat estão disponíveis
+como opção (`src/eurostat_sdmx.jl`):
+
+```julia
+# INE (19 setores CAE), incluindo matriz técnica A real (IOT do Eurostat)
+params_real = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat)
+
+# AMECO (3 setores macro), matriz A mantém-se aleatória — ver LIMITACOES item 4
+params_real, dados = calibrar_com_ameco_v2("Portugal", ano = 2022, dados_setoriais = :eurostat)
+
+# Verificação manual do acesso ao Eurostat (não corre nos testes automáticos)
+verificar_eurostat_setorial()
+```
+
+Só cobre países da UE/EEE; fora dessa cobertura, ou se o pedido falhar, o
+caminho AMECO cai automaticamente para os pesos fixos (com aviso) — o
+caminho INE (só Portugal) lança erro em vez de degradar silenciosamente, por
+ser um pedido explícito de dados reais. Ver `docs/LIMITACOES.md` itens 4 e
+4-bis para o estado exato, incluindo a razão por que a matriz `A` real não
+se estende ao caminho AMECO de 3 setores.
+
 ## Estrutura do repositório
 
 ```
@@ -89,9 +114,11 @@ marxkapital/
 │   ├── analise.jl          # taxas de lucro, valores-trabalho, preços, transformação
 │   ├── distributiva.jl     # curva w-r e validação de calibração
 │   ├── choques.jl          # choques salariais
-│   ├── calibracao_pt.jl    # calibração INE (Portugal)
+│   ├── calibracao_pt.jl    # calibração INE (Portugal), sintética e real (Eurostat)
 │   ├── ameco.jl            # AMECO: sintético, calibração, comparação, séries
-│   ├── ameco_download.jl   # download automático + parser TXT/CSV
+│   ├── ameco_sdmx.jl       # API SDMX oficial da AMECO
+│   ├── ameco_download.jl   # download automático + parser TXT/CSV (legado)
+│   ├── eurostat_sdmx.jl    # API SDMX do Eurostat: dados setoriais reais + IOT
 │   ├── visualizacao.jl     # gráficos
 │   └── exemplos.jl         # exemplos prontos + ajuda + testar_modelo
 ├── test/runtests.jl

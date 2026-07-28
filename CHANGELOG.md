@@ -22,6 +22,22 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   `:auto`/`:download` passam a usar a API SDMX como caminho automático; os
   fluxos `:local`/`:csv` (ficheiro TXT/CSV já descarregado) mantêm-se
   disponíveis. Ver `docs/LIMITACOES.md` item 3.
+- `src/eurostat_sdmx.jl`: dados setoriais reais via API SDMX do Eurostat
+  (VAB, remunerações, consumo de capital fixo, emprego, FBCF, stock de
+  capital líquido — dataflows `NAMA_10_A64`, `NAMA_10_A64_E`,
+  `NAMA_10_A64_P5`, `NAMA_10_NFA_ST`), e matriz técnica `A` real a partir do
+  IOT simétrico (`NAIO_10_CP1620`). Opt-in em ambos os caminhos de
+  calibração:
+  - `calibrar_modelo_portugal(..., fonte_dados=:eurostat)` — 19 setores CAE,
+    dados reais e matriz `A` real; lança erro se indisponível (sem
+    fallback silencioso).
+  - `calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` — 3 setores
+    macro, dados reais (matriz `A` mantém-se aleatória — ver
+    `docs/LIMITACOES.md` item 4); cai para os pesos fixos com aviso se o
+    país não tiver cobertura Eurostat ou o pedido falhar.
+  - `verificar_eurostat_setorial()` faz uma verificação manual de sanidade.
+  - Comportamento por omissão em ambos os caminhos inalterado (sintético /
+    pesos fixos), suite de testes continua totalmente offline.
 
 ### Corrigido
 - `calcular_precos_producao` agora rejeita corretamente `r̄ ≥ R_max` (antes só

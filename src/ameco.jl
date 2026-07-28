@@ -151,15 +151,40 @@ function _dist_setorial_emprego(código_país)
     código_país == "PT" ? [0.04, 0.24, 0.72] : [0.03, 0.26, 0.71]
 end
 
+"""Grupos de 3 setores macro (Primário/Secundário/Terciário) em secções NACE."""
+const GRUPOS_MACRO_NACE = [["A"], ["B", "C", "D", "E", "F"],
+                           ["G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"]]
+
+"""Soma valores setoriais (secção NACE → valor) por grupo de secções."""
+function _somar_por_grupo(valores::Dict{String, Float64}, grupos::Vector{Vector{String}})
+    [sum(get(valores, s, 0.0) for s in secções) for secções in grupos]
+end
+
 """
-    calibrar_com_dados_ameco(dados::DadosAMECO, ano, agregação)
+    calibrar_com_dados_ameco(dados::DadosAMECO, ano, agregação; dados_setoriais=:fixo)
 
 Calibra o modelo a partir de uma estrutura DadosAMECO já carregada.
 Atualmente só a agregação `:macro` (Primário/Secundário/Terciário) está
 implementada. Se o ano pedido não tiver PIB válido, usa o ano válido mais
 próximo.
+
+`dados_setoriais`:
+- `:fixo` (omissão) — reparte os totais AMECO por pesos fixos
+  (`_dist_setorial_vab`/`_dist_setorial_emprego`), como sempre.
+- `:eurostat` — usa VAB, remunerações, CCF, emprego, FBCF e stock de capital
+  setoriais reais do Eurostat (`src/eurostat_sdmx.jl`), agregados aos 3
+  setores macro. Só cobre países da UE/EEE; sem cobertura, ou se o pedido
+  falhar, cai para `:fixo` com aviso — nunca lança erro por esta via (ao
+  contrário do caminho INE, aqui o pedido não é obrigatoriamente por dados
+  reais explícitos, já que `calibrar_com_ameco_v2` pode ser chamado para
+  qualquer país AMECO, incluindo os fora da cobertura Eurostat). A matriz
+  técnica `A` mantém-se sempre `criar_matriz_tecnica` (aleatória): agregar o
+  IOT real do Eurostat a 3 setores macro mistura de forma enganadora as
+  margens de comércio/transporte com os restantes serviços — ver
+  `docs/LIMITACOES.md` item 4.
 """
-function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symbol)
+function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symbol;
+                                  dados_setoriais::Symbol = :fixo)
     println("\n" * "="^70)
     println("CALIBRAÇÃO COM DADOS AMECO — $(dados.país) | Ano: $ano")
     println("Fonte: $(dados.fonte)")
@@ -181,8 +206,6 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
     setores = ["Primário", "Secundário", "Terciário"]
     códigos = ["PRIM", "SEC", "TER"]
     N = 3
-    dist_VAB = _dist_setorial_vab(dados.código_país)
-    dist_emp = _dist_setorial_emprego(dados.código_país)
 
     PIB_total    = dados.PIB[idx]
     emprego_tot  = dados.emprego[idx]
@@ -194,16 +217,47 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
             "Emprego $(round(emprego_tot/1000, digits=2)) M | " *
             "Stock K $(round(stock_tot/1000, digits=1)) mil M")
 
-    VAB           = PIB_total * dist_VAB
-    emprego       = emprego_tot * dist_emp
-    remunerações  = remun_tot * dist_VAB
-    stock_capital = stock_tot * [0.10, 0.35, 0.55]
-    FBCF_setorial = FBCF_total * dist_VAB
+    VAB = emprego = remunerações = stock_capital = FBCF_setorial = CCF = Float64[]
+    setoriais_reais = false
+
+    if dados_setoriais == :eurostat
+        try
+            vab_s, remun_s, ccf_s = obter_vab_remuneracoes_ccf_eurostat(dados.código_país, ano)
+            emprego_s = obter_emprego_setorial_eurostat(dados.código_país, ano)
+            fbcf_s = obter_fbcf_setorial_eurostat(dados.código_país, ano)
+            stock_s = obter_stock_capital_setorial_eurostat(dados.código_país, ano)
+            secções_completas = [s for s in SECÇÕES_NACE if haskey(vab_s, s) && haskey(remun_s, s) &&
+                                 haskey(ccf_s, s) && haskey(emprego_s, s) && haskey(fbcf_s, s) && haskey(stock_s, s)]
+            length(secções_completas) < 10 &&
+                error("cobertura insuficiente ($(length(secções_completas))/19 secções)")
+
+            VAB           = _somar_por_grupo(vab_s, GRUPOS_MACRO_NACE)
+            remunerações  = _somar_por_grupo(remun_s, GRUPOS_MACRO_NACE)
+            CCF           = _somar_por_grupo(ccf_s, GRUPOS_MACRO_NACE)
+            emprego       = _somar_por_grupo(emprego_s, GRUPOS_MACRO_NACE)
+            FBCF_setorial = _somar_por_grupo(fbcf_s, GRUPOS_MACRO_NACE)
+            stock_capital = _somar_por_grupo(stock_s, GRUPOS_MACRO_NACE)
+            setoriais_reais = true
+            println("  ✓ dados setoriais reais (Eurostat, $(length(secções_completas))/19 secções).")
+        catch e
+            @warn "Dados setoriais Eurostat indisponíveis para $(dados.código_país) ($e); a usar pesos fixos."
+        end
+    end
+
+    if !setoriais_reais
+        dist_VAB = _dist_setorial_vab(dados.código_país)
+        dist_emp = _dist_setorial_emprego(dados.código_país)
+        VAB           = PIB_total * dist_VAB
+        emprego       = emprego_tot * dist_emp
+        remunerações  = remun_tot * dist_VAB
+        stock_capital = stock_tot * [0.10, 0.35, 0.55]
+        FBCF_setorial = FBCF_total * dist_VAB
+        CCF           = stock_capital * 0.10
+    end
 
     V = remunerações
     C = stock_capital
     EBE = VAB .- remunerações
-    CCF = stock_capital * 0.10
     rendimento = EBE .- CCF
 
     e = max.(rendimento ./ remunerações, 0.1)
@@ -221,8 +275,9 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
     σ_v = fill(0.15, N)
     δ = CCF ./ stock_capital
 
+    fonte_setorial = setoriais_reais ? " + Eurostat (setorial real)" : ""
     resultado = ParâmetrosCalibrados(N, setores, códigos, C, V, e, k, r, A, l,
-        σ_c, σ_v, δ, "AMECO — $(dados.fonte)", ano, now(), 0.80)
+        σ_c, σ_v, δ, "AMECO — $(dados.fonte)$fonte_setorial", ano, now(), 0.80)
 
     println("\n✅ CALIBRAÇÃO CONCLUÍDA — e médio $(round(mean(e), digits=2)) | r médio $(round(mean(r)*100, digits=2))%")
     println("="^70 * "\n")
@@ -230,15 +285,17 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
 end
 
 """
-    calibrar_com_ameco_v2(país; ano=2022, método=:auto)
+    calibrar_com_ameco_v2(país; ano=2022, método=:auto, dados_setoriais=:fixo)
 
 Obtém dados AMECO (ver `obter_dados_ameco`) e calibra o modelo.
-`método` ∈ (:auto, :download, :local, :sintético, :manual).
+`método` ∈ (:auto, :sdmx, :download, :local, :csv, :sintético, :manual).
+`dados_setoriais` ∈ (:fixo, :eurostat) — ver `calibrar_com_dados_ameco`.
 """
 function calibrar_com_ameco_v2(país::String; ano = 2022, método = :auto,
-                               agregação_setorial = :macro)
+                               agregação_setorial = :macro, dados_setoriais = :fixo)
     dados = obter_dados_ameco(país, anos = 1995:ano, método = método)
-    return calibrar_com_dados_ameco(dados, ano, agregação_setorial)
+    return calibrar_com_dados_ameco(dados, ano, agregação_setorial;
+                                    dados_setoriais = dados_setoriais)
 end
 
 # ----------------------------------------------------------------------------

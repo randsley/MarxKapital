@@ -3,34 +3,38 @@
 # ============================================================================
 # Gera dados sintéticos com a estrutura setorial (CAE Rev.3) da economia
 # portuguesa e calibra o modelo. Os valores são aproximações para
-# demonstração — NÃO usar em análise oficial.
+# demonstração — NÃO usar em análise oficial. Ver `obter_dados_portugal_eurostat`
+# para o caminho com dados reais (opt-in, `fonte_dados=:eurostat`).
 # ============================================================================
+
+"""19 setores CAE Rev.3 (código, nome), usados tanto no caminho sintético como no real."""
+const SETORES_CAE_PT = [
+    ("A", "Agricultura, produção animal, caça, floresta e pesca"),
+    ("B", "Indústrias extrativas"),
+    ("C", "Indústrias transformadoras"),
+    ("D", "Eletricidade, gás, vapor"),
+    ("E", "Captação, tratamento e distribuição de água"),
+    ("F", "Construção"),
+    ("G", "Comércio por grosso e a retalho"),
+    ("H", "Transportes e armazenagem"),
+    ("I", "Alojamento, restauração"),
+    ("J", "Atividades de informação e comunicação"),
+    ("K", "Atividades financeiras e de seguros"),
+    ("L", "Atividades imobiliárias"),
+    ("M", "Atividades de consultoria, científicas"),
+    ("N", "Atividades administrativas"),
+    ("O", "Administração Pública"),
+    ("P", "Educação"),
+    ("Q", "Saúde humana e apoio social"),
+    ("R", "Atividades artísticas"),
+    ("S", "Outras atividades"),
+]
 
 """Gera dados sintéticos baseados na estrutura setorial portuguesa (19 setores CAE)."""
 function gerar_dados_sintéticos_portugal(ano::Int)
     println("\n🔬 Gerando dados sintéticos para Portugal ($ano)...")
 
-    setores = [
-        ("A", "Agricultura, produção animal, caça, floresta e pesca"),
-        ("B", "Indústrias extrativas"),
-        ("C", "Indústrias transformadoras"),
-        ("D", "Eletricidade, gás, vapor"),
-        ("E", "Captação, tratamento e distribuição de água"),
-        ("F", "Construção"),
-        ("G", "Comércio por grosso e a retalho"),
-        ("H", "Transportes e armazenagem"),
-        ("I", "Alojamento, restauração"),
-        ("J", "Atividades de informação e comunicação"),
-        ("K", "Atividades financeiras e de seguros"),
-        ("L", "Atividades imobiliárias"),
-        ("M", "Atividades de consultoria, científicas"),
-        ("N", "Atividades administrativas"),
-        ("O", "Administração Pública"),
-        ("P", "Educação"),
-        ("Q", "Saúde humana e apoio social"),
-        ("R", "Atividades artísticas"),
-        ("S", "Outras atividades"),
-    ]
+    setores = SETORES_CAE_PT
     N = length(setores)
     códigos = [s[1] for s in setores]
     nomes = [s[2] for s in setores]
@@ -71,6 +75,60 @@ function gerar_dados_sintéticos_portugal(ano::Int)
     metadados = Dict{String, Any}(
         "fonte" => "Dados sintéticos (estrutura baseada em INE)",
         "ano" => ano, "PIB_total" => sum(VAB), "emprego_total" => sum(emprego))
+
+    return DadosINE(ano, df, df, df, df, metadados)
+end
+
+"""
+    obter_dados_portugal_eurostat(ano)
+
+Constrói o mesmo formato de `DadosINE` que `gerar_dados_sintéticos_portugal`,
+mas com dados setoriais reais do Eurostat (`src/eurostat_sdmx.jl`): VAB,
+remunerações e consumo de capital fixo (NAMA_10_A64), emprego
+(NAMA_10_A64_E), FBCF (NAMA_10_A64_P5) e stock de capital líquido
+(NAMA_10_NFA_ST), para as 19 secções NACE. Usa apenas as secções com dados
+completos nas 6 séries; lança erro se restarem poucas (menos de 10 de 19) —
+sinal de falha de rede ou indisponibilidade, não um caso normal a degradar
+silenciosamente.
+"""
+function obter_dados_portugal_eurostat(ano::Int)
+    println("\n🌐 A obter dados setoriais reais (Eurostat) para Portugal ($ano)...")
+
+    vab, remun, ccf = obter_vab_remuneracoes_ccf_eurostat("PT", ano)
+    emprego = obter_emprego_setorial_eurostat("PT", ano)
+    fbcf = obter_fbcf_setorial_eurostat("PT", ano)
+    stock = obter_stock_capital_setorial_eurostat("PT", ano)
+
+    secções_completas = filter(s -> haskey(vab, s) && haskey(remun, s) && haskey(ccf, s) &&
+                                    haskey(emprego, s) && haskey(fbcf, s) && haskey(stock, s),
+                               [s[1] for s in SETORES_CAE_PT])
+    length(secções_completas) < 10 &&
+        error("Dados Eurostat incompletos para Portugal/$ano: só $(length(secções_completas))/19 " *
+              "secções com as 6 séries completas.")
+
+    nomes_por_código = Dict(s[1] => s[2] for s in SETORES_CAE_PT)
+    códigos = secções_completas
+    nomes = [nomes_por_código[c] for c in códigos]
+
+    VAB = [vab[c] for c in códigos]
+    remunerações = [remun[c] for c in códigos]
+    CCF = [ccf[c] for c in códigos]
+    EBE = VAB .- remunerações
+    rendimento_empresarial = EBE .- CCF
+    emprego_v = [emprego[c] for c in códigos]
+    FBCF = [fbcf[c] for c in códigos]
+    stock_capital = [stock[c] for c in códigos]
+
+    df = DataFrame(código_cae = códigos, setor = nomes, VAB = VAB,
+                   remunerações = remunerações, EBE = EBE, CCF = CCF,
+                   rendimento_empresarial = rendimento_empresarial,
+                   emprego = emprego_v, FBCF = FBCF, stock_capital = stock_capital)
+
+    println("  ✓ $(length(códigos))/19 secções com dados reais completos.")
+
+    metadados = Dict{String, Any}(
+        "fonte" => "Eurostat (dados reais)",
+        "ano" => ano, "PIB_total" => sum(VAB), "emprego_total" => sum(emprego_v))
 
     return DadosINE(ano, df, df, df, df, metadados)
 end
@@ -117,25 +175,38 @@ function estimar_parametros_setoriais(df::DataFrame, A::Matrix{Float64})
 end
 
 """
-    calibrar_modelo_portugal(; ano=2022, agregação=:detalhada)
+    calibrar_modelo_portugal(; ano=2022, agregação=:detalhada, fonte_dados=:sintético)
 
-Pipeline de calibração com dados INE sintéticos. `agregação` é aceite por
+Pipeline de calibração com dados INE. `agregação` é aceite por
 compatibilidade mas apenas `:detalhada` (19 setores) está totalmente ligada.
+`fonte_dados`:
+- `:sintético` (omissão) — estrutura sintética, `A` aleatória (comportamento
+  histórico, inalterado).
+- `:eurostat` — dados setoriais reais (`obter_dados_portugal_eurostat`) e
+  matriz técnica `A` real, construída a partir do IOT simétrico do Eurostat
+  (`construir_matriz_io_eurostat`). Requer rede; lança erro se indisponível
+  (sem fallback silencioso — pedido explícito de dados reais).
 """
-function calibrar_modelo_portugal(; ano = 2022, agregação = :detalhada)
+function calibrar_modelo_portugal(; ano = 2022, agregação = :detalhada,
+                                  fonte_dados = :sintético)
     println("\n" * "="^70)
-    println("CALIBRAÇÃO PARA PORTUGAL (INE)  |  Ano: $ano  |  Agregação: $agregação")
+    println("CALIBRAÇÃO PARA PORTUGAL (INE)  |  Ano: $ano  |  Agregação: $agregação  |  Fonte: $fonte_dados")
     println("="^70)
 
-    dados = gerar_dados_sintéticos_portugal(ano)
+    dados = fonte_dados == :eurostat ? obter_dados_portugal_eurostat(ano) :
+                                       gerar_dados_sintéticos_portugal(ano)
     df = processar_qre(dados)
     N = nrow(df)
-    A = criar_matriz_tecnica(N, densidade = 0.4)
+    A = fonte_dados == :eurostat ?
+        construir_matriz_io_eurostat("PT", ano, [[c] for c in df.código_cae],
+                                     Dict(zip(df.código_cae, df.VAB))) :
+        criar_matriz_tecnica(N, densidade = 0.4)
     p = estimar_parametros_setoriais(df, A)
 
+    fonte = fonte_dados == :eurostat ? "INE/Eurostat (dados reais)" : "INE (sintético)"
     resultado = ParâmetrosCalibrados(N, df.setor, df.código_cae,
         p.C, p.V, p.e, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
-        "INE (sintético)", ano, now(), 0.85)
+        fonte, ano, now(), 0.85)
 
     println("\n✅ CALIBRAÇÃO CONCLUÍDA — $N setores | PIB: $(round(sum(df.VAB)/1000, digits=1)) mil M€")
     return resultado

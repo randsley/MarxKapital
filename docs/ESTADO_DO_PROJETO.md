@@ -161,11 +161,17 @@ stock de capital). Falta ainda mapear as ~17 variáveis não-críticas para
 `calibrar_com_dados_ameco` (consumo, comércio externo, finanças públicas,
 preços) — ver `docs/LIMITACOES.md` item 3 para a lista e o estado exato.
 
-### 3.4 Médio: calibração AMECO só macro, com pesos fixos
+### 3.4 Parcialmente resolvido: calibração AMECO só macro, com pesos fixos por omissão
 
 `calibrar_com_dados_ameco` só implementa a agregação `:macro` (Primário,
-Secundário, Terciário), com repartição do VAB, emprego e stock de capital por
-pesos fixos por país. Países sem perfil específico caem num perfil médio da UE.
+Secundário, Terciário). Por omissão, repartição do VAB, emprego e stock de
+capital por pesos fixos por país; países sem perfil específico caem num
+perfil médio da UE. **Corrigido (opcional):** `dados_setoriais=:eurostat`
+usa dados setoriais reais do Eurostat em vez dos pesos fixos, com fallback
+automático para países fora da cobertura UE/EEE. A matriz `A` desta via
+mantém-se aleatória — ver `docs/LIMITACOES.md` item 4 para a razão
+(agregação a 3 setores mistura margens de comércio/transporte de forma
+enganadora com os restantes serviços).
 
 ### 3.5 Médio: agregação INE incompleta
 
@@ -251,15 +257,29 @@ viabilidade reportado passa a corresponder ao cenário simulado.
   empregos para `A`, `nama_10_nfa` para stock de capital) continua relevante
   e ainda por explorar — não coberta por este trabalho.
 
-### 4.4 Calibração setorial real
+### 4.4 Calibração setorial real (feito para 19 setores; parcial para 3 setores macro)
 
-- Substituir os pesos fixos por dados reais de contas nacionais por ramo
-  (VAB, remunerações, EBE, emprego por setor).
-- Construir a matriz `A` a partir das tabelas de recursos e empregos (SUT) do
-  Eurostat ou do INE, em vez de a gerar aleatoriamente.
-- Estimar stock de capital por setor pelo método do inventário perpétuo, com
-  séries de FBCF e taxas de depreciação por tipo de ativo.
-- Implementar de facto as agregações `:média` e `:macro` no caminho INE.
+- ~~Substituir os pesos fixos por dados reais de contas nacionais por
+  ramo~~ — feito, `src/eurostat_sdmx.jl` (VAB, remunerações, CCF, emprego,
+  FBCF, stock de capital via `NAMA_10_A64`/`NAMA_10_A64_E`/`NAMA_10_A64_P5`/
+  `NAMA_10_NFA_ST`), opt-in em ambos os caminhos (`fonte_dados=:eurostat` no
+  INE, `dados_setoriais=:eurostat` no AMECO).
+- ~~Construir a matriz `A` a partir das tabelas do Eurostat~~ — feito para o
+  caminho INE (19 setores, `construir_matriz_io_eurostat` via
+  `NAIO_10_CP1620`). **Não feito** para o caminho AMECO (3 setores macro): a
+  agregação a apenas 3 grupos mistura margens de comércio/transporte com os
+  restantes serviços de forma que não se conseguiu resolver com confiança —
+  ver `docs/LIMITACOES.md` item 4. Pista para uma correção futura: combinar
+  as tabelas de oferta e de utilização (supply/use, não o IOT simétrico já
+  construído) via o pressuposto de tecnologia da indústria, que mantém as
+  margens como linha própria em vez de as renetear no produto — ficou por
+  explorar (a query ao dataflow de utilização do Eurostat para Portugal
+  falhou por razão não investigada).
+- Estimar stock de capital por setor pelo método do inventário perpétuo —
+  ainda não feito; usa-se o stock líquido reportado diretamente pelo
+  Eurostat (`NAMA_10_NFA_ST`), não um inventário perpétuo próprio.
+- Implementar de facto as agregações `:média` e `:macro` no caminho INE —
+  ainda não feito (item independente do trabalho de dados reais).
 
 ### 4.5 Testes e integração contínua
 
@@ -320,7 +340,7 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 - [x] Download AMECO via API SDMX oficial (substitui o ficheiro TXT descontinuado)
 - [x] API SDMX validada com valor conhecido (`verificar_sdmx_ameco()`)
 - [x] Mnemónicos AMECO confirmados (6 variáveis críticas; ~17 restantes pendentes)
-- [ ] Matriz A a partir de tabelas de recursos e empregos reais
-- [ ] Calibração setorial com contas nacionais por ramo
-- [ ] Stock de capital por inventário perpétuo
+- [x] Matriz A a partir de tabelas de recursos e empregos reais (INE/19 setores; não AMECO/3 setores — ver LIMITACOES item 4)
+- [x] Calibração setorial com contas nacionais por ramo (ambos os caminhos, opt-in)
+- [ ] Stock de capital por inventário perpétuo (usa-se o stock líquido reportado pelo Eurostat diretamente)
 - [ ] Agregações `:média` e `:macro` do INE implementadas
