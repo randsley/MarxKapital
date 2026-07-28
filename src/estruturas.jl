@@ -223,33 +223,37 @@ const CÓDIGOS_PAÍSES_AMECO = Dict(
 # ----------------------------------------------------------------------------
 # NOTA: usados apenas pelo parser TXT legado (`ler_ficheiro_ameco_txt`,
 # `src/ameco_download.jl`), hoje sem caminho automático (ver
-# docs/LIMITACOES.md item 3). Vários destes mnemónicos foram entretanto
-# confirmados ERRADOS contra a API SDMX real — não apenas por validar:
-# "receitas_governo"/"despesas_governo" tinham os códigos trocados, e
-# "consumo_privado"/"exportações"/"importações" usam aqui mnemónicos que já
-# não existem na API. Para os mnemónicos corretos e verificados, ver
-# `MAPA_AMECO_SDMX` em `src/ameco_sdmx.jl` (fonte de verdade atual).
+# docs/LIMITACOES.md item 3). Corrigidos contra a API SDMX real onde foi
+# possível verificar (`receitas_governo`/`despesas_governo` estavam
+# trocados; `consumo_privado`/`exportações`/`importações`/
+# `custos_unit_trabalho`/`produtividade_trabalho` usavam mnemónicos que já
+# não existem, ou nunca existiram, na API). `deflator_PIB` e
+# `stock_capital_bruto` continuam por confirmar — não têm equivalente direto
+# na API SDMX (o deflator calcula-se, o stock bruto não é publicado; ver
+# `docs/LIMITACOES.md` item 3) — mantidos como estavam, sem correção
+# fabricada. Para a fonte de verdade atual (API SDMX), ver `MAPA_AMECO_SDMX`
+# em `src/ameco_sdmx.jl`.
 
 const CÓDIGOS_AMECO_VARIÁVEIS = Dict(
     "PIB_corrente" => "UVGD",
     "PIB_constante" => "OVGD",
-    "consumo_privado" => "UNCT",
+    "consumo_privado" => "UCPH",
     "consumo_público" => "UCTG",
     "FBCF" => "UIGT",
-    "exportações" => "UXTG",
-    "importações" => "UMTG",
+    "exportações" => "UXGS",
+    "importações" => "UMGS",
     "emprego_total" => "NETD",
     "emprego_assalariado" => "NWTD",
     "taxa_desemprego" => "ZUTN",
     "população_ativa" => "NLTN",
     "remunerações" => "UWCD",
     "remunerações_por_assalariado" => "HWCDW",
-    "produtividade_trabalho" => "PLCD",
-    "custos_unit_trabalho" => "PLCDU",
+    "produtividade_trabalho" => "ZVGDE",
+    "custos_unit_trabalho" => "PLCD",
     "deflator_PIB" => "PVGD",
     "IPC" => "ZCPIH",
-    "receitas_governo" => "UUTG",
-    "despesas_governo" => "UUTGF",
+    "receitas_governo" => "URTG",
+    "despesas_governo" => "UUTG",
     "saldo_orçamental" => "UBLG",
     "dívida_pública" => "UDGGL",
     "balança_corrente" => "UBCA",
