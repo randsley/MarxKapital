@@ -51,6 +51,31 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test std(r[:, end]) < std(r[:, 1])
     end
 
+    @testset "Simulação N-dept com pressão de realização" begin
+        Random.seed!(5)
+        sol_sem, _, p_sem = simular_Ndept(6, T = 200.0, seed = 5, acoplado = true, μ = 0.5)
+        Random.seed!(5)
+        sol_com, _, p_com = simular_Ndept(6, T = 200.0, seed = 5, acoplado = true, μ = 0.5,
+                                          realização = true)
+        @test all(isfinite.(sol_com[end]))
+        eq = verificar_equilibrio_Ndept(sol_com, p_com)
+        @test 0.0 <= eq.ρ_real <= 1.0
+        # o fator de realização só pode amortecer o reinvestimento (nunca reforçá-lo),
+        # logo a acumulação total não pode exceder a do sistema sem esta pressão
+        @test sum(sol_com[end]) <= sum(sol_sem[end])
+    end
+
+    @testset "Agregação de matriz técnica (Leontief)" begin
+        A = [0.1 0.2 0.3 0.4; 0.5 0.6 0.7 0.8; 0.1 0.1 0.1 0.1; 0.2 0.2 0.2 0.2]
+        secções = ["a", "b", "c", "d"]
+        grupos = [["a", "b"], ["c", "d"]]
+        pesos = Dict("a" => 1.0, "b" => 1.0, "c" => 1.0, "d" => 1.0)
+        A_grossa = agregar_matriz_io(A, secções, grupos, pesos)
+        @test size(A_grossa) == (2, 2)
+        @test A_grossa ≈ [0.7 1.1; 0.3 0.3]
+        @test all(A_grossa .>= 0)
+    end
+
     @testset "Valores e preços" begin
         A = criar_matriz_tecnica(4, seed = 2)
         l = [0.6, 0.5, 0.4, 0.3]

@@ -35,15 +35,34 @@ calculado sobre capital valorizado a preços de produção de Sraffa (que depend
 de A), em vez do `e/(k+1)` nu. `sistema_Ndept!` mantém-se como versão por
 omissão ("setores independentes"), inalterada, por compatibilidade.
 
-O que **ainda não** está feito: a condição de realização/consistência de
-reprodução (a procura de capital constante do setor i ser satisfeita pelo
-output real dos fornecedores) não é imposta na dinâmica — só o efeito de
-mobilidade de capital sobre taxas de lucro díspares. À semelhança do modelo de
-2 departamentos (cujo `verificar_equilibrio_2dept` também só verifica a
-posteriori, sem realimentar `sistema_2dept!`), não existe ainda um mecanismo de
-compensação de oferta/procura setorial dentro da EDO. Validado por teste
-(`test/runtests.jl`, "Simulação N-dept acoplada") que a dispersão das taxas de
-lucro entre setores diminui ao longo do tempo sob mobilidade de capital.
+**Parcialmente corrigido (segundo mecanismo, opcional):** `sistema_Ndept_io!`
+aceita agora `realização=true` (transportado via `p.realização`, kwarg de
+`simular_Ndept`/`simular_Ndept_customizado`), que acresce uma pressão de
+realização: define-se o output bruto por setor `Oᵢ=Cᵢ+Vᵢ+Sᵢ` e a procura
+intermédia implícita em A, `(A·O)ᵢ`; a razão de realização agregada
+`ρ_real = Σ min(Oᵢ,(A·O)ᵢ) / Σ(A·O)ᵢ` (≤ 1) escala o reinvestimento planeado
+(`σ_c,ᵢ·Sᵢ`), travando a acumulação quando a estrutura técnica não consegue
+sustentar os níveis de output correntes. Verificado por teste
+(`test/runtests.jl`, "Simulação N-dept com pressão de realização") e por
+robustez em 20 combinações seed/μ sem falhas do solver.
+
+**Explicitamente fora de alcance (não confundir com o acima):** um
+tratamento exato — níveis de output resolvidos como restrições algébricas a
+cada instante (haveria de facto realização setor a setor, não só uma pressão
+agregada) — exigiria transformar o sistema numa equação
+algébrico-diferencial (DAE), com dependências novas
+(`DifferentialEquations.jl` tem suporte a DAE, ou `NonlinearSolve.jl`). Não
+implementado; a pressão de realização acima é uma aproximação suave que se
+mantém uma EDO comum.
+
+`verificar_equilibrio_Ndept(sol, p)` (`src/analise.jl`) generaliza
+`verificar_equilibrio_2dept` a N setores: devolve o desvio `Oᵢ−(A·O)ᵢ` por
+setor e `ρ_real` num dado instante, a posteriori (não realimenta a
+dinâmica por si só — é o `sistema_Ndept_io!` com `realização=true` que usa a
+mesma lógica dentro da EDO). À semelhança do modelo de 2 departamentos (cujo
+`verificar_equilibrio_2dept` também só verifica a posteriori, sem realimentar
+`sistema_2dept!`), a consistência de reprodução setor a setor continua a não
+ser imposta de forma exata — só a pressão agregada.
 
 ## 2. R_max no choque salarial usa uma matriz auxiliar (corrigido)
 
@@ -83,15 +102,29 @@ remapear. Os códigos de país precisaram de um mapeamento próprio
 (`CÓDIGOS_PAÍSES_AMECO_SDMX`), maioritariamente ISO3 mas com irregularidades
 reais (GRC não EL, GBR não UK, ROM não ROU).
 
-**Trabalho pendente (parcialmente resolvido):** `MAPA_AMECO_SDMX` mapeia
-agora 20 das 25 variáveis de `CÓDIGOS_AMECO_VARIÁVEIS`, verificadas com
-chamadas reais em 2026-07: além das 6 originais (PIB corrente/constante,
-emprego total, remunerações, FBCF, stock de capital líquido), acrescentaram-se
-consumo privado/público, exportações, importações, emprego assalariado, taxa
-de desemprego, população ativa, remunerações por assalariado, produtividade
-do trabalho, IPC, receitas/despesas do governo, saldo orçamental e balança
-corrente. Os valores obtidos para Portugal batem com figuras reais conhecidas
-(défice 2022 ≈ -0.3% do PIB, desemprego 2022 ≈ 6.2%).
+**Resolvido (quase por completo):** `MAPA_AMECO_SDMX` mapeia agora 22 das 25
+variáveis de `CÓDIGOS_AMECO_VARIÁVEIS`, mais 2 séries calculadas a partir de
+séries já mapeadas (deflator do PIB, balança comercial) — 24/25 no total,
+todas verificadas com chamadas reais em 2026-07. Além das 6 originais (PIB
+corrente/constante, emprego total, remunerações, FBCF, stock de capital
+líquido) e das 14 seguintes (consumo privado/público, exportações,
+importações, emprego assalariado, taxa de desemprego, população ativa,
+remunerações por assalariado, produtividade do trabalho, IPC,
+receitas/despesas do governo, saldo orçamental e balança corrente),
+acrescentaram-se: custos unitários de trabalho (capítulo 07-07, item `PLCD`,
+`TRANSFORMATION=3`), dívida pública (capítulo 18-02, item `UDGGL` — confirma-se
+o mnemónico antigo, nunca verificado, estava certo desta vez), deflator do
+PIB (calculado, `PIB_corrente/PIB_constante×100`, não pedido à API) e
+balança comercial (calculada, exportações menos importações de **bens**
+apenas — capítulo 11-01, itens `DXGT`/`DMGT`, `UNIT=99`; distinta de
+`exportações`/`importações`, que cobrem bens e serviços). Os valores obtidos
+para Portugal batem com figuras reais conhecidas (défice 2022 ≈ -0.3% do
+PIB, desemprego 2022 ≈ 6.2%, dívida pública 2022 ≈ 111% do PIB).
+
+**Confirmado indisponível (não "pendente"):** stock de capital bruto. Só o
+capítulo de stock líquido (`AMECO_CHAPTER08-01`) existe nesta API, sem
+equivalente bruto publicado — verificado por wildcard completo dos itens do
+capítulo, não apenas por não ter sido encontrado à primeira tentativa.
 
 **Nota importante:** vários mnemónicos que estavam em `CÓDIGOS_AMECO_VARIÁVEIS`
 (nunca antes verificados) revelaram-se **incorretos** contra a API real —
@@ -103,14 +136,11 @@ códigos corrigidos; `CÓDIGOS_AMECO_VARIÁVEIS` (`estruturas.jl`, usado só pel
 parser TXT legado) não foi alterado — continua a ser heurístico, como sempre
 se avisou.
 
-Ainda por confirmar: custos unitários de trabalho (indexados — a API exige um
-ano de referência específico que não se identificou), deflator do PIB (não
-encontrado como item próprio no capítulo do PIB), dívida pública, balança
-comercial e stock de capital bruto. Ficam simplesmente ausentes do resultado
-(preenchidos a 0.0/NaN por `construir_dados_ameco`, sem erro) até serem
-confirmados. Corra `verificar_sdmx_ameco()` manualmente (não faz parte dos
-testes automáticos, para não depender de rede em CI) antes de confiar nos
-dados numa análise real.
+Só o stock de capital bruto (confirmado indisponível, ver acima) fica
+ausente do resultado (preenchido a 0.0 por `construir_dados_ameco`, sem
+erro). Corra `verificar_sdmx_ameco()` manualmente (não faz parte dos testes
+automáticos, para não depender de rede em CI) antes de confiar nos dados
+numa análise real.
 
 O antigo caminho TXT/CSV (`ler_ficheiro_ameco_txt`, `processar_csv_ameco`,
 métodos `:local`/`:csv`) mantém-se disponível para quem já tenha um ficheiro
@@ -120,7 +150,7 @@ Se todas as vias falharem, `obter_dados_ameco(..., método=:auto)` recorre
 silenciosamente a **dados sintéticos** (com aviso). Verifique sempre o campo
 `fonte` do resultado.
 
-## 4. Calibração AMECO é macro (3 setores), com pesos fixos por omissão (parcialmente corrigido)
+## 4. Calibração AMECO é macro (3 setores), com pesos fixos por omissão (corrigido, com ressalva)
 
 `calibrar_com_dados_ameco` só implementa a agregação `:macro`
 (Primário/Secundário/Terciário). Por omissão (`dados_setoriais=:fixo`), a
@@ -133,43 +163,63 @@ sem perfil específico caem no perfil médio da UE.
 consumo de capital fixo, emprego, FBCF e stock de capital **reais** do
 Eurostat (`src/eurostat_sdmx.jl`, dataflows `NAMA_10_A64`, `NAMA_10_A64_E`,
 `NAMA_10_A64_P5`, `NAMA_10_NFA_ST`), agregados às 3 secções macro. Só cobre
-países da UE/EEE; fora dessa cobertura, ou se o pedido falhar, cai
-silenciosamente (com aviso) para os pesos fixos — nunca lança erro.
+países da UE/EEE; fora dessa cobertura, ou se o pedido (dados ou matriz A)
+falhar, cai silenciosamente (com aviso) para os pesos fixos e A aleatória —
+nunca lança erro.
 
-**Ainda não corrigido:** a matriz técnica `A` desta via **mantém-se sempre
-aleatória** (`criar_matriz_tecnica`), mesmo com `dados_setoriais=:eurostat`.
-Tentou-se construir `A` a partir do IOT simétrico real do Eurostat
-(`NAIO_10_CP1620`) agregado aos 3 setores macro (mesma técnica usada com
-sucesso no caminho INE de 19 setores — ver item 4-bis abaixo), mas a
-agregação a apenas 3 grupos mistura de forma enganadora as margens de
-comércio/transporte (ver item 4-bis) com os restantes 11 setores de
-serviços: mesmo depois de tratar as margens negativas célula a célula (não
-apenas na matriz final), a linha do Terciário como fornecedor ficou
-implausivelmente pequena (ordens de grandeza abaixo do Secundário), sinal de
-que a maior parte do que a tabela regista sob comércio/transporte é margem,
-não fornecimento direto. Não se encontrou uma forma fiável de separar as
-duas coisas só com este dataflow — ficou documentado como trabalho pendente,
-não usado por não haver confiança suficiente na fidelidade do resultado.
+**Matriz A real — corrigido, com ressalva conhecida:** a via direta
+(agregar os fluxos brutos do IOT do Eurostat a apenas 3 grupos) foi tentada
+e rejeitada numa sessão anterior — a agregação a 3 grupos mistura de forma
+enganadora as margens de comércio/transporte (ver item 4-bis) com os
+restantes 11 setores de serviços, deixando a linha do Terciário
+implausivelmente pequena mesmo depois de tratar as margens negativas célula
+a célula. A correção que resultou: em vez de agregar os fluxos brutos,
+constrói-se primeiro a matriz real aos 19 setores finos (já limpa e
+não-negativa — item 4-bis) e agrega-se essa matriz de **coeficientes**
+(não fluxos brutos) aos 3 grupos pela fórmula padrão de agregação de
+Leontief (`agregar_matriz_io`, `src/eurostat_sdmx.jl`):
+`A₃[gi,gj] = Σ A₁₉[i,j]·VAB[j] / Σ VAB[j]` (soma ponderada por VAB dentro do
+grupo `j`). Verificado com dados reais de Portugal 2022: matriz não-negativa,
+ρ(A)≈0.11. **Ressalva honesta:** isto evita reintroduzir o problema das
+margens (já não há valores negativos), mas não o resolve na origem — a
+linha do Terciário na matriz agregada continua a refletir o mesmo
+subdimensionamento herdado da matriz de 19 setores (ver item 4-bis), só que
+já não se manifesta como números inválidos. Uma melhoria real e mais
+trabalhosa exigiria combinar tabelas de oferta e utilização (que mantêm as
+margens como linha própria) em vez do IOT simétrico — não tentado.
 
-## 4-bis. Matriz técnica A real (Eurostat IOT) — implementada só para 19 setores
+## 4-bis. Matriz técnica A real (Eurostat IOT) — 19 setores (INE) e 3 setores macro (AMECO, agregada)
 
 `construir_matriz_io_eurostat` (`src/eurostat_sdmx.jl`) constrói `A` a
 partir do IOT simétrico do Eurostat (`NAIO_10_CP1620`), usado por
 `calibrar_modelo_portugal(..., fonte_dados=:eurostat)` (19 setores CAE —
-ver item 5). Verificado com dados reais de Portugal: matriz não-negativa,
+ver item 5) e, agregada via `agregar_matriz_io`, por
+`calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` (3 setores macro —
+ver item 4). Verificado com dados reais de Portugal: matriz não-negativa,
 ρ(A)≈0.12-0.15 consoante o ano, estável em 2018/2020/2022. A tabela regista
 margens de comércio/transporte por vezes como fluxos negativos (convenção
 normal de contabilidade nacional, confirmada: 100% das ~300 células
 negativas de PT/2022 estão confinadas às secções de comércio/transporte
 como fornecedoras) — tratadas célula a célula (não na matriz agregada) antes
 de somar, para não apagar fluxos genuínos de outros setores. Ver item 4 para
-a razão por que isto não se generalizou à agregação de 3 setores macro.
+como a agregação a 3 setores macro reutiliza esta matriz (já limpa) em vez
+de agregar os fluxos brutos do IOT diretamente.
 
-## 5. `agregação` na calibração INE não está totalmente ligada
+## 5. `agregação` na calibração INE não está totalmente ligada (corrigido)
 
-`calibrar_modelo_portugal` aceita o argumento `agregação` mas só corre em
-`:detalhada` (19 setores). Os modos `:média` e `:macro` do INE não estão
-implementados nesta versão.
+`calibrar_modelo_portugal` aceitava o argumento `agregação` mas só corria em
+`:detalhada` (19 setores); os modos `:média` e `:macro` eram ignorados
+silenciosamente.
+
+**Corrigido:** `:macro` agrega aos mesmos 3 setores usados no caminho AMECO
+(`GRUPOS_MACRO_NACE`); `:média` agrega a 10 setores, o nível padrão NACE
+Rev.2 "A10" (`GRUPOS_MEDIO_NACE`, `src/eurostat_sdmx.jl`) — uma agregação
+reconhecida, não inventada. `agregar_setores` (`src/calibracao_pt.jl`) soma
+as variáveis de fluxo por grupo e agrega `A` pela mesma fórmula de Leontief
+do item 4 — funciona tanto com `fonte_dados=:sintético` (A aleatória) como
+`:eurostat` (A real), sem distinção de código entre os dois casos.
+Verificado: as 6 combinações (`:detalhada`/`:macro`/`:média` ×
+`:sintético`/`:eurostat`) produzem matrizes não-negativas com ρ(A)<1.
 
 ## 6. Todos os dados por omissão são SINTÉTICOS (dados reais agora opcionais)
 
@@ -178,10 +228,11 @@ padrões plausíveis. Servem para demonstração, testes e desenvolvimento
 metodológico — **não para análise empírica publicável** nesse modo.
 
 **Dados reais disponíveis (opt-in):**
-- INE: `calibrar_modelo_portugal(fonte_dados=:eurostat)` — 19 setores CAE,
-  dados reais Eurostat, incluindo matriz técnica `A` real (ver item 4-bis).
+- INE: `calibrar_modelo_portugal(fonte_dados=:eurostat, agregação=:detalhada|:macro|:média)`
+  — 19, 3 ou 10 setores, dados e matriz técnica `A` reais (ver item 4-bis e item 5).
 - AMECO: `calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` — 3 setores
-  macro, dados reais Eurostat (exceto `A`, ver item 4).
+  macro, dados e matriz `A` reais (ver item 4 para a ressalva sobre a linha
+  do Terciário na matriz agregada).
 
 Continua a ser necessário pedir explicitamente estes modos — o comportamento
 por omissão em ambos os caminhos mantém-se sintético/pesos fixos, por
@@ -198,7 +249,7 @@ e taxas de depreciação diferenciadas.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 33 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 39 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`fonte_dados=:eurostat`,

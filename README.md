@@ -89,10 +89,10 @@ pesos fixos por setor. Dados setoriais reais do Eurostat estão disponíveis
 como opção (`src/eurostat_sdmx.jl`):
 
 ```julia
-# INE (19 setores CAE), incluindo matriz técnica A real (IOT do Eurostat)
-params_real = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat)
+# INE — 19 (:detalhada), 10 (:média) ou 3 (:macro) setores, com matriz A real (IOT do Eurostat)
+params_real = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat, agregação = :detalhada)
 
-# AMECO (3 setores macro), matriz A mantém-se aleatória — ver LIMITACOES item 4
+# AMECO (3 setores macro), com matriz A real (agregada a partir da matriz de 19 setores)
 params_real, dados = calibrar_com_ameco_v2("Portugal", ano = 2022, dados_setoriais = :eurostat)
 
 # Verificação manual do acesso ao Eurostat (não corre nos testes automáticos)
@@ -100,11 +100,12 @@ verificar_eurostat_setorial()
 ```
 
 Só cobre países da UE/EEE; fora dessa cobertura, ou se o pedido falhar, o
-caminho AMECO cai automaticamente para os pesos fixos (com aviso) — o
-caminho INE (só Portugal) lança erro em vez de degradar silenciosamente, por
-ser um pedido explícito de dados reais. Ver `docs/LIMITACOES.md` itens 4 e
-4-bis para o estado exato, incluindo a razão por que a matriz `A` real não
-se estende ao caminho AMECO de 3 setores.
+caminho AMECO cai automaticamente para os pesos fixos e matriz `A` aleatória
+(com aviso) — o caminho INE (só Portugal) lança erro em vez de degradar
+silenciosamente, por ser um pedido explícito de dados reais. Ver
+`docs/LIMITACOES.md` itens 4 e 4-bis para o estado exato, incluindo a
+ressalva conhecida sobre a linha do Terciário na matriz agregada a 3
+setores.
 
 ## Estrutura do repositório
 
@@ -150,7 +151,7 @@ raio espectral de `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-33 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
+39 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
 em cada push a `main` — ver `.github/workflows/test.yml`. A suite cobre os
 caminhos sintéticos/opt-in por omissão e corre totalmente offline; os
 caminhos de dados reais (`método=:sdmx`, `fonte_dados=:eurostat`,
@@ -160,13 +161,16 @@ manualmente com `verificar_sdmx_ameco()` e `verificar_eurostat_setorial()`.
 ## Limitações
 
 Leia [`docs/LIMITACOES.md`](docs/LIMITACOES.md). Em resumo: (1) a matriz A só
-realimenta a simulação N-dept opcionalmente (`acoplado=true`); (2) `R_max` do
-choque salarial usa a matriz e os coeficientes reais da simulação; (3) o
-download AMECO usa a API SDMX oficial (20/25 variáveis mapeadas); (4)-(5)
-calibração setorial real (Eurostat) disponível como opção, mas com pesos
-fixos/matriz A aleatória por omissão e para o caminho AMECO de 3 setores
-macro; (6)-(7) dados sintéticos e stock de capital aproximado continuam a ser
-o comportamento por omissão.
+realimenta a simulação N-dept opcionalmente (`acoplado=true`, mais uma
+pressão de realização opcional `realização=true` — sem restrição exata por
+setor, isso exigiria uma DAE); (2) `R_max` do choque salarial usa a matriz e
+os coeficientes reais da simulação; (3) o download AMECO usa a API SDMX
+oficial (24/25 variáveis mapeadas ou calculadas); (4)-(5) calibração
+setorial real (Eurostat), incluindo matriz A real em ambos os caminhos,
+disponível como opção, mas com pesos fixos/matriz A aleatória por omissão
+(a matriz A agregada a 3 setores tem uma ressalva conhecida — linha do
+Terciário conservadora); (6)-(7) dados sintéticos e stock de capital
+aproximado continuam a ser o comportamento por omissão.
 
 ## Licença
 

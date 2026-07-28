@@ -151,10 +151,6 @@ function _dist_setorial_emprego(código_país)
     código_país == "PT" ? [0.04, 0.24, 0.72] : [0.03, 0.26, 0.71]
 end
 
-"""Grupos de 3 setores macro (Primário/Secundário/Terciário) em secções NACE."""
-const GRUPOS_MACRO_NACE = [["A"], ["B", "C", "D", "E", "F"],
-                           ["G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"]]
-
 """Soma valores setoriais (secção NACE → valor) por grupo de secções."""
 function _somar_por_grupo(valores::Dict{String, Float64}, grupos::Vector{Vector{String}})
     [sum(get(valores, s, 0.0) for s in secções) for secções in grupos]
@@ -173,15 +169,18 @@ próximo.
   (`_dist_setorial_vab`/`_dist_setorial_emprego`), como sempre.
 - `:eurostat` — usa VAB, remunerações, CCF, emprego, FBCF e stock de capital
   setoriais reais do Eurostat (`src/eurostat_sdmx.jl`), agregados aos 3
-  setores macro. Só cobre países da UE/EEE; sem cobertura, ou se o pedido
-  falhar, cai para `:fixo` com aviso — nunca lança erro por esta via (ao
-  contrário do caminho INE, aqui o pedido não é obrigatoriamente por dados
-  reais explícitos, já que `calibrar_com_ameco_v2` pode ser chamado para
-  qualquer país AMECO, incluindo os fora da cobertura Eurostat). A matriz
-  técnica `A` mantém-se sempre `criar_matriz_tecnica` (aleatória): agregar o
-  IOT real do Eurostat a 3 setores macro mistura de forma enganadora as
-  margens de comércio/transporte com os restantes serviços — ver
-  `docs/LIMITACOES.md` item 4.
+  setores macro, e uma matriz técnica `A` real: construída aos 19 setores
+  finos (`construir_matriz_io_eurostat`, já não-negativa) e agregada aos 3
+  setores macro pela fórmula de Leontief (`agregar_matriz_io`) — não a
+  partir dos fluxos brutos do IOT diretamente, o que reintroduziria o
+  problema das margens de comércio/transporte (ver `docs/LIMITACOES.md`
+  item 4, agora resolvido desta forma, com a ressalva de que a linha do
+  Terciário fica conservadora). Só cobre países da UE/EEE; sem cobertura,
+  ou se o pedido (dados ou matriz) falhar, cai para `:fixo` com aviso —
+  nunca lança erro por esta via (ao contrário do caminho INE, aqui o pedido
+  não é obrigatoriamente por dados reais explícitos, já que
+  `calibrar_com_ameco_v2` pode ser chamado para qualquer país AMECO,
+  incluindo os fora da cobertura Eurostat).
 """
 function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symbol;
                                   dados_setoriais::Symbol = :fixo)
@@ -218,6 +217,7 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
             "Stock K $(round(stock_tot/1000, digits=1)) mil M")
 
     VAB = emprego = remunerações = stock_capital = FBCF_setorial = CCF = Float64[]
+    A_real = zeros(0, 0)
     setoriais_reais = false
 
     if dados_setoriais == :eurostat
@@ -237,10 +237,20 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
             emprego       = _somar_por_grupo(emprego_s, GRUPOS_MACRO_NACE)
             FBCF_setorial = _somar_por_grupo(fbcf_s, GRUPOS_MACRO_NACE)
             stock_capital = _somar_por_grupo(stock_s, GRUPOS_MACRO_NACE)
+
+            # Matriz A real: constrói-se aos 19 setores finos (limpa, não-negativa —
+            # ver construir_matriz_io_eurostat) e agrega-se aos 3 setores macro pela
+            # fórmula de Leontief (agregar_matriz_io), não a partir dos fluxos brutos
+            # do IOT diretamente — isso reintroduziria o problema das margens de
+            # comércio/transporte (ver docs/LIMITACOES.md item 4).
+            A19 = construir_matriz_io_eurostat(dados.código_país, ano,
+                [[s] for s in SECÇÕES_NACE], vab_s)
+            A_real = agregar_matriz_io(A19, SECÇÕES_NACE, GRUPOS_MACRO_NACE, vab_s)
+
             setoriais_reais = true
-            println("  ✓ dados setoriais reais (Eurostat, $(length(secções_completas))/19 secções).")
+            println("  ✓ dados setoriais reais (Eurostat, $(length(secções_completas))/19 secções), matriz A real.")
         catch e
-            @warn "Dados setoriais Eurostat indisponíveis para $(dados.código_país) ($e); a usar pesos fixos."
+            @warn "Dados setoriais/matriz A Eurostat indisponíveis para $(dados.código_país) ($e); a usar pesos fixos e A aleatória."
         end
     end
 
@@ -269,7 +279,7 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
         println("  $(setores[i]): e=$(round(e[i], digits=2)) k=$(round(k[i], digits=2)) r=$(round(r[i]*100, digits=2))%")
     end
 
-    A = criar_matriz_tecnica(N, densidade = 0.3)
+    A = setoriais_reais ? A_real : criar_matriz_tecnica(N, densidade = 0.3)
     l = emprego ./ VAB; l = l / maximum(l)
     σ_c = clamp.(FBCF_setorial ./ rendimento, 0.2, 0.7)
     σ_v = fill(0.15, N)

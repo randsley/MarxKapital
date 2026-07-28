@@ -57,11 +57,17 @@ dos que estavam (nunca verificados) em `CÓDIGOS_AMECO_VARIÁVEIS`
 (`estruturas.jl`) — por exemplo `receitas_governo`/`despesas_governo`
 tinham os códigos trocados (`UUTG` era a despesa, não a receita), e
 `consumo_privado`/`exportações`/`importações` usavam mnemónicos que já não
-existem na API atual (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`). As
-variáveis ainda por confirmar (custos unitários de trabalho indexados,
-deflator do PIB, dívida pública, balança comercial, stock de capital bruto)
-ficam por preencher aqui; `descarregar_ameco_sdmx` simplesmente não as
-inclui no resultado, sem erro (ver `docs/LIMITACOES.md` item 3).
+existem na API atual (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`).
+
+`deflator_PIB` e `balança_comercial` não têm entrada aqui: são calculadas em
+`descarregar_ameco_sdmx` a partir de séries já mapeadas (`PIB_corrente` /
+`PIB_constante`, e exportações/importações de bens do capítulo 11-01 — este
+último não é o mesmo item que `exportações`/`importações` acima, que cobrem
+bens e serviços; comércio de bens usa `UNIT=99`, não o `UNIT=0` por omissão
+de `_obter_série_sdmx`). `stock_capital_bruto` foi confirmado **indisponível**
+nesta API — só o capítulo de stock líquido (`AMECO_CHAPTER08-01`) existe,
+sem equivalente bruto; não fica pendente, fica documentado como não
+publicado (ver `docs/LIMITACOES.md` item 3).
 
 O fator de escala converte a unidade devolvida pela API (confirmada via a
 coluna COMMENT/UNIT_MULT de cada resposta) para a convenção já usada no resto
@@ -94,23 +100,26 @@ const MAPA_AMECO_SDMX = Dict(
     "despesas_governo"             => ("AMECO_CHAPTER16-02", "UUTG",  1000.0, 1),
     "saldo_orçamental"             => ("AMECO_CHAPTER16-03", "UBLG",  1000.0, 1),
     "balança_corrente"             => ("AMECO_CHAPTER10-01", "UBCA",  1000.0, 1),
+    "custos_unit_trabalho"         => ("AMECO_CHAPTER07-07", "PLCD",  1.0,    3),
+    "dívida_pública"               => ("AMECO_CHAPTER18-02", "UDGGL", 1000.0, 1),
 )
 
 """
 Chama a API SDMX para um (dataflow, item, área) e devolve Dict{Int,Float64}
-ano→valor. A chave SDMX fixa TRANSFORMATION (1 por omissão), UNIT=0 e
-REFERENCE=0 e deixa AGG_METHOD por preencher (`.`): sem isto, a API devolve
-várias séries por ano para o mesmo item (ex.: UVGD sem UNIT fixo devolve
-preços correntes, PPS e ECU/EUR em simultâneo) e o dicionário ano→valor
-ficaria dependente da ordem de chegada das linhas. A maioria dos capítulos
-usa TRANSFORMATION=1; alguns (ex. capítulo 07-07/08-02, custos unitários e
-produtividade) usam TRANSFORMATION=3 — passar explicitamente quando
-necessário (confirmado por tentativa: a API devolve "número de filtros
-incorreto" se o valor errado for wildcardeado em vez de fixo).
+ano→valor. A chave SDMX fixa TRANSFORMATION (1 por omissão), UNIT (0 por
+omissão) e REFERENCE=0 e deixa AGG_METHOD por preencher (`.`): sem isto, a
+API devolve várias séries por ano para o mesmo item (ex.: UVGD sem UNIT fixo
+devolve preços correntes, PPS e ECU/EUR em simultâneo) e o dicionário
+ano→valor ficaria dependente da ordem de chegada das linhas. A maioria dos
+capítulos usa TRANSFORMATION=1 e UNIT=0; alguns precisam de outros valores
+(ex. capítulo 07-07/08-02 usam TRANSFORMATION=3; capítulo 11-01, comércio
+externo, usa UNIT=99) — passar explicitamente quando necessário (confirmado
+por tentativa: a API devolve "número de filtros incorreto"/vazio se o valor
+errado for wildcardeado em vez de fixo).
 """
 function _obter_série_sdmx(dataflow::String, código_área::String, item::String;
-                           transformação::Int = 1)
-    url = "$URL_BASE_SDMX_AMECO/data/ECFIN,$dataflow,1.0/A.$código_área.$transformação..0.0.$item" *
+                           transformação::Int = 1, unidade::Int = 0)
+    url = "$URL_BASE_SDMX_AMECO/data/ECFIN,$dataflow,1.0/A.$código_área.$transformação..$unidade.0.$item" *
           "?format=SDMX-CSV"
     try
         resp = HTTP.get(url, retry = true, readtimeout = 30, status_exception = false)
@@ -134,6 +143,13 @@ para resolver a partir do nome do país), devolvendo um
 (`src/ameco.jl`). Variáveis sem mapeamento, ou cuja chamada falhe, ficam
 simplesmente ausentes do dicionário — `construir_dados_ameco` preenche por
 omissão (0.0 ou NaN), pelo que uma falha parcial nunca lança erro.
+
+Duas séries adicionais são calculadas (não vêm de `MAPA_AMECO_SDMX`):
+`deflator_PIB` = `PIB_corrente/PIB_constante × 100` (a partir de séries já
+obtidas, sem chamada extra); `balança_comercial` = exportações menos
+importações de bens (`AMECO_CHAPTER11-01`, itens `DXGT`/`DMGT`, `UNIT=99` —
+note-se que este é o comércio só de bens, distinto de
+`exportações`/`importações` acima, que cobrem bens e serviços).
 """
 function descarregar_ameco_sdmx(código_área::String, anos)
     println("\n🌐 A obter dados AMECO via API SDMX oficial ($código_área)...")
@@ -147,8 +163,21 @@ function descarregar_ameco_sdmx(código_área::String, anos)
         end
         resultado[nome] = [get(série, a, NaN) * escala for a in anos_vec]
     end
+
+    if haskey(resultado, "PIB_corrente") && haskey(resultado, "PIB_constante")
+        resultado["deflator_PIB"] = resultado["PIB_corrente"] ./ resultado["PIB_constante"] .* 100
+    end
+
+    dxgt = _obter_série_sdmx("AMECO_CHAPTER11-01", código_área, "DXGT"; unidade = 99)
+    dmgt = _obter_série_sdmx("AMECO_CHAPTER11-01", código_área, "DMGT"; unidade = 99)
+    if !isempty(dxgt) && !isempty(dmgt)
+        resultado["balança_comercial"] = [(get(dxgt, a, NaN) - get(dmgt, a, NaN)) * 1000.0 for a in anos_vec]
+    else
+        @warn "Sem dados AMECO SDMX para 'balança_comercial' (AMECO_CHAPTER11-01, $código_área)."
+    end
+
     isempty(resultado) && error("Nenhuma série obtida da API SDMX para '$código_área'.")
-    println("  ✓ $(length(resultado))/$(length(MAPA_AMECO_SDMX)) séries obtidas.")
+    println("  ✓ $(length(resultado))/$(length(MAPA_AMECO_SDMX) + 2) séries obtidas.")
     return resultado
 end
 

@@ -35,6 +35,29 @@ const URL_BASE_EUROSTAT_SDMX = "https://ec.europa.eu/eurostat/api/dissemination/
 const SECÇÕES_NACE = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K",
                       "L", "M", "N", "O", "P", "Q", "R", "S"]
 
+"""Agregação macro (3 setores: Primário/Secundário/Terciário), usada pelo
+caminho AMECO (`src/ameco.jl`) e por `agregação=:macro` no caminho INE
+(`src/calibracao_pt.jl`)."""
+const GRUPOS_MACRO_NACE = [["A"], ["B", "C", "D", "E", "F"],
+                           ["G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S"]]
+
+"""Agregação intermédia — nível padrão NACE Rev.2 "A10" (10 grupos), restrito
+às secções A-S já usadas neste projeto (sem T/U, atividades das famílias e
+extraterritoriais, irrelevantes aqui). Usada por `agregação=:média` no
+caminho INE (`src/calibracao_pt.jl`)."""
+const GRUPOS_MEDIO_NACE = [
+    ["A"],                  # Agricultura, floresta e pesca
+    ["B", "C", "D", "E"],   # Indústria, incl. energia
+    ["F"],                  # Construção
+    ["G", "H", "I"],        # Comércio, transportes, alojamento e restauração
+    ["J"],                  # Informação e comunicação
+    ["K"],                  # Atividades financeiras e de seguros
+    ["L"],                  # Atividades imobiliárias
+    ["M", "N"],             # Atividades profissionais, científicas, administrativas
+    ["O", "P", "Q"],        # Administração pública, educação, saúde
+    ["R", "S"],             # Artísticas, outras atividades de serviços
+]
+
 """
 Chama a API SDMX do Eurostat para `dataflow`/`chave` e devolve
 Dict{String,Dict{Int,Float64}} secção NACE → (ano → valor). Filtra a
@@ -184,6 +207,56 @@ function construir_matriz_io_eurostat(código_país::String, ano::Int,
     ρ_A = maximum(abs.(eigvals(A)))
     ρ_A >= 1.0 && (A = A / ρ_A * 0.8)
     return A
+end
+
+"""
+    agregar_matriz_io(A_fina, secções_finas, grupos, pesos)
+
+Agrega uma matriz técnica N×N (`A_fina`, cujas linhas/colunas correspondem,
+por ordem, a `secções_finas`) num conjunto de G grupos (`grupos`, cada
+elemento uma lista de identificadores de `secções_finas`), pela fórmula
+padrão de agregação de matrizes de Leontief: cada coluna agregada é a média
+das colunas finas do grupo, ponderada pelo peso de cada setor fino
+(tipicamente VAB ou output bruto, em `pesos`), não uma média simples:
+
+    A_grossa[gi,gj] = Σ_{i∈Gi} Σ_{j∈Gj} A_fina[i,j]·pesos[j]  /  Σ_{j∈Gj} pesos[j]
+
+Preserva não-negatividade (soma/média ponderada de valores não-negativos) —
+ao contrário de agregar os fluxos brutos do IOT diretamente (ver nota em
+`construir_matriz_io_eurostat` sobre as margens de comércio/transporte),
+agregar coeficientes já limpos evita reintroduzir esse problema. Não assume
+nada sobre a origem de `A_fina` — funciona tanto para uma matriz real
+(`construir_matriz_io_eurostat`) como para uma matriz aleatória
+(`criar_matriz_tecnica`, `src/nucleo.jl`), útil para agregação setorial
+independente da fonte de dados (`agregar_setores`, `src/calibracao_pt.jl`).
+Setores de `secções_finas` sem grupo correspondente em `grupos` são
+ignorados (permite `grupos` parcial).
+"""
+function agregar_matriz_io(A_fina::Matrix{Float64}, secções_finas::Vector{String},
+                           grupos::Vector{Vector{String}}, pesos::Dict{String, Float64})
+    N = length(secções_finas)
+    G = length(grupos)
+    idx = Dict(s => i for (i, s) in enumerate(secções_finas))
+    grupo_de = Dict{Int, Int}()
+    for (gi, secções) in enumerate(grupos), s in secções
+        haskey(idx, s) && (grupo_de[idx[s]] = gi)
+    end
+    peso_fino = [get(pesos, s, 0.0) for s in secções_finas]
+
+    A_grossa = zeros(G, G)
+    denom = zeros(G)
+    for j in 1:N
+        haskey(grupo_de, j) || continue
+        denom[grupo_de[j]] += peso_fino[j]
+    end
+    for i in 1:N, j in 1:N
+        (haskey(grupo_de, i) && haskey(grupo_de, j)) || continue
+        A_grossa[grupo_de[i], grupo_de[j]] += A_fina[i, j] * peso_fino[j]
+    end
+    for gj in 1:G
+        denom[gj] > 0 && (A_grossa[:, gj] ./= denom[gj])
+    end
+    return A_grossa
 end
 
 """

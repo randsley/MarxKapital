@@ -99,6 +99,39 @@ function verificar_equilibrio_2dept(C1, V1, C2, V2, e1, e2, σ_c1, σ_c2)
             lado_esquerdo = lado_esq, lado_direito = lado_dir)
 end
 
+"""
+    verificar_equilibrio_Ndept(sol, p; t_idx=length(sol.t))
+
+Generalização a N setores de `verificar_equilibrio_2dept`: verifica a
+posteriori (não realimenta a dinâmica — tal como a versão de 2 departamentos
+não realimenta `sistema_2dept!`) se os níveis de output correntes conseguem
+sustentar a procura intermédia implícita na matriz técnica `p.A`.
+
+Para o instante `t_idx` (por omissão, o último), calcula o output bruto por
+setor `Oᵢ = Cᵢ+Vᵢ+Sᵢ` e a procura intermédia `(A·O)ᵢ`; devolve o desvio por
+setor (`Oᵢ − (A·O)ᵢ`, positivo quando o setor produz mais do que a economia
+precisa dele como input, negativo quando produz menos) e a razão de
+realização agregada `ρ_real = Σ min(Oᵢ,(A·O)ᵢ) / Σ(A·O)ᵢ` (≤ 1; = 1 sem
+estrangulamento). Usada por `sistema_Ndept_io!` (`realização=true`,
+`src/nucleo.jl`) como base do fator de amortecimento do reinvestimento —
+aqui exposta para inspecionar o resultado fora da EDO, à semelhança de
+`calcular_taxas_lucro_precos`.
+"""
+function verificar_equilibrio_Ndept(sol, p; t_idx = length(sol.t))
+    N = length(p.e)
+    X = sol.u[t_idx]
+    C = X[1:N]
+    V = X[N+1:2N]
+    S = p.e .* V
+    O = C .+ V .+ S
+    procura_intermédia = p.A * O
+    desvio = O .- procura_intermédia
+    soma_procura = sum(procura_intermédia)
+    ρ_real = soma_procura > 0 ? sum(min.(O, procura_intermédia)) / soma_procura : 1.0
+    return (equilibrio = ρ_real > 0.95, ρ_real = ρ_real, desvio = desvio,
+            output = O, procura_intermédia = procura_intermédia)
+end
+
 # ----------------------------------------------------------------------------
 # Valores-trabalho e preços de produção
 # ----------------------------------------------------------------------------

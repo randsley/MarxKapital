@@ -174,11 +174,59 @@ function estimar_parametros_setoriais(df::DataFrame, A::Matrix{Float64})
     return (C = C, V = V, e = e, k = k, r = r, l = l, σ_c = σ_c, σ_v = σ_v, δ = δ)
 end
 
+"""Nomes em português para os 10 grupos de `GRUPOS_MEDIO_NACE` (mesma ordem)."""
+const NOMES_GRUPOS_MEDIO = [
+    "Agricultura, floresta e pesca", "Indústria (incl. energia)", "Construção",
+    "Comércio, transportes, alojamento e restauração", "Informação e comunicação",
+    "Atividades financeiras e de seguros", "Atividades imobiliárias",
+    "Atividades profissionais, científicas e administrativas",
+    "Administração pública, educação e saúde", "Atividades artísticas e outros serviços",
+]
+const CÓDIGOS_GRUPOS_MEDIO = ["A", "BCDE", "F", "GHI", "J", "K", "L", "MN", "OPQ", "RS"]
+
+"""
+    agregar_setores(df, A, grupos, códigos_grupos, nomes_grupos)
+
+Agrega um DataFrame de setores (colunas `código_cae, setor, VAB,
+remunerações, EBE, CCF, rendimento_empresarial, emprego, FBCF,
+stock_capital` — o formato produzido por `gerar_dados_sintéticos_portugal`/
+`obter_dados_portugal_eurostat`) e a matriz técnica `A` correspondente para
+um número menor de grupos (cada elemento de `grupos` é uma lista de
+`código_cae` de 1 letra a juntar). Devolve `(df_agregado, A_agregada)`.
+
+Funciona tanto com `A` real (`construir_matriz_io_eurostat`) como aleatória
+(`criar_matriz_tecnica`) — reusa `agregar_matriz_io` (`src/eurostat_sdmx.jl`),
+que só assume `A ≥ 0` e pesos (VAB) `≥ 0`, sem depender da origem dos dados.
+"""
+function agregar_setores(df::DataFrame, A::Matrix{Float64}, grupos::Vector{Vector{String}},
+                         códigos_grupos::Vector{String}, nomes_grupos::Vector{String})
+    vab_por_secção = Dict(zip(df.código_cae, df.VAB))
+    A_agregada = agregar_matriz_io(A, df.código_cae, grupos, vab_por_secção)
+
+    soma(col) = [sum(df[in.(df.código_cae, Ref(secções)), col]) for secções in grupos]
+
+    df_agregado = DataFrame(
+        código_cae = códigos_grupos, setor = nomes_grupos,
+        VAB = soma(:VAB), remunerações = soma(:remunerações), EBE = soma(:EBE),
+        CCF = soma(:CCF), rendimento_empresarial = soma(:rendimento_empresarial),
+        emprego = soma(:emprego), FBCF = soma(:FBCF), stock_capital = soma(:stock_capital))
+
+    return df_agregado, A_agregada
+end
+
 """
     calibrar_modelo_portugal(; ano=2022, agregação=:detalhada, fonte_dados=:sintético)
 
-Pipeline de calibração com dados INE. `agregação` é aceite por
-compatibilidade mas apenas `:detalhada` (19 setores) está totalmente ligada.
+Pipeline de calibração com dados INE. `agregação`:
+- `:detalhada` (omissão) — 19 setores CAE, sem agregação.
+- `:macro` — 3 setores (Primário/Secundário/Terciário, `GRUPOS_MACRO_NACE`,
+  `src/eurostat_sdmx.jl`), mesma agregação usada no caminho AMECO.
+- `:média` — 10 setores (nível padrão NACE Rev.2 "A10", `GRUPOS_MEDIO_NACE`).
+
+Em ambos os modos agregados, a matriz técnica `A` é agregada pela fórmula de
+Leontief (`agregar_matriz_io`) — funciona com `A` sintética (aleatória) ou
+real (`fonte_dados=:eurostat`), sem distinção de código entre os dois casos.
+
 `fonte_dados`:
 - `:sintético` (omissão) — estrutura sintética, `A` aleatória (comportamento
   histórico, inalterado).
@@ -195,12 +243,25 @@ function calibrar_modelo_portugal(; ano = 2022, agregação = :detalhada,
 
     dados = fonte_dados == :eurostat ? obter_dados_portugal_eurostat(ano) :
                                        gerar_dados_sintéticos_portugal(ano)
-    df = processar_qre(dados)
+    df19 = processar_qre(dados)
+    N19 = nrow(df19)
+    A19 = fonte_dados == :eurostat ?
+        construir_matriz_io_eurostat("PT", ano, [[c] for c in df19.código_cae],
+                                     Dict(zip(df19.código_cae, df19.VAB))) :
+        criar_matriz_tecnica(N19, densidade = 0.4)
+
+    df, A = if agregação == :detalhada
+        df19, A19
+    elseif agregação == :macro
+        agregar_setores(df19, A19, GRUPOS_MACRO_NACE, ["PRIM", "SEC", "TER"],
+                        ["Primário", "Secundário", "Terciário"])
+    elseif agregação == :média
+        agregar_setores(df19, A19, GRUPOS_MEDIO_NACE, CÓDIGOS_GRUPOS_MEDIO, NOMES_GRUPOS_MEDIO)
+    else
+        error("agregação '$agregação' desconhecida (use :detalhada, :macro ou :média)")
+    end
+    agregação == :detalhada || (df = processar_qre(DadosINE(dados.ano, df, df, df, df, dados.metadados)))
     N = nrow(df)
-    A = fonte_dados == :eurostat ?
-        construir_matriz_io_eurostat("PT", ano, [[c] for c in df.código_cae],
-                                     Dict(zip(df.código_cae, df.VAB))) :
-        criar_matriz_tecnica(N, densidade = 0.4)
     p = estimar_parametros_setoriais(df, A)
 
     fonte = fonte_dados == :eurostat ? "INE/Eurostat (dados reais)" : "INE (sintético)"

@@ -160,6 +160,27 @@ preços falhar (matriz mal condicionada), cai-se para preços = valores-trabalho
 Ver `docs/LIMITACOES.md` (item 1): esta é a versão opcional acoplada,
 selecionável com `acoplado=true` em `simular_Ndept`/`simular_Ndept_customizado`.
 `sistema_Ndept!` mantém-se como a versão "setores independentes".
+
+Se `p.realização == true`, acresce um segundo mecanismo, independente da
+mobilidade de capital: uma pressão de realização que trava o reinvestimento
+quando a estrutura técnica (`A`) não consegue suportar os níveis de output
+correntes. Define-se o output bruto por setor `Oᵢ = Cᵢ+Vᵢ+Sᵢ` e a procura
+intermédia implícita em A, `(A·O)ᵢ`; a razão de realização agregada
+
+    ρ_real = Σᵢ min(Oᵢ, (A·O)ᵢ) / Σᵢ (A·O)ᵢ
+
+mede que fração da procura intermédia agregada os outputs correntes
+conseguem cobrir (≤ 1; = 1 quando não há estrangulamento). O reinvestimento
+planeado (`σ_c,ᵢ·Sᵢ`) é escalado por `min(ρ_real, 1)`, travando a acumulação
+quando a economia, dada a sua estrutura A, não produz o suficiente para
+sustentar o investimento pretendido — sem introduzir variáveis de estado
+novas nem exigir um solver de equações algébrico-diferenciais (DAE): fica
+uma EDO comum, tal como o termo de mobilidade. Não impõe realização exata
+setor a setor (isso exigiria resolver níveis de output como restrições
+algébricas a cada instante); ver `verificar_equilibrio_Ndept`
+(`src/analise.jl`) para uma verificação a posteriori mais detalhada, e
+`docs/LIMITACOES.md` item 1 para a fronteira de alcance explícita desta
+aproximação.
 """
 function sistema_Ndept_io!(dX, X, p, t)
     N = length(p.e)
@@ -182,7 +203,15 @@ function sistema_Ndept_io!(dX, X, p, t)
     r = S ./ (C_valorizado .+ V)
     r̄ = sum(S) / sum(C_valorizado .+ V)
 
-    dX[1:N]    = p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C
+    fator_realização = 1.0
+    if p.realização
+        O = C .+ V .+ S
+        procura_intermédia = p.A * O
+        soma_procura = sum(procura_intermédia)
+        soma_procura > 0 && (fator_realização = min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0))
+    end
+
+    dX[1:N]    = fator_realização .* p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C
     dX[N+1:2N] = p.σ_v .* S
 end
 
@@ -204,27 +233,32 @@ function simular_2dept(; T = 100.0)
 end
 
 """
-    simular_Ndept(N; T=100.0, nomes=String[], seed=nothing, acoplado=false, μ=0.3)
+    simular_Ndept(N; T=100.0, nomes=String[], seed=nothing, acoplado=false, μ=0.3, realização=false)
 
 Simula o modelo de N departamentos com departamentos gerados aleatoriamente.
 Com `acoplado=true`, usa `sistema_Ndept_io!` (mobilidade de capital via A e
 preços de produção); `μ` é o coeficiente de mobilidade nesse caso.
+`realização=true` (só tem efeito com `acoplado=true`) acresce a pressão de
+realização — ver docstring de `sistema_Ndept_io!`.
 """
 function simular_Ndept(N::Int; T = 100.0, nomes::Vector{String} = String[],
-                       seed = nothing, acoplado = false, μ = 0.3)
+                       seed = nothing, acoplado = false, μ = 0.3, realização = false)
     depts = criar_departamentos(N, nomes)
     return simular_Ndept_customizado(depts, T = T, seed = seed,
-                                     acoplado = acoplado, μ = μ)
+                                     acoplado = acoplado, μ = μ, realização = realização)
 end
 
 """
-    simular_Ndept_customizado(depts; T=100.0, seed=nothing, acoplado=false, μ=0.3)
+    simular_Ndept_customizado(depts; T=100.0, seed=nothing, acoplado=false, μ=0.3, realização=false)
 
 Simula o modelo de N departamentos a partir de departamentos pré-configurados.
 Com `acoplado=true`, usa `sistema_Ndept_io!` em vez de `sistema_Ndept!`.
+`realização=true` (só tem efeito com `acoplado=true`) acresce a pressão de
+realização — ver docstring de `sistema_Ndept_io!`.
 """
 function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
-                                   seed = nothing, acoplado = false, μ = 0.3)
+                                   seed = nothing, acoplado = false, μ = 0.3,
+                                   realização = false)
     N = length(depts)
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
     A = criar_matriz_tecnica(N, seed = seed)
@@ -232,15 +266,16 @@ function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
     if acoplado
         l = [d.v for d in depts]
         p = (
-            e     = [d.e for d in depts],
-            σ_c   = [d.σ_c for d in depts],
-            σ_v   = [d.σ_v for d in depts],
-            δ     = [d.δ for d in depts],
-            A     = A,
-            l     = l,
-            R_max = calcular_taxa_lucro_maxima(A, l),
-            μ     = μ,
-            w     = 1.0,
+            e         = [d.e for d in depts],
+            σ_c       = [d.σ_c for d in depts],
+            σ_v       = [d.σ_v for d in depts],
+            δ         = [d.δ for d in depts],
+            A         = A,
+            l         = l,
+            R_max     = calcular_taxa_lucro_maxima(A, l),
+            μ         = μ,
+            w         = 1.0,
+            realização = realização,
         )
         prob = ODEProblem(sistema_Ndept_io!, X0, (0.0, T), p)
     else

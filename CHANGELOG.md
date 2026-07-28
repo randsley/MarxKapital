@@ -32,18 +32,49 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
     dados reais e matriz `A` real; lança erro se indisponível (sem
     fallback silencioso).
   - `calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` — 3 setores
-    macro, dados reais (matriz `A` mantém-se aleatória — ver
-    `docs/LIMITACOES.md` item 4); cai para os pesos fixos com aviso se o
-    país não tiver cobertura Eurostat ou o pedido falhar.
+    macro, dados reais e matriz `A` real (ver entrada seguinte); cai para
+    os pesos fixos e A aleatória com aviso se o país não tiver cobertura
+    Eurostat ou o pedido falhar.
   - `verificar_eurostat_setorial()` faz uma verificação manual de sanidade.
   - Comportamento por omissão em ambos os caminhos inalterado (sintético /
     pesos fixos), suite de testes continua totalmente offline.
-- `MAPA_AMECO_SDMX` (`src/ameco_sdmx.jl`) alargado de 6 para 20 das 25
+- `MAPA_AMECO_SDMX` (`src/ameco_sdmx.jl`) alargado de 6 para 22 das 25
   variáveis de `CÓDIGOS_AMECO_VARIÁVEIS` (consumo privado/público,
   exportações, importações, emprego assalariado, taxa de desemprego,
   população ativa, remunerações por assalariado, produtividade do
   trabalho, IPC, receitas/despesas do governo, saldo orçamental, balança
-  corrente), todas verificadas com chamadas reais contra Portugal.
+  corrente, custos unitários de trabalho, dívida pública), mais 2 séries
+  calculadas a partir de séries já mapeadas (deflator do PIB, balança
+  comercial de bens) — 24/25 no total. Stock de capital bruto confirmado
+  indisponível nesta API (não fica "pendente"). Todas verificadas com
+  chamadas reais contra Portugal (défice, desemprego e dívida pública 2022
+  batem com valores conhecidos).
+- `agregar_matriz_io` (`src/eurostat_sdmx.jl`): agregação de matrizes
+  técnicas pela fórmula padrão de Leontief (colunas ponderadas pelo VAB/
+  output dos setores finos), reutilizável com matrizes reais ou aleatórias.
+  Usada para (a) construir a matriz `A` real do caminho AMECO de 3 setores
+  a partir da matriz real de 19 setores já limpa — a via direta (agregar os
+  fluxos brutos do IOT) tinha sido tentada e rejeitada numa sessão anterior
+  por misturar margens de comércio/transporte com serviços genuínos; e (b)
+  as novas agregações `:macro`/`:média` do caminho INE (ver entrada
+  seguinte). Testada offline com um exemplo sintético verificado à mão.
+- `calibrar_modelo_portugal` ganha agregação real para `agregação=:macro`
+  (3 setores, mesmos grupos do caminho AMECO) e `:média` (10 setores, nível
+  padrão NACE Rev.2 "A10") via `agregar_setores`
+  (`src/calibracao_pt.jl`) — antes, ambos os valores eram aceites mas
+  silenciosamente ignorados, correndo sempre `:detalhada`. Funciona com
+  dados sintéticos ou reais (Eurostat), sem distinção de código.
+- `sistema_Ndept_io!` ganha um segundo mecanismo opcional, independente da
+  mobilidade de capital: `realização=true` acresce uma pressão de
+  realização agregada (`ρ_real = Σmin(Oᵢ,(A·O)ᵢ)/Σ(A·O)ᵢ`, output bruto vs.
+  procura intermédia implícita em A) que amortece o reinvestimento quando a
+  estrutura técnica não sustenta os outputs correntes — sem introduzir
+  variáveis de estado novas nem exigir um solver de equações
+  algébrico-diferenciais (DAE, explicitamente fora de alcance). Robustez
+  verificada em 20 combinações seed/μ sem falhas do solver.
+- `verificar_equilibrio_Ndept(sol, p)` (`src/analise.jl`): generalização a N
+  setores de `verificar_equilibrio_2dept`, verificação a posteriori (desvio
+  `Oᵢ−(A·O)ᵢ` por setor e `ρ_real` agregado).
 
 ### Corrigido
 - `MAPA_AMECO_SDMX`: vários mnemónicos herdados de `CÓDIGOS_AMECO_VARIÁVEIS`
@@ -51,8 +82,8 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   e `despesas_governo` tinham os códigos trocados, e `consumo_privado`/
   `exportações`/`importações` usavam mnemónicos já retirados da API
   (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`). `_obter_série_sdmx` passa a
-  aceitar `transformação` (nem todos os capítulos AMECO usam
-  TRANSFORMATION=1).
+  aceitar `transformação` e `unidade` (nem todos os capítulos AMECO usam
+  TRANSFORMATION=1/UNIT=0).
 - `calcular_precos_producao` agora rejeita corretamente `r̄ ≥ R_max` (antes só
   detetava matriz literalmente singular, permitindo preços negativos silenciosos
   acima de R_max apesar do que a docstring prometia).
