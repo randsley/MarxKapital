@@ -2,7 +2,7 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
-## [Não lançado]
+## [0.4.0] — 2026-07-28
 
 ### Adicionado
 - CI headless via GitHub Actions (`.github/workflows/test.yml`), Julia 1.10 e 1.

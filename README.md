@@ -6,7 +6,7 @@ problema da transformação valores→preços, fronteira distributiva salário-l
 e calibração empírica com dados nacionais (INE) e europeus (**AMECO**, todos os
 países da base).
 
-> Estado: pós-**v0.3.0** (por lançar) — funcional para demonstração e
+> Estado: **v0.4.0** — funcional para demonstração e
 > desenvolvimento metodológico, com testes automáticos em CI
 > ([![Testes](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml)).
 > Dados setoriais e da AMECO **reais** estão disponíveis como opção (via

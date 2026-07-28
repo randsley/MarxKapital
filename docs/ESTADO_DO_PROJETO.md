@@ -1,9 +1,9 @@
 # MarxKapital — Estado do Projeto
 
-Documento de acompanhamento, iniciado na versão **0.3.0** e atualizado desde
-então com o trabalho subsequente (ainda não lançado como nova versão em
-`Project.toml`). Descreve o que está feito, o que falta resolver e
-recomendações concretas de implementação. Destina-se a ficar em
+Documento de acompanhamento, iniciado na versão 0.3.0 e atualizado desde
+então; o trabalho descrito nas secções seguintes corresponde à versão
+**0.4.0**. Descreve o que está feito, o que falta resolver e recomendações
+concretas de implementação. Destina-se a ficar em
 `docs/ESTADO_DO_PROJETO.md`, ao lado de `docs/LIMITACOES.md`.
 
 Data: julho de 2026. Autor do projeto: Nigel Randsley.
