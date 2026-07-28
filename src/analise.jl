@@ -107,8 +107,8 @@ function calcular_precos_producao(A, l, w, r_barra)
     Id = matriz_identidade(N)
     fator = 1 + r_barra
     matriz = Id - fator * A'
-    if abs(det(matriz)) < 1e-10
-        R_max = calcular_taxa_lucro_maxima(A, l)
+    R_max = calcular_taxa_lucro_maxima(A, l)
+    if r_barra >= R_max || abs(det(matriz)) < 1e-10
         error("Sistema singular para r̄=$r_barra. Taxa máxima R_max=$(round(R_max, digits=3))")
     end
     p = w * fator * (matriz \ l)
