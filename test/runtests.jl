@@ -65,6 +65,32 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test sum(sol_com[end]) <= sum(sol_sem[end])
     end
 
+    @testset "Racionamento de mercado (ponto fixo)" begin
+        # exemplo com solução fechada verificada à mão: setor 2 depende de um único
+        # fornecedor (setor 1), que está fortemente limitado em oferta (O₁=2 vs
+        # procura potencial de 5) — a condição de ponto fixo reduz-se a
+        # ρ₁ = O₁/(A[1,2]·ρ₁·D₂) ⟹ ρ₁² = O₁/(A[1,2]·D₂) = 2/2.5 = 0.8 ⟹ ρ₁=√0.8
+        A = [0.0 0.5; 0.0 0.0]
+        σ_c = [0.5, 0.5]
+        S = [10.0, 10.0]
+        O = [2.0, 100.0]
+        κ = _resolver_racionamento(A, σ_c, S, O)
+        @test κ[1] ≈ 1.0                    # setor 1 não depende de ninguém
+        @test κ[2] ≈ sqrt(0.8) atol = 1e-6   # setor 2 racionado pelo fornecedor escasso
+        @test all(0.0 .<= κ .<= 1.0)
+    end
+
+    @testset "Simulação N-dept com racionamento" begin
+        Random.seed!(5)
+        sol_sem, _, p_sem = simular_Ndept(6, T = 200.0, seed = 5, acoplado = true, μ = 0.5)
+        Random.seed!(5)
+        sol_com, _, p_com = simular_Ndept(6, T = 200.0, seed = 5, acoplado = true, μ = 0.5,
+                                          racionamento = true)
+        @test all(isfinite.(sol_com[end]))
+        # κ ≤ 1 sempre, logo a acumulação total não pode exceder a do sistema sem racionamento
+        @test sum(sol_com[end]) <= sum(sol_sem[end])
+    end
+
     @testset "Agregação de matriz técnica (Leontief)" begin
         A = [0.1 0.2 0.3 0.4; 0.5 0.6 0.7 0.8; 0.1 0.1 0.1 0.1; 0.2 0.2 0.2 0.2]
         secções = ["a", "b", "c", "d"]
@@ -74,6 +100,18 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test size(A_grossa) == (2, 2)
         @test A_grossa ≈ [0.7 1.1; 0.3 0.3]
         @test all(A_grossa .>= 0)
+    end
+
+    @testset "Stock de capital por inventário perpétuo" begin
+        # FBCF constante=10, δ=0.2, K₀=100 ⟹ K₁=0.8·100+10=90, K₂=0.8·90+10=82
+        fbcf = Dict(2000 => 10.0, 2001 => 10.0, 2002 => 10.0)
+        K = calcular_stock_capital_pim(fbcf, 0.2, 2000, 100.0, [2000, 2001, 2002])
+        @test K[2000] ≈ 100.0
+        @test K[2001] ≈ 90.0
+        @test K[2002] ≈ 82.0
+        # ano sem FBCF disponível trunca a série em vez de extrapolar
+        K2 = calcular_stock_capital_pim(Dict(2000 => 10.0), 0.2, 2000, 100.0, [2000, 2001])
+        @test !haskey(K2, 2001)
     end
 
     @testset "Valores e preços" begin

@@ -120,6 +120,48 @@ function obter_stock_capital_setorial_eurostat(código_país::String, ano::Int)
     _valores_setoriais_eurostat("NAMA_10_NFA_ST", "A.CRC_MEUR..N11N.$código_país", ano)
 end
 
+"""Série completa (todos os anos disponíveis) de FBCF por secção — usada pelo inventário perpétuo (`calcular_stock_capital_pim`)."""
+function obter_série_fbcf_setorial_eurostat(código_país::String)
+    _obter_secções_eurostat("NAMA_10_A64_P5", "A.CP_MEUR..N11G.P51G.$código_país")
+end
+
+"""Série completa (todos os anos disponíveis) de stock de capital líquido por secção — usada como referência (benchmark) pelo inventário perpétuo."""
+function obter_série_stock_capital_setorial_eurostat(código_país::String)
+    _obter_secções_eurostat("NAMA_10_NFA_ST", "A.CRC_MEUR..N11N.$código_país")
+end
+
+"""Série completa (todos os anos disponíveis) de CCF por secção — usada para estimar δ no inventário perpétuo."""
+function obter_série_ccf_setorial_eurostat(código_país::String)
+    _obter_secções_eurostat("NAMA_10_A64", "A.CP_MEUR..P51C.$código_país")
+end
+
+"""
+    calcular_stock_capital_pim(fbcf_série, δ, benchmark_ano, benchmark_valor, anos)
+
+Constrói uma série de stock de capital pelo método do inventário perpétuo
+(PIM — Perpetual Inventory Method): `Kₜ = (1-δ)·Kₜ₋₁ + FBCFₜ`, a partir de
+um ano de referência (`benchmark_ano`, `benchmark_valor` — tipicamente o
+stock líquido reportado pelo Eurostat no ano mais antigo disponível) e uma
+série de FBCF (`fbcf_série`, `Dict{Int,Float64}` ano→valor). `δ` é uma taxa
+de depreciação única (não diferenciada por tipo de ativo — essa seria uma
+extensão de maior fidelidade, ver `docs/LIMITACOES.md` item 7), tipicamente
+estimada como `CCF/stock` no ano de referência, não um valor fixo ~10%.
+
+Devolve `Dict{Int,Float64}` ano→stock, só para os anos em que a recursão
+consegue avançar sem interrupção (para se faltar FBCF nalgum ano
+intermédio — a série fica truncada nesse ponto, não extrapolada).
+"""
+function calcular_stock_capital_pim(fbcf_série::Dict{Int, Float64}, δ::Float64,
+                                    benchmark_ano::Int, benchmark_valor::Float64,
+                                    anos::Vector{Int})
+    K = Dict{Int, Float64}(benchmark_ano => benchmark_valor)
+    for a in (benchmark_ano + 1):maximum(anos)
+        (haskey(fbcf_série, a) && haskey(K, a - 1)) || continue
+        K[a] = (1 - δ) * K[a - 1] + fbcf_série[a]
+    end
+    return K
+end
+
 """Secção NACE (1 letra) correspondente a um código A64 do IOT (ex. "A01"→"A", "CPA_C10-12"→"C")."""
 function _secção_do_código_a64(código::String)
     s = startswith(código, "CPA_") ? código[5:end] : código
@@ -290,6 +332,20 @@ function verificar_eurostat_setorial()
         ok &= plausível
     catch e
         println("✗ Matriz A real: falhou ($e)")
+        ok = false
+    end
+
+    try
+        stock_reportado = obter_stock_capital_setorial_eurostat("PT", ano)
+        secções_pim = [s for s in SECÇÕES_NACE if haskey(stock_reportado, s)][1:min(3, end)]
+        stock_pim = _stock_capital_pim_por_secção("PT", ano, secções_pim, stock_reportado)
+        desvios = [abs(stock_pim[s] - stock_reportado[s]) / stock_reportado[s] for s in secções_pim]
+        plausível = maximum(desvios) < 0.5   # mesma ordem de grandeza, não igual (metodologias diferentes)
+        println(plausível ? "✓" : "✗", " Stock por inventário perpétuo vs. reportado (",
+                join(secções_pim, ","), "): desvio máx. $(round(maximum(desvios)*100, digits=1))%")
+        ok &= plausível
+    catch e
+        println("✗ Stock por inventário perpétuo: falhou ($e)")
         ok = false
     end
 

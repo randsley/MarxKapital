@@ -171,16 +171,21 @@ intermédia implícita em A, `(A·O)ᵢ`; a razão de realização agregada
 
 mede que fração da procura intermédia agregada os outputs correntes
 conseguem cobrir (≤ 1; = 1 quando não há estrangulamento). O reinvestimento
-planeado (`σ_c,ᵢ·Sᵢ`) é escalado por `min(ρ_real, 1)`, travando a acumulação
-quando a economia, dada a sua estrutura A, não produz o suficiente para
-sustentar o investimento pretendido — sem introduzir variáveis de estado
-novas nem exigir um solver de equações algébrico-diferenciais (DAE): fica
-uma EDO comum, tal como o termo de mobilidade. Não impõe realização exata
-setor a setor (isso exigiria resolver níveis de output como restrições
-algébricas a cada instante); ver `verificar_equilibrio_Ndept`
-(`src/analise.jl`) para uma verificação a posteriori mais detalhada, e
-`docs/LIMITACOES.md` item 1 para a fronteira de alcance explícita desta
-aproximação.
+planeado (`σ_c,ᵢ·Sᵢ`) é escalado por `min(ρ_real, 1)` — uma aproximação
+agregada, a mesma escala para todos os setores.
+
+Se `p.racionamento == true` (tem precedência sobre `p.realização`), usa-se
+em vez disso um racionamento **por setor**, via `_resolver_racionamento`:
+ver a sua docstring para o mecanismo (racionamento de quantidades à
+Bénassy/Barro-Grossman, com tecnologia Leontief). Ambos os mecanismos ficam
+uma EDO comum — não introduzem variáveis de estado novas nem exigem um
+solver de equações algébrico-diferenciais (DAE): o racionamento é resolvido
+por iteração de ponto fixo dentro do próprio cálculo do lado direito, tal
+como os preços de Sraffa já o são. Nenhum dos dois impõe realização exata
+por via de restrições algébricas geridas pelo solver; ver
+`verificar_equilibrio_Ndept` (`src/analise.jl`) para uma verificação a
+posteriori mais detalhada, e `docs/LIMITACOES.md` item 1 para a fronteira de
+alcance explícita desta aproximação.
 """
 function sistema_Ndept_io!(dX, X, p, t)
     N = length(p.e)
@@ -203,16 +208,69 @@ function sistema_Ndept_io!(dX, X, p, t)
     r = S ./ (C_valorizado .+ V)
     r̄ = sum(S) / sum(C_valorizado .+ V)
 
-    fator_realização = 1.0
-    if p.realização
+    κ = ones(N)
+    if p.racionamento
+        O = C .+ V .+ S
+        κ = _resolver_racionamento(p.A, p.σ_c, S, O)
+    elseif p.realização
         O = C .+ V .+ S
         procura_intermédia = p.A * O
         soma_procura = sum(procura_intermédia)
-        soma_procura > 0 && (fator_realização = min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0))
+        soma_procura > 0 && (κ .= min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0))
     end
 
-    dX[1:N]    = fator_realização .* p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C
+    dX[1:N]    = κ .* p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C
     dX[N+1:2N] = p.σ_v .* S
+end
+
+"""
+    _resolver_racionamento(A, σ_c, S, O; max_iter=100, tol=1e-8)
+
+Resolve o racionamento de mercado (regra do lado curto, tecnologia Leontief)
+para os bens de investimento, dado o estado corrente. Para cada setor
+comprador `j`, o reinvestimento planeado `σ_c,ⱼ·Sⱼ` exige inputs de
+fornecedores na proporção `A[:,j]` — não há substituição entre inputs, logo
+o reinvestimento realizado fica limitado pelo input mais escasso (lei do
+mínimo). Isto torna o problema simultâneo: o racionamento sofrido por um
+setor reduz a sua procura efetiva de TODOS os seus inputs, o que por sua vez
+afeta o racionamento sofrido pelos seus fornecedores. Resolve-se por
+iteração de ponto fixo (`ρ`= fator de racionamento por setor fornecedor,
+`κ` = fração realizada do reinvestimento planeado por setor comprador):
+
+    κⱼ = min_{i: A[i,j]>0} ρᵢ                    (limitado pelo input mais escasso)
+    Dᵢ = Σⱼ A[i,j]·κⱼ·σ_c,ⱼ·Sⱼ                     (procura efetiva, já consistente com o racionamento)
+    ρᵢ = min(1, Oᵢ / Dᵢ)                          (regra do lado curto)
+
+Se não convergir em `max_iter` iterações, cai-se para `κ = ones(N)` (sem
+racionamento, equivalente a desligar este mecanismo) com um aviso — a
+mesma filosofia de degradação graciosa usada no resto do código (fallback
+de preços de Sraffa na mesma função, fallbacks de rede AMECO/Eurostat).
+"""
+function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8, relaxação = 0.5)
+    N = length(S)
+    D_planeado = σ_c .* S
+    fornecedores(j) = A[:, j] .> 0
+    ρ = ones(N)
+    convergiu = false
+    for _ in 1:max_iter
+        κ = [minimum(ρ[fornecedores(j)]; init = 1.0) for j in 1:N]
+        D_real = A * (κ .* D_planeado)
+        ρ_alvo = min.(1.0, O ./ max.(D_real, 1e-12))
+        # sub-relaxação: sem isto, a iteração pode oscilar entre dois estados em vez de
+        # convergir (o mapa min(1,O/D) não é uma contração pura) — verificado num exemplo
+        # de 2 setores em que a versão sem relaxação oscilava indefinidamente entre
+        # ρ=[0.8,1] e ρ=[1,1].
+        ρ_novo = (1 - relaxação) .* ρ .+ relaxação .* ρ_alvo
+        if maximum(abs.(ρ_novo .- ρ)) < tol
+            ρ = ρ_novo
+            convergiu = true
+            break
+        end
+        ρ = ρ_novo
+    end
+    convergiu || @warn "Racionamento não convergiu em $max_iter iterações; a usar κ=1 (sem racionamento)."
+    convergiu || return ones(N)
+    return [minimum(ρ[fornecedores(j)]; init = 1.0) for j in 1:N]
 end
 
 # ----------------------------------------------------------------------------
@@ -233,32 +291,37 @@ function simular_2dept(; T = 100.0)
 end
 
 """
-    simular_Ndept(N; T=100.0, nomes=String[], seed=nothing, acoplado=false, μ=0.3, realização=false)
+    simular_Ndept(N; T=100.0, nomes=String[], seed=nothing, acoplado=false, μ=0.3, realização=false, racionamento=false)
 
 Simula o modelo de N departamentos com departamentos gerados aleatoriamente.
 Com `acoplado=true`, usa `sistema_Ndept_io!` (mobilidade de capital via A e
 preços de produção); `μ` é o coeficiente de mobilidade nesse caso.
 `realização=true` (só tem efeito com `acoplado=true`) acresce a pressão de
-realização — ver docstring de `sistema_Ndept_io!`.
+realização agregada; `racionamento=true` (tem precedência sobre
+`realização`) usa racionamento por setor — ver docstring de
+`sistema_Ndept_io!`.
 """
 function simular_Ndept(N::Int; T = 100.0, nomes::Vector{String} = String[],
-                       seed = nothing, acoplado = false, μ = 0.3, realização = false)
+                       seed = nothing, acoplado = false, μ = 0.3,
+                       realização = false, racionamento = false)
     depts = criar_departamentos(N, nomes)
-    return simular_Ndept_customizado(depts, T = T, seed = seed,
-                                     acoplado = acoplado, μ = μ, realização = realização)
+    return simular_Ndept_customizado(depts, T = T, seed = seed, acoplado = acoplado, μ = μ,
+                                     realização = realização, racionamento = racionamento)
 end
 
 """
-    simular_Ndept_customizado(depts; T=100.0, seed=nothing, acoplado=false, μ=0.3, realização=false)
+    simular_Ndept_customizado(depts; T=100.0, seed=nothing, acoplado=false, μ=0.3, realização=false, racionamento=false)
 
 Simula o modelo de N departamentos a partir de departamentos pré-configurados.
 Com `acoplado=true`, usa `sistema_Ndept_io!` em vez de `sistema_Ndept!`.
 `realização=true` (só tem efeito com `acoplado=true`) acresce a pressão de
-realização — ver docstring de `sistema_Ndept_io!`.
+realização agregada; `racionamento=true` (tem precedência sobre
+`realização`) usa racionamento por setor — ver docstring de
+`sistema_Ndept_io!`.
 """
 function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
                                    seed = nothing, acoplado = false, μ = 0.3,
-                                   realização = false)
+                                   realização = false, racionamento = false)
     N = length(depts)
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
     A = criar_matriz_tecnica(N, seed = seed)
@@ -266,16 +329,17 @@ function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
     if acoplado
         l = [d.v for d in depts]
         p = (
-            e         = [d.e for d in depts],
-            σ_c       = [d.σ_c for d in depts],
-            σ_v       = [d.σ_v for d in depts],
-            δ         = [d.δ for d in depts],
-            A         = A,
-            l         = l,
-            R_max     = calcular_taxa_lucro_maxima(A, l),
-            μ         = μ,
-            w         = 1.0,
-            realização = realização,
+            e           = [d.e for d in depts],
+            σ_c         = [d.σ_c for d in depts],
+            σ_v         = [d.σ_v for d in depts],
+            δ           = [d.δ for d in depts],
+            A           = A,
+            l           = l,
+            R_max       = calcular_taxa_lucro_maxima(A, l),
+            μ           = μ,
+            w           = 1.0,
+            realização  = realização,
+            racionamento = racionamento,
         )
         prob = ODEProblem(sistema_Ndept_io!, X0, (0.0, T), p)
     else

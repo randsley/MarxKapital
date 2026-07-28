@@ -80,7 +80,41 @@ function gerar_dados_sintéticos_portugal(ano::Int)
 end
 
 """
-    obter_dados_portugal_eurostat(ano)
+Recalcula o stock de capital por secção pelo método do inventário perpétuo
+(`calcular_stock_capital_pim`, `src/eurostat_sdmx.jl`), em vez de usar
+diretamente o valor reportado pelo Eurostat para `ano`. Faz fallback por
+secção (não globalmente) para o valor reportado, se a secção não tiver
+histórico de FBCF suficiente para a recursão chegar a `ano`, ou se `δ`
+estimado não for válido — nunca falha por completo, tal como o resto dos
+caminhos de dados reais deste ficheiro.
+"""
+function _stock_capital_pim_por_secção(código_área::String, ano::Int, códigos::Vector{String},
+                                       stock_reportado::Dict{String, Float64})
+    fbcf_série = obter_série_fbcf_setorial_eurostat(código_área)
+    stock_série = obter_série_stock_capital_setorial_eurostat(código_área)
+    ccf_série = obter_série_ccf_setorial_eurostat(código_área)
+
+    resultado = Dict{String, Float64}()
+    for c in códigos
+        (haskey(fbcf_série, c) && haskey(stock_série, c) && haskey(ccf_série, c)) || continue
+        anos_possíveis = [k for k in keys(stock_série[c]) if haskey(fbcf_série[c], k)]
+        isempty(anos_possíveis) && continue
+        benchmark_ano = minimum(anos_possíveis)
+        benchmark_valor = stock_série[c][benchmark_ano]
+        δ = get(ccf_série[c], benchmark_ano, 0.0) / benchmark_valor
+        (isfinite(δ) && δ > 0) || continue
+        K = calcular_stock_capital_pim(fbcf_série[c], δ, benchmark_ano, benchmark_valor,
+                                       collect(benchmark_ano:ano))
+        haskey(K, ano) && (resultado[c] = K[ano])
+    end
+    for c in códigos
+        haskey(resultado, c) || (resultado[c] = stock_reportado[c])
+    end
+    return resultado
+end
+
+"""
+    obter_dados_portugal_eurostat(ano; inventário_perpétuo=false)
 
 Constrói o mesmo formato de `DadosINE` que `gerar_dados_sintéticos_portugal`,
 mas com dados setoriais reais do Eurostat (`src/eurostat_sdmx.jl`): VAB,
@@ -90,8 +124,12 @@ remunerações e consumo de capital fixo (NAMA_10_A64), emprego
 completos nas 6 séries; lança erro se restarem poucas (menos de 10 de 19) —
 sinal de falha de rede ou indisponibilidade, não um caso normal a degradar
 silenciosamente.
+
+`inventário_perpétuo=true` substitui o stock líquido reportado diretamente
+pelo Eurostat por uma série própria calculada pelo método do inventário
+perpétuo (`_stock_capital_pim_por_secção`) — ver `docs/LIMITACOES.md` item 7.
 """
-function obter_dados_portugal_eurostat(ano::Int)
+function obter_dados_portugal_eurostat(ano::Int; inventário_perpétuo::Bool = false)
     println("\n🌐 A obter dados setoriais reais (Eurostat) para Portugal ($ano)...")
 
     vab, remun, ccf = obter_vab_remuneracoes_ccf_eurostat("PT", ano)
@@ -109,6 +147,11 @@ function obter_dados_portugal_eurostat(ano::Int)
     nomes_por_código = Dict(s[1] => s[2] for s in SETORES_CAE_PT)
     códigos = secções_completas
     nomes = [nomes_por_código[c] for c in códigos]
+
+    if inventário_perpétuo
+        stock = _stock_capital_pim_por_secção("PT", ano, códigos, stock)
+        println("  ✓ stock de capital recalculado por inventário perpétuo.")
+    end
 
     VAB = [vab[c] for c in códigos]
     remunerações = [remun[c] for c in códigos]
@@ -234,15 +277,20 @@ real (`fonte_dados=:eurostat`), sem distinção de código entre os dois casos.
   matriz técnica `A` real, construída a partir do IOT simétrico do Eurostat
   (`construir_matriz_io_eurostat`). Requer rede; lança erro se indisponível
   (sem fallback silencioso — pedido explícito de dados reais).
+  `inventário_perpétuo=true` (só tem efeito com `fonte_dados=:eurostat`)
+  substitui o stock líquido reportado pelo Eurostat por uma série própria
+  calculada pelo método do inventário perpétuo — ver
+  `obter_dados_portugal_eurostat` e `docs/LIMITACOES.md` item 7.
 """
 function calibrar_modelo_portugal(; ano = 2022, agregação = :detalhada,
-                                  fonte_dados = :sintético)
+                                  fonte_dados = :sintético, inventário_perpétuo = false)
     println("\n" * "="^70)
     println("CALIBRAÇÃO PARA PORTUGAL (INE)  |  Ano: $ano  |  Agregação: $agregação  |  Fonte: $fonte_dados")
     println("="^70)
 
-    dados = fonte_dados == :eurostat ? obter_dados_portugal_eurostat(ano) :
-                                       gerar_dados_sintéticos_portugal(ano)
+    dados = fonte_dados == :eurostat ?
+        obter_dados_portugal_eurostat(ano; inventário_perpétuo = inventário_perpétuo) :
+        gerar_dados_sintéticos_portugal(ano)
     df19 = processar_qre(dados)
     N19 = nrow(df19)
     A19 = fonte_dados == :eurostat ?

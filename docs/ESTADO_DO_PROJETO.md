@@ -126,7 +126,7 @@ empacotamento, a verificação era só estática (delimitadores equilibrados,
 nenhuma função chamada sem definição, contagem de argumentos nos
 construtores posicionais). Desde então, a suite de testes corre por
 compilação real — localmente e em CI (GitHub Actions, Julia 1.10 e 1, em
-cada push a `main`, ver `.github/workflows/test.yml`) — 39 testes, todos a
+cada push a `main`, ver `.github/workflows/test.yml`) — 48 testes, todos a
 passar. Os caminhos de dados reais (rede) são verificados manualmente com
 `verificar_sdmx_ameco()`/`verificar_eurostat_setorial()`, fora da suite
 automática por design (ver `docs/LIMITACOES.md`).
@@ -137,24 +137,31 @@ automática por design (ver `docs/LIMITACOES.md`).
 
 Ordenado por prioridade. O detalhe completo está em `docs/LIMITACOES.md`.
 
-### 3.1 Parcialmente resolvido: a matriz A não realimenta a dinâmica de N departamentos
+### 3.1 Resolvido: a matriz A não realimenta a dinâmica de N departamentos
 
 Em `sistema_Ndept!`, a acumulação de cada setor depende apenas da sua própria
 mais-valia; a matriz `A` é transportada nos parâmetros mas não entra nas
 equações. Os setores comportam-se como independentes, o que contradiz a lógica
 da reprodução ampliada (o output de um setor é o capital constante de outro).
 
-**Corrigido (opcional):** `sistema_Ndept_io!` (`acoplado=true`) acopla A à
-dinâmica via um termo de mobilidade de capital `μ·(rᵢ − r̄)·Cᵢ`, com `rᵢ`
-valorizado a preços de produção de Sraffa. `sistema_Ndept!` mantém-se como
-omissão. **Corrigido em parte (segundo mecanismo, `realização=true`):** uma
-pressão de realização agregada (`ρ_real = Σmin(Oᵢ,(A·O)ᵢ)/Σ(A·O)ᵢ`) trava o
-reinvestimento quando a estrutura técnica não sustenta os outputs
-correntes; `verificar_equilibrio_Ndept` generaliza a verificação a
-posteriori do modelo de 2 departamentos. Um tratamento exato (restrições
-algébricas por setor a cada instante, exigindo transformar o sistema numa
-DAE) continua fora de alcance — ver `docs/LIMITACOES.md` item 1 para a
-fronteira explícita.
+**Corrigido, com três mecanismos opcionais em `sistema_Ndept_io!`
+(`acoplado=true`), independentes entre si:**
+1. Mobilidade de capital: `μ·(rᵢ − r̄)·Cᵢ`, com `rᵢ` valorizado a preços de
+   produção de Sraffa.
+2. Pressão de realização agregada (`realização=true`):
+   `ρ_real = Σmin(Oᵢ,(A·O)ᵢ)/Σ(A·O)ᵢ` trava o reinvestimento quando a
+   estrutura técnica não sustenta os outputs correntes.
+3. Racionamento de quantidades exato por setor (`racionamento=true`, tem
+   precedência sobre `realização`): resolve o racionamento à
+   Bénassy/Barro-Grossman por iteração de ponto fixo — cada setor limitado
+   pelo input mais escasso (tecnologia Leontief), sem precisar de expor o
+   sistema como DAE nem de uma nova dependência de solver. Verificado com um
+   exemplo de solução fechada e por robustez em 20+ combinações seed/μ.
+
+`sistema_Ndept!` mantém-se como omissão (setores independentes).
+`verificar_equilibrio_Ndept` generaliza a verificação a posteriori do
+modelo de 2 departamentos — ver `docs/LIMITACOES.md` item 1 para os detalhes
+de cada mecanismo.
 
 ### 3.2 Resolvido: `R_max` no choque salarial era ilustrativo
 
@@ -210,7 +217,7 @@ demonstração e testes, não para análise empírica.
 
 ### 3.8 Resolvido: testes agora executados em CI
 
-A suite `test/runtests.jl` (39 testes) corre localmente e em CI (GitHub
+A suite `test/runtests.jl` (48 testes) corre localmente e em CI (GitHub
 Actions, Julia 1.10 e 1, `.github/workflows/test.yml`) em cada push a
 `main`. Cobre os caminhos sintéticos/opt-in por omissão; os caminhos de
 dados reais (rede) ficam de fora por design — ver §3.3/§4.3.
@@ -252,9 +259,10 @@ selecionável por argumento. Validar exigindo que, no limite estacionário, as
 taxas de lucro convirjam para `r̄` e que os balanços setoriais fechem.
 
 **Passo 2 (mobilidade) — feito**, exatamente como recomendado acima.
-**Passo 1 (consistência de reprodução) — feito em parte**, como pressão
-agregada opcional (`realização=true`) em vez de restrição exata por setor
-(essa exigiria uma DAE, fora de alcance) — ver `docs/LIMITACOES.md` item 1.
+**Passo 1 (consistência de reprodução) — feito**, com dois mecanismos: uma
+pressão agregada (`realização=true`) e um racionamento de quantidades exato
+por setor (`racionamento=true`, resolvido por ponto fixo, sem precisar de
+DAE) — ver `docs/LIMITACOES.md` item 1.
 
 ### 4.2 Corrigir `R_max` no choque
 
@@ -300,16 +308,19 @@ viabilidade reportado passa a corresponder ao cenário simulado.
   mesmo subdimensionamento da matriz de 19 setores, só que sem produzir
   valores inválidos). Combinar tabelas de oferta e utilização em vez do IOT
   simétrico continua por explorar como melhoria futura mais trabalhosa.
-- Estimar stock de capital por setor pelo método do inventário perpétuo —
-  ainda não feito; usa-se o stock líquido reportado diretamente pelo
-  Eurostat (`NAMA_10_NFA_ST`), não um inventário perpétuo próprio.
+- ~~Estimar stock de capital por setor pelo método do inventário
+  perpétuo~~ — feito (opcional, `inventário_perpétuo=true`;
+  `calcular_stock_capital_pim`, `src/eurostat_sdmx.jl`). Usa uma taxa de
+  depreciação única por setor (estimada, não fixa) — um PIM diferenciado por
+  tipo de ativo exigiria perfis de depreciação que o Eurostat não publica
+  diretamente, ficou por fazer (ver `docs/LIMITACOES.md` item 7).
 - ~~Implementar de facto as agregações `:média` e `:macro` no caminho
   INE~~ — feito, `agregar_setores` (`src/calibracao_pt.jl`).
 
 ### 4.5 Testes e integração contínua — feito
 
 - ~~Correr localmente~~ — feito, `julia install_deps.jl` seguido de
-  `julia --project=. test/runtests.jl`, 39 testes a passar.
+  `julia --project=. test/runtests.jl`, 48 testes a passar.
 - ~~Execução sem ecrã~~ — feito, via `GKSwstype=100` (variável de ambiente,
   não argumento por função) antes de carregar `Plots`; usado tanto localmente
   como em CI.
@@ -346,16 +357,18 @@ Sequência proposta, do mais estruturante ao mais exploratório:
    Adicionar CI headless.~~ — feito.
 2. ~~Corrigir o `R_max` do choque~~ — feito.
 3. ~~Acoplar `A` à dinâmica N-dept com mobilidade de capital~~ — feito
-   (opcional, `acoplado=true`), mais uma pressão de realização opcional
-   (`realização=true`); convergência de dispersão e amortecimento validados
-   por teste, restrição exata por setor (DAE) fora de alcance.
+   (opcional, `acoplado=true`), mais pressão de realização agregada
+   (`realização=true`) e racionamento de quantidades exato por setor
+   (`racionamento=true`, ponto fixo, sem DAE); convergência de dispersão e
+   amortecimento validados por teste.
 4. ~~Robustecer o acesso à AMECO~~ — feito (API SDMX oficial, 24/25
    variáveis mapeadas ou calculadas; 1 confirmada indisponível).
 5. ~~Ligar dados setoriais reais (Eurostat)~~ — feito, opt-in, com matriz
    `A` real em ambos os caminhos (INE 19/10/3 setores; AMECO 3 setores,
    ver §4.4 para a ressalva). Comportamento por omissão continua
    sintético/pesos fixos.
-6. Estimar stock de capital por inventário perpétuo — ainda por fazer.
+6. ~~Estimar stock de capital por inventário perpétuo~~ — feito, opcional
+   (`inventário_perpétuo=true`).
 7. Extensões de médio prazo (financeirização, ecologia, troca desigual, agentes
    heterogéneos) — ainda por fazer.
 
@@ -367,12 +380,12 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 - [x] CI headless configurada
 - [x] `R_max` do choque calculado com A e l reais
 - [x] `sistema_Ndept_io!` com acoplamento via A e mobilidade de capital (opcional, `acoplado=true`)
-- [x] Pressão de realização opcional (`realização=true`) e `verificar_equilibrio_Ndept` (verificação a posteriori)
-- [ ] Consistência de reprodução exata por setor (restrição algébrica/DAE) — fora de alcance, só a pressão agregada acima
+- [x] Pressão de realização agregada opcional (`realização=true`) e `verificar_equilibrio_Ndept` (verificação a posteriori)
+- [x] Racionamento de quantidades exato por setor (`racionamento=true`, ponto fixo, sem DAE nem `NonlinearSolve.jl`)
 - [x] Download AMECO via API SDMX oficial (substitui o ficheiro TXT descontinuado)
 - [x] API SDMX validada com valor conhecido (`verificar_sdmx_ameco()`)
 - [x] Mnemónicos AMECO confirmados (24/25 variáveis; 1 confirmada indisponível)
 - [x] Matriz A a partir de tabelas de recursos e empregos reais (INE 19/10/3 setores; AMECO 3 setores, agregada — ver LIMITACOES item 4)
 - [x] Calibração setorial com contas nacionais por ramo (ambos os caminhos, opt-in)
-- [ ] Stock de capital por inventário perpétuo (usa-se o stock líquido reportado pelo Eurostat diretamente)
+- [x] Stock de capital por inventário perpétuo (opcional, `inventário_perpétuo=true`; taxa de depreciação única por setor, não diferenciada por tipo de ativo)
 - [x] Agregações `:média` e `:macro` do INE implementadas

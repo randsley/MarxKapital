@@ -46,23 +46,46 @@ sustentar os níveis de output correntes. Verificado por teste
 (`test/runtests.jl`, "Simulação N-dept com pressão de realização") e por
 robustez em 20 combinações seed/μ sem falhas do solver.
 
-**Explicitamente fora de alcance (não confundir com o acima):** um
-tratamento exato — níveis de output resolvidos como restrições algébricas a
-cada instante (haveria de facto realização setor a setor, não só uma pressão
-agregada) — exigiria transformar o sistema numa equação
-algébrico-diferencial (DAE), com dependências novas
-(`DifferentialEquations.jl` tem suporte a DAE, ou `NonlinearSolve.jl`). Não
-implementado; a pressão de realização acima é uma aproximação suave que se
-mantém uma EDO comum.
+**Corrigido (terceiro mecanismo, exato por setor, opcional):**
+`sistema_Ndept_io!` aceita agora `racionamento=true` (tem precedência sobre
+`realização`), que resolve **racionamento de quantidades por setor** — não
+apenas uma pressão agregada. O reinvestimento planeado de cada setor `j`
+(`σ_c,ⱼ·Sⱼ`) exige inputs dos fornecedores na proporção `A[:,j]` (tecnologia
+Leontief, sem substituição entre inputs), pelo que o reinvestimento
+realizado fica limitado pelo input mais escasso — e o racionamento sofrido
+por um setor reduz a sua procura efetiva de TODOS os seus inputs, afetando
+por sua vez o racionamento dos seus fornecedores. Resolve-se por iteração de
+ponto fixo (`_resolver_racionamento`, `src/nucleo.jl`):
+
+```
+κⱼ = min_{i: A[i,j]>0} ρᵢ          (limitado pelo input mais escasso)
+Dᵢ = Σⱼ A[i,j]·κⱼ·σ_c,ⱼ·Sⱼ           (procura efetiva, já consistente com o racionamento)
+ρᵢ = min(1, Oᵢ / Dᵢ)               (regra do lado curto)
+```
+
+Mecanismo de racionamento de quantidades à Bénassy/Barro-Grossman
+(disequilibrium macro), não uma restrição algébrica gerida por um solver
+DAE: resolve-se por iteração de ponto fixo dentro do próprio cálculo do
+lado direito da EDO (com sub-relaxação, necessária — a versão sem
+relaxação oscila indefinidamente em vez de convergir, confirmado num
+exemplo de 2 setores), tal como os preços de Sraffa já são resolvidos
+por um sistema linear direto na mesma função. Sem convergência em 200
+iterações, cai-se para `κ=1` (sem racionamento) com aviso — a mesma
+degradação graciosa usada no resto do código. **Não foi necessária** a
+dependência `NonlinearSolve.jl` nem transformar o sistema numa DAE
+formal (mass-matrix/`DAEProblem`) — o ponto fixo já dá uma resposta
+exata (dentro da tolerância numérica) ao problema de racionamento tal
+como formulado, sem precisar de expor `(ρ,κ)` como estado gerido pelo
+solver. Verificado com um exemplo de solução fechada (`test/runtests.jl`,
+"Racionamento de mercado (ponto fixo)": `ρ₁=√0.8`, verificado à mão) e por
+robustez em 20 combinações seed/μ (N=8) e em N=19, sem falhas de
+convergência nem do solver da EDO.
 
 `verificar_equilibrio_Ndept(sol, p)` (`src/analise.jl`) generaliza
 `verificar_equilibrio_2dept` a N setores: devolve o desvio `Oᵢ−(A·O)ᵢ` por
-setor e `ρ_real` num dado instante, a posteriori (não realimenta a
-dinâmica por si só — é o `sistema_Ndept_io!` com `realização=true` que usa a
-mesma lógica dentro da EDO). À semelhança do modelo de 2 departamentos (cujo
-`verificar_equilibrio_2dept` também só verifica a posteriori, sem realimentar
-`sistema_2dept!`), a consistência de reprodução setor a setor continua a não
-ser imposta de forma exata — só a pressão agregada.
+setor e `ρ_real` (a versão agregada) num dado instante, a posteriori — não
+usa o racionamento por setor (esse já está embutido em `κ` dentro de
+`sistema_Ndept_io!` quando `racionamento=true`).
 
 ## 2. R_max no choque salarial usa uma matriz auxiliar (corrigido)
 
@@ -240,16 +263,38 @@ compatibilidade com o comportamento histórico e para manter a suite de
 testes totalmente offline (ver `verificar_eurostat_setorial()` para uma
 verificação manual, fora dos testes automáticos).
 
-## 7. Stock de capital e depreciação são aproximados
+## 7. Stock de capital e depreciação são aproximados (corrigido, com ressalva)
 
 O capital constante é aproximado pelo stock de capital, e a depreciação é
-fixada em ~10% do stock em vários pontos. Uma calibração séria exigiria
-séries de stock de capital líquido por setor (método do inventário perpétuo)
-e taxas de depreciação diferenciadas.
+fixada em ~10% do stock em vários pontos (fora dos caminhos de dados reais,
+onde já se usa CCF/stock real). Por omissão, o caminho `:eurostat` usa o
+stock líquido reportado diretamente pelo Eurostat para o ano pedido.
+
+**Corrigido (opcional):** `inventário_perpétuo=true`
+(`calibrar_modelo_portugal`/`calibrar_com_ameco_v2`, com
+`fonte_dados`/`dados_setoriais=:eurostat`) substitui essa leitura direta por
+uma série própria calculada pelo método do inventário perpétuo (PIM —
+`calcular_stock_capital_pim`, `src/eurostat_sdmx.jl`):
+`Kₜ = (1-δ)·Kₜ₋₁ + FBCFₜ`, com `δ` estimado (`CCF/stock` no ano de
+referência, não um valor fixo) e semeada a partir do ano mais antigo com
+stock e FBCF reportados. Verificado com dados reais de Portugal: a série PIM
+acompanha o stock reportado ao longo de 22 anos (2000-2022), com desvio
+crescente mas moderado até ao ano mais recente (setor C: ~10% em 2022) —
+esperado, já que o PIM aqui usa uma taxa de depreciação única por setor, não
+diferenciada por tipo de ativo (estruturas, máquinas, TIC, etc. têm vidas
+úteis muito diferentes na prática — dados de FBCF por tipo de ativo já estão
+disponíveis no Eurostat, `NAMA_10_A64_P5` tem uma dimensão `asset10`, mas
+construir um PIM multi-ativo exigiria também perfis de depreciação por tipo
+de ativo, que a Eurostat não publica diretamente — ficou por fazer).
+
+Degrada por setor, não globalmente: se a FBCF histórica de um setor não
+chegar ao ano pedido, ou `δ` estimado não for válido, esse setor
+individualmente cai para o valor reportado pelo Eurostat, sem afetar os
+restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 39 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 48 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`fonte_dados=:eurostat`,

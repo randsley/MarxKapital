@@ -181,9 +181,18 @@ próximo.
   não é obrigatoriamente por dados reais explícitos, já que
   `calibrar_com_ameco_v2` pode ser chamado para qualquer país AMECO,
   incluindo os fora da cobertura Eurostat).
+
+`inventário_perpétuo=true` (só tem efeito com `dados_setoriais=:eurostat`)
+substitui o stock líquido reportado pelo Eurostat por uma série própria
+calculada pelo método do inventário perpétuo, aos 19 setores finos
+(`_stock_capital_pim_por_secção`, `src/calibracao_pt.jl`), agregada só
+depois aos 3 setores macro — agregar a série já calculada é mais correto do
+que recalcular a partir de FBCF já somado a 3 grupos. Ver
+`docs/LIMITACOES.md` item 7.
 """
 function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symbol;
-                                  dados_setoriais::Symbol = :fixo)
+                                  dados_setoriais::Symbol = :fixo,
+                                  inventário_perpétuo::Bool = false)
     println("\n" * "="^70)
     println("CALIBRAÇÃO COM DADOS AMECO — $(dados.país) | Ano: $ano")
     println("Fonte: $(dados.fonte)")
@@ -230,6 +239,11 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
                                  haskey(ccf_s, s) && haskey(emprego_s, s) && haskey(fbcf_s, s) && haskey(stock_s, s)]
             length(secções_completas) < 10 &&
                 error("cobertura insuficiente ($(length(secções_completas))/19 secções)")
+
+            if inventário_perpétuo
+                stock_s = _stock_capital_pim_por_secção(dados.código_país, ano, secções_completas, stock_s)
+                println("  ✓ stock de capital recalculado por inventário perpétuo (19 setores finos).")
+            end
 
             VAB           = _somar_por_grupo(vab_s, GRUPOS_MACRO_NACE)
             remunerações  = _somar_por_grupo(remun_s, GRUPOS_MACRO_NACE)
@@ -295,17 +309,20 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
 end
 
 """
-    calibrar_com_ameco_v2(país; ano=2022, método=:auto, dados_setoriais=:fixo)
+    calibrar_com_ameco_v2(país; ano=2022, método=:auto, dados_setoriais=:fixo, inventário_perpétuo=false)
 
 Obtém dados AMECO (ver `obter_dados_ameco`) e calibra o modelo.
 `método` ∈ (:auto, :sdmx, :download, :local, :csv, :sintético, :manual).
-`dados_setoriais` ∈ (:fixo, :eurostat) — ver `calibrar_com_dados_ameco`.
+`dados_setoriais` ∈ (:fixo, :eurostat), `inventário_perpétuo` — ver
+`calibrar_com_dados_ameco`.
 """
 function calibrar_com_ameco_v2(país::String; ano = 2022, método = :auto,
-                               agregação_setorial = :macro, dados_setoriais = :fixo)
+                               agregação_setorial = :macro, dados_setoriais = :fixo,
+                               inventário_perpétuo = false)
     dados = obter_dados_ameco(país, anos = 1995:ano, método = método)
     return calibrar_com_dados_ameco(dados, ano, agregação_setorial;
-                                    dados_setoriais = dados_setoriais)
+                                    dados_setoriais = dados_setoriais,
+                                    inventário_perpétuo = inventário_perpétuo)
 end
 
 # ----------------------------------------------------------------------------

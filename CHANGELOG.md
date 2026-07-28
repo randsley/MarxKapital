@@ -2,6 +2,32 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [Não lançado]
+
+### Adicionado
+- `_resolver_racionamento` (`src/nucleo.jl`) e o kwarg `racionamento=true`
+  em `sistema_Ndept_io!`/`simular_Ndept`/`simular_Ndept_customizado`
+  (tem precedência sobre `realização`): racionamento de quantidades exato
+  por setor à Bénassy/Barro-Grossman, com tecnologia Leontief — o
+  reinvestimento realizado de cada setor fica limitado pelo input mais
+  escasso, e o racionamento propaga-se entre fornecedores/compradores.
+  Resolvido por iteração de ponto fixo com sub-relaxação (necessária — a
+  versão sem relaxação oscila indefinidamente, confirmado num exemplo de 2
+  setores) dentro do cálculo do lado direito da EDO — sem transformar o
+  sistema numa DAE nem depender de `NonlinearSolve.jl`. Verificado com um
+  exemplo de solução fechada (`ρ₁=√0.8`) e por robustez em 20+ combinações
+  seed/μ e em N=19, sem falhas de convergência.
+- `calcular_stock_capital_pim` (`src/eurostat_sdmx.jl`) e o kwarg
+  `inventário_perpétuo=true` em `calibrar_modelo_portugal`/
+  `calibrar_com_ameco_v2`: stock de capital calculado pelo método do
+  inventário perpétuo (`Kₜ=(1-δ)Kₜ₋₁+FBCFₜ`, `δ` estimado por setor a
+  partir de CCF/stock no ano de referência), em vez do valor reportado
+  diretamente pelo Eurostat. Degrada por setor (não globalmente) quando a
+  série de FBCF de um setor não chega ao ano pedido. Verificado com dados
+  reais de Portugal: a série PIM acompanha o stock reportado ao longo de
+  22 anos, com desvio moderado e crescente (esperado — taxa de
+  depreciação única por setor, não diferenciada por tipo de ativo).
+
 ## [0.4.0] — 2026-07-28
 
 ### Adicionado

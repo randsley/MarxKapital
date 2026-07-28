@@ -32,6 +32,12 @@ ajuda_modelo()
 exemplo_2dept()
 exemplo_Ndept(10)
 
+# N departamentos acoplados via A: mobilidade de capital, pressão de realização
+# agregada, ou racionamento de quantidades exato por setor (opcionais, independentes)
+simular_Ndept(10, acoplado = true, μ = 0.3)
+simular_Ndept(10, acoplado = true, realização = true)
+simular_Ndept(10, acoplado = true, racionamento = true)
+
 # Valores → preços de produção
 exemplo_transformacao()
 
@@ -95,6 +101,9 @@ params_real = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat, agre
 # AMECO (3 setores macro), com matriz A real (agregada a partir da matriz de 19 setores)
 params_real, dados = calibrar_com_ameco_v2("Portugal", ano = 2022, dados_setoriais = :eurostat)
 
+# Stock de capital por inventário perpétuo em vez do valor reportado diretamente (opcional)
+params_pim = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat, inventário_perpétuo = true)
+
 # Verificação manual do acesso ao Eurostat (não corre nos testes automáticos)
 verificar_eurostat_setorial()
 ```
@@ -151,7 +160,7 @@ raio espectral de `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-39 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
+48 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
 em cada push a `main` — ver `.github/workflows/test.yml`. A suite cobre os
 caminhos sintéticos/opt-in por omissão e corre totalmente offline; os
 caminhos de dados reais (`método=:sdmx`, `fonte_dados=:eurostat`,
@@ -161,16 +170,20 @@ manualmente com `verificar_sdmx_ameco()` e `verificar_eurostat_setorial()`.
 ## Limitações
 
 Leia [`docs/LIMITACOES.md`](docs/LIMITACOES.md). Em resumo: (1) a matriz A só
-realimenta a simulação N-dept opcionalmente (`acoplado=true`, mais uma
-pressão de realização opcional `realização=true` — sem restrição exata por
-setor, isso exigiria uma DAE); (2) `R_max` do choque salarial usa a matriz e
-os coeficientes reais da simulação; (3) o download AMECO usa a API SDMX
-oficial (24/25 variáveis mapeadas ou calculadas); (4)-(5) calibração
-setorial real (Eurostat), incluindo matriz A real em ambos os caminhos,
-disponível como opção, mas com pesos fixos/matriz A aleatória por omissão
-(a matriz A agregada a 3 setores tem uma ressalva conhecida — linha do
-Terciário conservadora); (6)-(7) dados sintéticos e stock de capital
-aproximado continuam a ser o comportamento por omissão.
+realimenta a simulação N-dept opcionalmente (`acoplado=true`), com três
+mecanismos disponíveis — mobilidade de capital, pressão de realização
+agregada (`realização=true`) e racionamento de quantidades exato por setor
+(`racionamento=true`, resolvido por ponto fixo, sem precisar de DAE); (2)
+`R_max` do choque salarial usa a matriz e os coeficientes reais da
+simulação; (3) o download AMECO usa a API SDMX oficial (24/25 variáveis
+mapeadas ou calculadas); (4)-(5) calibração setorial real (Eurostat),
+incluindo matriz A real em ambos os caminhos, disponível como opção, mas
+com pesos fixos/matriz A aleatória por omissão (a matriz A agregada a 3
+setores tem uma ressalva conhecida — linha do Terciário conservadora);
+(6) dados sintéticos continuam a ser o comportamento por omissão; (7) o
+stock de capital pode ser calculado por inventário perpétuo
+(`inventário_perpétuo=true`) em vez do valor reportado diretamente, também
+opcional.
 
 ## Licença
 
