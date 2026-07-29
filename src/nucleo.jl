@@ -157,6 +157,13 @@ para não colidir com a singularidade de Sraffa. Se mesmo assim o sistema de
 preços falhar (matriz mal condicionada), cai-se para preços = valores-trabalho
 (sem ajuste, π = 1).
 
+`r̄` (a taxa usada no termo de mobilidade, distinta de `r̄_naive` acima) é a
+média de `r` ponderada por `C` — não a razão agregada `ΣS/Σ(C+V)` — porque é
+a única escolha para a qual `Σᵢ μ(rᵢ-r̄)Cᵢ = 0` exatamente, garantindo que o
+termo de mobilidade realoca capital constante agregado entre setores em vez
+de o criar ou destruir (verificado por teste, `test/runtests.jl`,
+"Mobilidade de capital — conservação exata").
+
 Ver `docs/LIMITACOES.md` (item 1): esta é a versão opcional acoplada,
 selecionável com `acoplado=true` em `simular_Ndept`/`simular_Ndept_customizado`.
 `sistema_Ndept!` mantém-se como a versão "setores independentes".
@@ -206,7 +213,13 @@ function sistema_Ndept_io!(dX, X, p, t)
 
     C_valorizado = π .* C
     r = S ./ (C_valorizado .+ V)
-    r̄ = sum(S) / sum(C_valorizado .+ V)
+    # r̄ é a média de r ponderada por C (o stock em livro, o mesmo peso que
+    # multiplica o termo de mobilidade abaixo) — não Σ S/Σ(C+V), a razão
+    # agregada usada antes. É a única escolha para a qual Σμ(rᵢ-r̄)Cᵢ = 0
+    # exatamente, de modo que o termo de mobilidade realoca capital
+    # constante agregado em vez de o criar ou destruir (ver paper/main.tex,
+    # discussão da conservação do termo de mobilidade).
+    r̄ = sum(r .* C) / sum(C)
 
     κ = ones(N)
     # Output bruto de um período soma o valor de capital constante
@@ -252,13 +265,14 @@ mesma filosofia de degradação graciosa usada no resto do código (fallback
 de preços de Sraffa na mesma função, fallbacks de rede AMECO/Eurostat).
 """
 function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8, relaxação = 0.5,
-                                ρ_inicial = nothing)
+                                ρ_inicial = nothing, devolver_diagnóstico::Bool = false)
     N = length(S)
     D_planeado = σ_c .* S
     fornecedores(j) = A[:, j] .> 0
     ρ = isnothing(ρ_inicial) ? ones(N) : copy(ρ_inicial)
     convergiu = false
-    for _ in 1:max_iter
+    iterações = max_iter
+    for it in 1:max_iter
         κ = [minimum(ρ[fornecedores(j)]; init = 1.0) for j in 1:N]
         D_real = A * (κ .* D_planeado)
         ρ_alvo = min.(1.0, O ./ max.(D_real, 1e-12))
@@ -270,13 +284,18 @@ function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8, relax
         if maximum(abs.(ρ_novo .- ρ)) < tol
             ρ = ρ_novo
             convergiu = true
+            iterações = it
             break
         end
         ρ = ρ_novo
     end
     convergiu || @warn "Racionamento não convergiu em $max_iter iterações; a usar κ=1 (sem racionamento)."
-    convergiu || return ones(N)
-    return [minimum(ρ[fornecedores(j)]; init = 1.0) for j in 1:N]
+    κ_final = convergiu ? [minimum(ρ[fornecedores(j)]; init = 1.0) for j in 1:N] : ones(N)
+    if devolver_diagnóstico
+        return (κ = κ_final, convergiu = convergiu, iterações = iterações,
+                fração_racionada = count(κ_final .< 0.999) / N)
+    end
+    return κ_final
 end
 
 # ----------------------------------------------------------------------------

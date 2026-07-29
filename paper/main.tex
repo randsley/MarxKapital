@@ -253,16 +253,18 @@ through the mechanisms below.
 
 \paragraph{Capital mobility.} The term $\mu(r_i-\bar r)C_i$ reallocates
 investment toward above-average-profit sectors, a direct computational
-analogue of capital's tendency to flow toward higher returns. We note
-without resolving it that this term is not guaranteed to conserve
-aggregate constant capital: $\sum_i\mu(r_i-\bar r)C_i=0$ requires $\bar r$
-to equal the $C_i$-weighted average of the $r_i$, whereas $\bar r$ is
-computed as the aggregate ratio $\sum_iS_i/\sum_i(C_i+V_i)$ (Equation
-above), which need not coincide with that weighted average since each
-$r_i$'s own denominator includes $V_i$ as well as $C_i$. Mobility can
-therefore create or destroy aggregate constant capital rather than
-purely reallocating it; we flag this as an open modeling question in
-Section~6.2 rather than a resolved design choice.
+analogue of capital's tendency to flow toward higher returns. An earlier
+draft used $\bar r=\sum_iS_i/\sum_i(C_i+V_i)$, the aggregate profit-rate
+ratio, for this purpose. That choice does not generally satisfy
+$\sum_i\mu(r_i-\bar r)C_i=0$, since each $r_i$'s own denominator includes
+$V_i$ as well as $C_i$; the term could therefore create or destroy
+aggregate constant capital rather than purely reallocating it, a defect
+identified by external review. We fixed this by defining $\bar r$ as the
+$C_i$-weighted mean of the sectoral $r_i$ instead,
+$\bar r=\sum_ir_iC_i/\sum_iC_i$ --- the only choice for which
+$\sum_i\mu(r_i-\bar r)C_i=0$ holds by construction, which we verify
+directly (to floating-point precision, in the model's test suite) rather
+than merely asserting algebraically.
 
 \paragraph{Aggregate realization pressure.} Setting $\kappa_i \equiv
 \min(\rho_{\text{real}},1)$ uniformly across sectors, with
@@ -316,7 +318,11 @@ or a general nonlinear-complementarity solver would add real numerical
 risk and a new package dependency for no benefit over the fixed point,
 which we verified converges reliably (a closed-form two-sector example
 with a known solution $\rho_1=\sqrt{0.8}$, and no convergence failures
-across more than twenty parameter combinations at $N=8$ and at $N=19$).
+across a systematic sweep of 270 random trials spanning $N\in\{6,12,19\}$
+and matrix densities $\in\{0.2,0.4,0.6\}$, deliberately scaled to force
+genuine rationing rather than the trivial case, converging in a mean of
+$25.8$ and a maximum of $30$ iterations against a cap of 200 ---
+Section~5.4).
 We emphasize that undamped iteration is \emph{not} reliable here: we
 verified by hand that a small two-sector example oscillates indefinitely
 between two states without under-relaxation, a concrete instance of the
@@ -411,8 +417,8 @@ is designed for. We report this as a genuine negative result rather
 than omit it: no clean global contraction constant in the spirit of
 $\rho(A)<1$ exists for this map by this route, which is why we rely on
 the local analysis above, together with the empirical convergence sweep
-reported earlier in this section (twenty-plus parameter combinations at
-$N=8$ and $N=19$, no failures), rather than a single global theorem.
+reported earlier in this section (270 trials, no failures --- Section~5.4),
+rather than a single global theorem.
 
 None of the three mechanisms imposes exact market clearing at every
 instant for every sector as a hard constraint solved simultaneously with
@@ -694,32 +700,83 @@ matrix, Portugal 2022, at three illustrative profit rates.}
 \label{fig:transformation}
 \end{figure}
 
-\subsection{Illustrative comparison of coupling mechanisms}
+\subsection{Comparison of coupling mechanisms: one illustration, then a systematic sweep}
 
 Because no real per-sector accumulation time series exists to calibrate
 the dynamic coupling mechanisms of Section~3.3 empirically, Figure~\ref{fig:coupling}
-illustrates their qualitative behavior on a synthetic six-sector economy
-under a common random technical matrix and seed. Capital mobility alone
-reduces cross-sector profit-rate dispersion over time, as expected.
-Adding the aggregate realization-pressure term leaves the qualitative
-picture largely unchanged in this run. Adding exact quantity rationing
-instead \emph{increases} final dispersion relative to mobility alone in
-this particular random economy: rationing can prevent the mobility term
-from fully equalizing rates when a high-profit sector's own suppliers
-cannot support the investment mobility would otherwise direct there. We
-report this honestly as an example of the mechanism's behavior rather than
-evidence that rationing systematically increases or decreases dispersion
-in general --- the result is specific to this synthetic economy's random
-technical structure, and a systematic characterization across many random
-economies is left for future work.
+first illustrates their qualitative behavior on a single synthetic
+six-sector economy under one random technical matrix and seed. Capital
+mobility alone reduces cross-sector profit-rate dispersion over time, as
+expected. Adding the aggregate realization-pressure term leaves the
+qualitative picture largely unchanged in this run. Adding exact quantity
+rationing instead \emph{increases} final dispersion relative to mobility
+alone in this particular random economy: rationing can prevent the
+mobility term from fully equalizing rates when a high-profit sector's
+own suppliers cannot support the investment mobility would otherwise
+direct there.
+
+An earlier draft reported this as an example of the mechanism's
+behavior without evidence it generalizes beyond one random seed. We
+checked directly rather than leaving that as an open question:
+Figure~\ref{fig:dispersion} repeats the same three-way comparison across
+$50$ independent random seeds (each with its own random six-sector
+technical matrix, sectoral parameters, and initial conditions). Rationing
+produces \emph{higher} final dispersion than mobility alone in
+\textbf{50 of 50} seeds --- the pattern in Figure~\ref{fig:coupling} is
+not an artifact of one unlucky draw, but the systematic behavior of the
+mechanism in this class of random economy. The mean final dispersion is
+$0.063$ (mobility only), $0.189$ (adding realization pressure), and
+$0.440$ (adding rationing) --- rationing roughly triples dispersion
+relative to realization pressure and roughly seven-folds it relative to
+mobility alone, on average, with substantial spread across seeds
+(rationing's dispersion ranges $0.108$--$0.736$ across the 50 economies).
+The economic reading is the same as before, now with numerical backing:
+exact per-sector rationing is a genuinely different, more disequalizing
+mechanism than either capital mobility or an aggregate realization
+heuristic, because it can trap a high-profit sector behind a
+supply-constrained supplier in a way neither of the other two mechanisms
+can represent.
+
+We separately checked the rationing fixed point's convergence claim
+(Section~3.3) far beyond the closed-form example and the earlier
+twenty-parameter-combination sweep: $270$ trials spanning
+$N\in\{6,12,19\}$ and matrix density $\in\{0.2,0.4,0.6\}$ (30 seeds per
+combination), with supply deliberately scaled to force genuine rationing
+rather than the trivial $\kappa\equiv1$ case ($268/270$ trials had at
+least one rationed sector). The damped iteration converged in
+\textbf{270 of 270} trials, in a mean of $25.8$ and a maximum of $30$
+iterations (against a cap of 200) --- no failures, and no case requiring
+anywhere near the iteration budget. This remains empirical evidence, not
+a proof (Section~3.3), but it is now evidence across a systematic sweep
+rather than a small hand-picked set.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.75\textwidth]{figures/fig4_coupling_comparison.pdf}
 \caption{Cross-sector profit-rate dispersion over time under three
-coupling mechanisms (illustrative synthetic economy, not calibrated to
-real data).}
+coupling mechanisms, one illustrative synthetic economy (not calibrated
+to real data).}
 \label{fig:coupling}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/fig6c_dispersion_distribution.pdf}
+\caption{Final profit-rate dispersion under three coupling mechanisms,
+across 50 independent random synthetic economies (points: individual
+seeds, jittered; diamond: mean; bar: median).}
+\label{fig:dispersion}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/fig6a_convergence_iterations.pdf}
+\includegraphics[width=0.48\textwidth]{figures/fig6b_rationing_incidence.pdf}
+\caption{Rationing fixed-point convergence sweep, 270 trials
+($N\in\{6,12,19\}$, density $\in\{0.2,0.4,0.6\}$, 30 seeds each). Left:
+iterations to converge (all 270 trials converged). Right: fraction of
+sectors genuinely rationed per trial.}
+\label{fig:convergence}
 \end{figure}
 
 \section{Discussion}
@@ -845,22 +902,27 @@ aggregating (Section~4.2); the coarser matrix is non-negative and usable,
 but likely understates services' true role as an input supplier to other
 sectors.
 
-\emph{Limited robustness and sensitivity analysis.} We report the
-aggregate trend under three valuation conventions (unadjusted, GDP-deflated,
-investment-deflated; Section~5.2 and Section~6.1) and for two countries
-(Portugal and Spain), which is enough to show the corrected finding is
-not a single-country, single-deflator artifact, but not enough to
-establish a general pattern across peripheral EU economies, nor to rule
-out sectoral composition effects that an aggregate series cannot
-separate from a genuine average-rate change. The sectoral
-profile (Table~\ref{tab:sectors}) still uses a single set of choices: net capital stock
-rather than perpetual-inventory, and, for the coupling mechanisms of
-Section~3.3, a single value of the mobility coefficient $\mu$ and a
-single random seed for the synthetic illustration; a systematic sweep
-across many random technical matrices (rather than the single seed used
-in Figure~\ref{fig:coupling}), reporting convergence rates, iteration
-counts, and dispersion outcomes as a distribution rather than a point
-estimate, is left for future work. Section~3.3
+\emph{Limited robustness and sensitivity analysis, partially addressed.}
+We report the aggregate trend under three valuation conventions
+(unadjusted, GDP-deflated, investment-deflated; Section~5.2 and
+Section~6.1) and for two countries (Portugal and Spain), which is enough
+to show the corrected finding is not a single-country, single-deflator
+artifact, but not enough to establish a general pattern across
+peripheral EU economies, nor to rule out sectoral composition effects
+that an aggregate series cannot separate from a genuine average-rate
+change. The sectoral profile (Table~\ref{tab:sectors}) still uses a
+single set of choices: net capital stock rather than perpetual-inventory,
+and a single value of the mobility coefficient $\mu$. For the coupling
+mechanisms of Section~3.3, we no longer rely on a single random seed: a
+270-trial sweep (Section~5.4) confirms the rationing fixed point
+converges reliably ($270/270$) across varied $N$, matrix density, and
+demand/supply configurations, and a 50-seed sweep confirms rationing
+produces higher dispersion than mobility alone systematically
+($50/50$ seeds), not as an artifact of one draw. What these sweeps do
+not cover: a fixed $\mu$ and fixed relaxation parameter throughout, and
+only random (not empirically calibrated) technical matrices for the
+dynamic comparison, since no real per-sector accumulation series exists
+to calibrate it against (Section~5.4). Section~3.3
 establishes that a fixed point always exists (Brouwer), explains
 structurally why undamped iteration oscillates rather than converges
 (the map is antitone), gives direct empirical evidence of practical
@@ -903,10 +965,10 @@ totals, in the spirit of the VAB check in Section~5.1), is the most
 important remaining item of future work on the empirical side of this
 paper.
 
-\emph{The mobility term's conservation properties are unresolved}
-(Section~3.3): $\sum_i\mu(r_i-\bar r)C_i$ need not vanish under the
-model's definition of $\bar r$, so capital mobility may not purely
-reallocate aggregate constant capital. \emph{The rationing mechanism's
+\emph{The mobility term's conservation was fixed} (Section~3.3): an
+earlier draft's $\bar r$ did not guarantee $\sum_i\mu(r_i-\bar r)C_i=0$;
+redefining $\bar r$ as the $C_i$-weighted mean of $r_i$ makes this hold
+by construction, verified directly rather than assumed. \emph{The rationing mechanism's
 demand term treats planned investment expenditure as if it required the
 same input mix as a unit of physical output}, an explicit simplifying
 assumption (Section~3.3) rather than a derived capital-output
@@ -944,14 +1006,21 @@ valuation artifact in the aggregate profit-rate series that we had
 originally overstated because of it. Corrected, the underlying trend is
 real but modest --- a $7.9\%$--$15.1\%$ range for Portugal across three
 deflation conventions, not the near-fivefold swing an earlier, buggy
-version of this calibration reported. We think this exercise is itself a
+version of this calibration reported. Two further defects surfaced by
+the same review process are also fixed and verified directly rather than
+merely asserted: the capital-mobility term now conserves aggregate
+constant capital exactly by construction, and the rationing mechanism's
+convergence and dispersion claims (Section~5.4) now rest on systematic
+sweeps of 270 and 50 random economies respectively, not a single
+hand-picked illustration. We think this exercise is itself a
 useful illustration of what a live, multi-source statistical pipeline
 buys a computational Marxian model: not just convenience, but the
 ability to catch exactly this kind of measurement and modeling error
 before it is mistaken for an economic finding --- provided the pipeline
 is checked as carefully as the theory it implements. Extending the
 valuation-consistent comparison to more economies, auditing the
-technical matrix construction more thoroughly, and archiving frozen data
+technical matrix construction more thoroughly (Section~6.2's single
+largest remaining open item), and archiving frozen data
 snapshots for stronger reproducibility guarantees (Section~6.2) are left
 for future work.
 

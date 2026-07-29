@@ -51,6 +51,29 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test std(r[:, end]) < std(r[:, 1])
     end
 
+    @testset "Mobilidade de capital — conservação exata" begin
+        # Σᵢ μ(rᵢ-r̄)Cᵢ deve ser exatamente 0 (r̄ ponderado por C, não a razão
+        # agregada ΣS/Σ(C+V)) — testado diretamente no lado direito da EDO,
+        # isolando o termo de mobilidade dos termos de reinvestimento/depreciação.
+        Random.seed!(9)
+        N = 8
+        A = criar_matriz_tecnica(N, seed = 9)
+        depts = criar_departamentos(N)
+        l = [d.v for d in depts]
+        p = (e = [d.e for d in depts], σ_c = [d.σ_c for d in depts],
+             σ_v = [d.σ_v for d in depts], δ = [d.δ for d in depts],
+             A = A, l = l, R_max = calcular_taxa_lucro_maxima(A, l),
+             μ = 0.5, w = 1.0, realização = false, racionamento = false)
+        X0 = [[d.c for d in depts]; [d.v for d in depts]]
+        dX_sem_mobilidade = similar(X0)
+        dX_com_mobilidade = similar(X0)
+        sistema_Ndept_io!(dX_com_mobilidade, X0, p, 0.0)
+        sistema_Ndept_io!(dX_sem_mobilidade, X0, merge(p, (μ = 0.0,)), 0.0)
+        termo_mobilidade = dX_com_mobilidade[1:N] .- dX_sem_mobilidade[1:N]
+        @test abs(sum(termo_mobilidade)) < 1e-10
+        @test !all(iszero, termo_mobilidade)  # o termo é ativo, não trivialmente nulo
+    end
+
     @testset "Simulação N-dept com pressão de realização" begin
         Random.seed!(5)
         sol_sem, _, p_sem = simular_Ndept(6, T = 200.0, seed = 5, acoplado = true, μ = 0.5)
