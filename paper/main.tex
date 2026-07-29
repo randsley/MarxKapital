@@ -52,9 +52,11 @@ consumption-of-fixed-capital series. The correction has a clean,
 checkable consequence: the rate of exploitation, computed as $(Y-V)/V$,
 becomes exactly invariant under a common deflator applied to $Y$ and $V$,
 as the algebra requires, which it was not before the fix. With this in
-place, Portugal's profit rate for 1996--2022 sits in an $8$--$12\%$ band
-under three deflation conventions we test, modestly rising or mildly
-declining depending on which is used, rather than the dramatic swing an
+place, Portugal's profit rate for 1996--2022 ranges from about $8\%$ to
+$15\%$ across three deflation conventions we test, clustering lower under
+the unadjusted convention and higher under the investment-deflator
+convention, moving mildly rather than dramatically within each, in
+contrast to the dramatic swing an
 earlier, buggy version of this calibration reported. We treat this
 two-stage correction --- catching a stock-flow error, then re-measuring
 valuation sensitivity correctly on top of it --- as a contribution in its
@@ -118,9 +120,11 @@ not under the earlier, buggy formula. With the fix in place, we
 re-examine the same valuation question the earlier draft raised ---
 whether AMECO's mixed-valuation capital and flow series distort the
 measured trend --- and find a real but much more modest effect than
-before: Portugal's profit rate sits in an $8$--$12\%$ band across three
-deflation conventions over 1996--2022, moving mildly in either direction
-depending on which is used, with the residual sensitivity now
+before: Portugal's profit rate ranges from $7.9\%$ to $15.1\%$ across
+three deflation conventions over 1996--2022 --- $7.9$--$11.5\%$ unadjusted,
+$9.3$--$12.7\%$ GDP-deflated, $9.3$--$15.1\%$ investment-deflated --- moving
+mildly in either direction within each convention rather than
+dramatically, with the residual sensitivity now
 concentrated in the profit rate (through the classical
 capital-advanced denominator $C+V$) rather than in the rate of
 exploitation. We report the whole sequence --- the bug, the fix, and the
@@ -272,7 +276,11 @@ actually constrained --- but requires no iterative solution.
 
 \paragraph{Exact per-sector quantity rationing.} The paper's central
 technical contribution replaces the aggregate heuristic with a genuine
-per-sector rationing scheme. Under Leontief technology, a sector's planned
+per-sector rationing scheme --- ``exact'' in the sense of solving the
+specified proportional short-side rationing rule exactly via its fixed
+point, not in the sense of a full, empirically validated model of
+sectoral reproduction balances (the simplifying assumptions this entails
+are stated below and revisited in Section~6.2). Under Leontief technology, a sector's planned
 reinvestment cannot substitute a shortage of one input with more of
 another; realized investment is bounded by the scarcest required input,
 and a sector's own shortfall reduces its effective demand for \emph{all}
@@ -480,15 +488,33 @@ pipeline exposes both the raw combination and valuation-consistent
 alternatives that deflate the wage and output series by AMECO's own GDP
 deflator (\texttt{PVGD}$=$\texttt{UVGD}/\texttt{OVGD}$\times100$) or
 investment-goods deflator (\texttt{PIGT}) onto the same basis as the
-capital stock; Section~5.2 reports all three. The period's surplus in
-this aggregate calculation, $Y-V-\text{CCF}$, uses AMECO's own
-consumption-of-fixed-capital series (item \texttt{UKCT}, current-price,
-deflated consistently with $V$ and $Y$ in each convention) rather than an
-assumed fraction of the capital stock; an earlier version of this
-calculation used a flat $10\%$ of the (constant-price) capital stock,
-which breaks the algebraic invariance of $e=(Y-V)/V$ under a common
-deflator applied to $Y$ and $V$ --- an inconsistency we found via
-external review and verify is now resolved in Section~5.2.
+capital stock; Section~5.2 reports all three.
+
+To avoid the ambiguity of an unqualified ``surplus,'' we distinguish
+\begin{equation}
+  S^{\text{gross}} = Y - V, \qquad
+  S^{\text{net}} = Y - V - \text{CCF},
+\end{equation}
+and state explicitly which is used where. The invariance argument above
+concerns $S^{\text{gross}}$: $(Y-V)/V$ is exactly invariant under a
+common deflator applied to $Y$ and $V$, with no dependence on how CCF is
+measured. The rate of exploitation $e$ and profit rate $r$ reported in
+Section~5.2 and throughout the aggregate time series use
+$S^{\text{net}}$ (equivalently, $e=(Y-V-\text{CCF})/V$), with CCF drawn
+from AMECO's own consumption-of-fixed-capital series (item
+\texttt{UKCT}, current-price, deflated consistently with $V$ and $Y$ in
+each convention) rather than an assumed fraction of the capital stock;
+an earlier version of this calculation used a flat $10\%$ of the
+(constant-price) capital stock in place of CCF, which breaks the
+algebraic invariance of $S^{\text{gross}}/V$ under a common deflator
+applied to $Y$ and $V$ (since it mixes an unscaled term into the
+numerator) --- an inconsistency we found via external review and verify
+is now resolved in Section~5.2, where we report that $e$ (computed with
+$S^{\text{net}}$, CCF deflated consistently with $Y$ and $V$) is
+invariant across conventions exactly, confirming the fix addresses the
+right term. The sectoral cross-section of Section~5.1 also uses
+$S^{\text{net}}$ throughout (business income after consumption of fixed
+capital, Section~4.3).
 
 Sectoral estimates of $e$ (Section~5.1) impose a floor of $0.1$: a small
 number of sectors have business income, net of consumption of fixed
@@ -501,6 +527,22 @@ leaving the floor invisible in the reported figures.
 \section{Results: Portugal}
 
 \subsection{Sectoral profile, 2022}
+
+Throughout this section and Section~5.2, $e$ and $r$ are computed from
+national-accounts aggregates (Section~4.3) and should be read as a
+\emph{national-accounts proxy} for the theoretical rate of exploitation
+and profit rate, not a direct measurement of either. Business income net
+of consumption of fixed capital, the numerator in our construction, is
+not a clean measure of surplus value: it is not adjusted for mixed
+income of the self-employed (allocated to neither $V$ nor $S$ here),
+taxes less subsidies on production, imputed rents, non-market output, or
+other national-accounts conventions that do not map cleanly onto Marxian
+categories. This matters most for exactly the sectors where these
+conventions bite hardest --- real estate, agriculture, public
+administration, education, and health --- and the real-estate outlier
+discussed below is one visible symptom of it, not the only one. We do
+not attempt gross/net or mixed-income-adjusted variants of the sectoral
+profile in this paper; doing so properly is future work.
 
 Table~\ref{tab:sectors} reports the calibrated rate of exploitation, organic composition,
 profit rate, and gross value added (VAB, sourced directly from the
@@ -522,11 +564,12 @@ is $e\approx1.45$, $k\approx44.2$, $r\approx10.7\%$; and the properly
 aggregated rate, $\sum_iS_i/\sum_i(C_i+V_i)$ (summing numerators and
 denominators separately before dividing, rather than averaging ratios),
 is $r\approx6.1\%$. The gap between these is driven substantially by a
-single outlier, real estate activities ($k\approx334$), reflecting the
-well-known effect of imputed owner-occupied rents inflating capital
-intensity in this sector's national-accounts treatment rather than a
-genuine production characteristic; it should be discounted when
-interpreting any of the three summary figures. Four of the 19 sectors
+single outlier, real estate activities ($k\approx334$), plausibly
+reflecting the well-documented effect of imputed owner-occupied rents on
+this sector's national-accounts capital intensity (a compositional
+effect of the accounting convention, not something we have independently
+verified is the sole driver here); it should be treated with caution
+when interpreting any of the three summary figures. Four of the 19 sectors
 hit the $e=0.1$ floor described in Section~4.3 (business income net of
 depreciation close to zero or negative relative to compensation) ---
 an imposed value in those four cases, not a purely empirical
@@ -570,14 +613,17 @@ symptom of the flat-depreciation bug, not a property of the underlying
 valuation question, and disappears once the bug is fixed. What remains
 convention-sensitive is the profit rate, through the capital-advanced
 denominator $C+V$: under the unadjusted convention it rises modestly
-from $7.9\%$ to $11.6\%$; under the GDP-deflated convention it moves from
-$12.6\%$ to $10.9\%$; under an investment-deflator convention
-(\texttt{PIGT} in place of \texttt{PVGD}, Section~6.1) from $15.0\%$ to
-$12.3\%$. Across all three and all 27 years, the profit rate stays within
-an $8$--$12\%$ band, rising mildly under one convention and declining
-mildly under the other two --- a real but modest sensitivity, not the
-near-fivefold artifact the earlier, buggy calibration reported.
-Figure~\ref{fig:ptvses} repeats the GDP-deflated calculation for Spain,
+from $7.9\%$ (1996) to $11.5\%$ (2022), ranging $7.9$--$11.5\%$ over the
+full period; under the GDP-deflated convention it moves from $12.6\%$ to
+$10.9\%$ at the endpoints but ranges $9.3$--$12.7\%$ over the full period
+(the endpoints are not the extremes); under an investment-deflator
+convention (\texttt{PIGT} in place of \texttt{PVGD}, Section~6.1) from
+$15.0\%$ to $12.3\%$ at the endpoints, ranging $9.3$--$15.1\%$ over the
+full period. Across all three conventions and all 27 years, the profit
+rate's global range is $7.9$--$15.1\%$ --- a real, moderate sensitivity to
+the deflator chosen, moving mildly within each convention rather than
+dramatically, and not the near-fivefold artifact the earlier, buggy
+calibration reported. Figure~\ref{fig:ptvses} repeats the GDP-deflated calculation for Spain,
 using the identical pipeline: the rate of exploitation again moves
 identically to the unadjusted convention (verified the same way), from
 $0.85$ to $0.76$, while the profit rate moves from $12.0\%$ to $9.1\%$ under
@@ -725,11 +771,12 @@ required to agree, and they do.''
 answer:} does AMECO's capital stock (constant-price) versus wage and
 output series (current-price) distort the measured profit rate once the
 depreciation bug is out of the way? It does, but modestly. Portugal's
-profit rate now sits in an $8\%$--$12\%$ band across three deflation
+profit rate now ranges $7.9\%$--$15.1\%$ across three deflation
 conventions over the full period (Section~5.2) --- rising mildly from
-$7.9\%$ to $11.6\%$ unadjusted, declining mildly from $12.6\%$ to
-$10.9\%$ under the GDP deflator, and from $15.0\%$ to $12.3\%$ under an
-investment-goods deflator. We checked the investment-deflator variant
+$7.9\%$ to $11.5\%$ unadjusted, declining mildly at the endpoints from
+$12.6\%$ to $10.9\%$ (ranging $9.3$--$12.7\%$ across the full period)
+under the GDP deflator, and from $15.0\%$ to $12.3\%$ at the endpoints
+(ranging $9.3$--$15.1\%$) under an investment-goods deflator. We checked the investment-deflator variant
 specifically because AMECO's capital stock is a chain-linked series built
 from investment flows using an investment-specific price index
 (\texttt{PIGT}), not the general GDP deflator (\texttt{PVGD}); the two
@@ -895,7 +942,7 @@ distinct measurement problems: a stock-flow conflation in the model's
 own output formula, caught by external review, and a resulting
 valuation artifact in the aggregate profit-rate series that we had
 originally overstated because of it. Corrected, the underlying trend is
-real but modest --- an $8$--$12\%$ band for Portugal across three
+real but modest --- a $7.9\%$--$15.1\%$ range for Portugal across three
 deflation conventions, not the near-fivefold swing an earlier, buggy
 version of this calibration reported. We think this exercise is itself a
 useful illustration of what a live, multi-source statistical pipeline

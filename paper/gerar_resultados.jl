@@ -92,7 +92,7 @@ const NACE_EN = Dict(
 open(joinpath(FIG_DIR, "table1_sectors.tex"), "w") do io
     println(io, "\\begin{tabular}{llrrrr}")
     println(io, "\\toprule")
-    println(io, "Code & Sector & VAB (M\\texteuro) & \$e\$ & \$k\$ & \$r\$ (\\%) \\\\")
+    println(io, "Code & Sector & VAB (\\texteuro bn) & \$e\$ & \$k\$ & \$r\$ (\\%) \\\\")
     println(io, "\\midrule")
     ord = sortperm(params.r, rev = true)
     for i in ord
