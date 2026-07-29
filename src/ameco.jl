@@ -105,6 +105,7 @@ function gerar_dados_sintéticos_ameco(código_país::String, anos::Vector{Int})
     bal_corrente = bal_comercial .+ rand(n) * 2 .- 1
 
     stock_capital = PIB * 3.0 .+ cumsum(FBCF) * 0.1
+    ccf = 0.05 .* stock_capital
 
     println("  ✓ $n anos ($(anos[1])-$(anos[end])) | PIB médio $(round(mean(PIB)/1000, digits=1)) mil M | desemprego médio $(round(mean(desemprego), digits=1))%")
 
@@ -115,7 +116,7 @@ function gerar_dados_sintéticos_ameco(código_país::String, anos::Vector{Int})
     return DadosAMECO(nome_país, código_país, anos,
         PIB, PIB_real, consumo_privado, consumo_público, FBCF, exportações, importações,
         emprego, emprego_assalariado, desemprego, população_ativa,
-        remunerações, produtividade, custos_unit, deflator, deflator, IPC,
+        remunerações, produtividade, custos_unit, deflator, deflator, IPC, ccf,
         receitas, despesas, saldo, dívida, bal_corrente, bal_comercial,
         stock_capital, "AMECO (sintético)", now(), notas)
 end
@@ -129,7 +130,7 @@ function construir_dados_ameco(código_país, anos, dados::Dict, fonte)
         g("FBCF"), g("exportações"), g("importações"), g("emprego_total"),
         g("emprego_assalariado"), g("taxa_desemprego"), g("população_ativa"),
         g("remunerações"), g("produtividade_trabalho"), g("custos_unit_trabalho"),
-        g("deflator_PIB"), g("deflator_FBCF"), g("IPC"), g("receitas_governo"), g("despesas_governo"),
+        g("deflator_PIB"), g("deflator_FBCF"), g("IPC"), g("CCF"), g("receitas_governo"), g("despesas_governo"),
         g("saldo_orçamental"), g("dívida_pública"), g("balança_corrente"),
         g("balança_comercial", NaN), g("stock_capital_líquido"),
         fonte, now(), Dict{String, String}())
@@ -300,7 +301,7 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
     δ = CCF ./ stock_capital
 
     fonte_setorial = setoriais_reais ? " + Eurostat (setorial real)" : ""
-    resultado = ParâmetrosCalibrados(N, setores, códigos, C, V, e, k, r, A, l,
+    resultado = ParâmetrosCalibrados(N, setores, códigos, C, V, VAB, e, k, r, A, l,
         σ_c, σ_v, δ, "AMECO — $(dados.fonte)$fonte_setorial", ano, now(), 0.80)
 
     println("\n✅ CALIBRAÇÃO CONCLUÍDA — e médio $(round(mean(e), digits=2)) | r médio $(round(mean(r)*100, digits=2))%")
@@ -408,6 +409,20 @@ e `PIB` (`UVGD`) são, pelo contrário, séries a preços correntes.
   determina a base de preços de `C`; esta variante testa se a conclusão de
   `:consistente` é sensível a essa escolha (preços de bens de capital
   tendem a cair, historicamente, face ao deflator do PIB geral).
+
+O excedente/mais-valia de um período usa `rend = VAB - V - CCF`, onde `CCF`
+(item AMECO `UKCT`, "Consumption of fixed capital... total economy") é o
+capital constante realmente \\emph{transferido/consumido} no período —
+não uma fração fixa arbitrária do stock `C` (versão anterior deste código
+usava `C*0.10`, uma aproximação que, por misturar um stock a preços
+constantes de 2020 com fluxos correntes, quebrava a invariância algébrica
+que `e=(VAB-V)/V` deveria ter sob um deflator comum — ver `docs/` para a
+verificação). `CCF` é deflacionado com o mesmo índice usado para `V`/`VAB`
+em cada convenção, preservando essa invariância para a parte
+`(VAB-V)/V` e isolando corretamente o efeito do desconto de depreciação.
+A taxa de lucro `r=rend/(C+V)` continua a dividir por `C` (stock avançado)
+— fórmula clássica de Marx (lucro sobre capital adiantado), distinta da
+composição do numerador `rend`.
 """
 function analisar_série_temporal_com_dados(dados::DadosAMECO; valorização::Symbol = :corrente)
     n = length(dados.anos)
@@ -415,20 +430,20 @@ function analisar_série_temporal_com_dados(dados::DadosAMECO; valorização::Sy
     for i in 1:n
         C = dados.stock_capital_total[i]
         if valorização == :corrente
-            V, VAB = dados.remunerações[i], dados.PIB[i]
+            V, VAB, CCF = dados.remunerações[i], dados.PIB[i], dados.CCF[i]
         elseif valorização == :consistente
             def = dados.deflator_PIB[i]
-            V = (!isnan(def) && def > 0) ? dados.remunerações[i] / (def / 100) : NaN
-            VAB = dados.PIB_real[i]
+            fator = (!isnan(def) && def > 0) ? 100 / def : NaN
+            V, VAB, CCF = dados.remunerações[i] * fator, dados.PIB_real[i], dados.CCF[i] * fator
         elseif valorização == :consistente_fbcf
             def = dados.deflator_FBCF[i]
-            V = (!isnan(def) && def > 0) ? dados.remunerações[i] / (def / 100) : NaN
-            VAB = dados.PIB_real[i]
+            fator = (!isnan(def) && def > 0) ? 100 / def : NaN
+            V, VAB, CCF = dados.remunerações[i] * fator, dados.PIB_real[i], dados.CCF[i] * fator
         else
             error("valorização desconhecida: $valorização (use :corrente, :consistente ou :consistente_fbcf)")
         end
-        if !isnan(V) && !isnan(C) && !isnan(VAB) && V > 0 && C > 0
-            rend = VAB - V - C * 0.10
+        if !isnan(V) && !isnan(C) && !isnan(VAB) && !isnan(CCF) && V > 0 && C > 0
+            rend = VAB - V - CCF
             e_t[i] = rend / V
             k_t[i] = C / V
             r_t[i] = rend / (C + V)

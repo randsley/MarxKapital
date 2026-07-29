@@ -38,7 +38,11 @@ omissão ("setores independentes"), inalterada, por compatibilidade.
 **Parcialmente corrigido (segundo mecanismo, opcional):** `sistema_Ndept_io!`
 aceita agora `realização=true` (transportado via `p.realização`, kwarg de
 `simular_Ndept`/`simular_Ndept_customizado`), que acresce uma pressão de
-realização: define-se o output bruto por setor `Oᵢ=Cᵢ+Vᵢ+Sᵢ` e a procura
+realização: define-se o output bruto por setor `Oᵢ=δᵢCᵢ+Vᵢ+Sᵢ` (capital
+constante *transferido*, δᵢCᵢ — não o stock Cᵢ, uma correção feita após
+revisão externa identificar que `Cᵢ+Vᵢ+Sᵢ` misturava um stock com dois
+fluxos anuais; ver `capital_transferido`/`valor_produto` em
+`estruturas.jl`) e a procura
 intermédia implícita em A, `(A·O)ᵢ`; a razão de realização agregada
 `ρ_real = Σ min(Oᵢ,(A·O)ᵢ) / Σ(A·O)ᵢ` (≤ 1) escala o reinvestimento planeado
 (`σ_c,ᵢ·Sᵢ`), travando a acumulação quando a estrutura técnica não consegue

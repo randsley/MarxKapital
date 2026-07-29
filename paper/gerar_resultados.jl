@@ -97,7 +97,7 @@ open(joinpath(FIG_DIR, "table1_sectors.tex"), "w") do io
     ord = sortperm(params.r, rev = true)
     for i in ord
         nome = NACE_EN[params.códigos_cae[i]]
-        vab_i = round((params.C[i] + params.V[i] + params.e[i] * params.V[i]) / 1000, digits = 1)
+        vab_i = round(params.VAB[i] / 1000, digits = 1)
         println(io, "$(params.códigos_cae[i]) & $nome & $vab_i & " *
                     "$(round(params.e[i], digits = 2)) & $(round(params.k[i], digits = 2)) & " *
                     "$(round(params.r[i] * 100, digits = 2)) \\\\")
@@ -105,8 +105,12 @@ open(joinpath(FIG_DIR, "table1_sectors.tex"), "w") do io
     println(io, "\\bottomrule")
     println(io, "\\end{tabular}")
 end
-println("  ✓ $(params.N) sectors, mean e=$(round(mean(params.e),digits=2)) ",
-        "mean k=$(round(mean(params.k),digits=2)) mean r=$(round(mean(params.r)*100,digits=2))%")
+w = params.VAB ./ sum(params.VAB)
+S_setorial = params.e .* params.V
+r_agregada = sum(S_setorial) / sum(params.C .+ params.V)
+println("  ✓ $(params.N) sectors, VAB-weighted mean e=$(round(sum(w.*params.e),digits=2)) ",
+        "k=$(round(sum(w.*params.k),digits=2)) r=$(round(sum(w.*params.r)*100,digits=2))%  ",
+        "| aggregate r=ΣS/Σ(C+V)=$(round(r_agregada*100,digits=2))%")
 
 # ----------------------------------------------------------------------------
 # Figure 2 — real 19x19 technical matrix A (heatmap)
@@ -131,7 +135,10 @@ A, l = params.A, params.l
 λ_norm = λ ./ sum(λ)
 R_max = calcular_taxa_lucro_maxima(A, l)
 
-r̄_vals = [0.0, 0.3 * R_max, 0.6 * R_max]
+# Plausible empirical profit rates for the main figure (R_max≈691% for this
+# economy is not itself a plausible rate to plot against — flagged as a
+# separate concern about the matrix's scale, see paper Section 6.2).
+r̄_vals = [0.05, 0.10, 0.15]
 fig3_series = []
 for r̄ in r̄_vals
     p = calcular_precos_producao(A, l, 1.0, r̄)

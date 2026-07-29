@@ -137,6 +137,7 @@ function ler_ficheiro_ameco_txt(ficheiro::String, código_país::String;
         série("emprego_total"), série("emprego_assalariado"), série("taxa_desemprego"),
         série("população_ativa"), série("remunerações"), série("produtividade_trabalho"),
         série("custos_unit_trabalho"), série("deflator_PIB"), série("deflator_FBCF"), série("IPC"),
+        série("CCF"),
         série("receitas_governo"), série("despesas_governo"), série("saldo_orçamental"),
         série("dívida_pública"), série("balança_corrente"), série("balança_comercial"),
         série("stock_capital_líquido"),

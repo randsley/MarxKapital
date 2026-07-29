@@ -209,11 +209,16 @@ function sistema_Ndept_io!(dX, X, p, t)
     r̄ = sum(S) / sum(C_valorizado .+ V)
 
     κ = ones(N)
+    # Output bruto de um período soma o valor de capital constante
+    # TRANSFERIDO (δ.*C, depreciação do stock avançado), não o stock C em
+    # si — C é uma magnitude de stock, V e S são fluxos anuais; somá-los
+    # diretamente misturaria dimensões temporais distintas (ver
+    # `estruturas.jl`, `capital_transferido`/`valor_produto`).
     if p.racionamento
-        O = C .+ V .+ S
+        O = p.δ .* C .+ V .+ S
         κ = _resolver_racionamento(p.A, p.σ_c, S, O)
     elseif p.realização
-        O = C .+ V .+ S
+        O = p.δ .* C .+ V .+ S
         procura_intermédia = p.A * O
         soma_procura = sum(procura_intermédia)
         soma_procura > 0 && (κ .= min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0))
@@ -246,11 +251,12 @@ racionamento, equivalente a desligar este mecanismo) com um aviso — a
 mesma filosofia de degradação graciosa usada no resto do código (fallback
 de preços de Sraffa na mesma função, fallbacks de rede AMECO/Eurostat).
 """
-function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8, relaxação = 0.5)
+function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8, relaxação = 0.5,
+                                ρ_inicial = nothing)
     N = length(S)
     D_planeado = σ_c .* S
     fornecedores(j) = A[:, j] .> 0
-    ρ = ones(N)
+    ρ = isnothing(ρ_inicial) ? ones(N) : copy(ρ_inicial)
     convergiu = false
     for _ in 1:max_iter
         κ = [minimum(ρ[fornecedores(j)]; init = 1.0) for j in 1:N]

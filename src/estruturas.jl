@@ -72,11 +72,21 @@ taxa_lucro(d::Departamento) = d.e / (d.k + 1)
 """Mais-valia s = e·v."""
 mais_valia(d::Departamento) = d.e * d.v
 
-"""Capital total K = c + v."""
+"""Capital total (avançado) K = c + v. `d.c` é o stock de capital constante
+avançado (usado na acumulação e na composição orgânica k=c/v), não o valor
+transferido/consumido num período."""
 capital_total(d::Departamento) = d.c + d.v
 
-"""Valor do produto W = c + v + s."""
-valor_produto(d::Departamento) = d.c + d.v + mais_valia(d)
+"""Capital constante transferido/consumido num período, c_transferido = δ·c
+(depreciação do stock avançado). Distinto de `d.c` (stock avançado): esta é
+a magnitude correta a somar com fluxos anuais (v, s) para obter o valor do
+produto de um período — ver `valor_produto`."""
+capital_transferido(d::Departamento) = d.δ * d.c
+
+"""Valor do produto de um período, W = c_transferido + v + s (não c + v + s:
+`d.c` é um stock, `v` e `s` são fluxos anuais; somá-los diretamente
+misturaria magnitudes de dimensões temporais diferentes)."""
+valor_produto(d::Departamento) = capital_transferido(d) + d.v + mais_valia(d)
 
 function Base.show(io::IO, d::Departamento)
     print(io, "Departamento(\"$(d.nome)\": ")
@@ -103,6 +113,7 @@ struct ParâmetrosCalibrados
 
     C::Vector{Float64}
     V::Vector{Float64}
+    VAB::Vector{Float64}  # valor acrescentado bruto real (fonte de dados), não C+V+e·V
 
     e::Vector{Float64}
     k::Vector{Float64}
@@ -178,6 +189,7 @@ struct DadosAMECO
     deflator_PIB::Vector{Float64}
     deflator_FBCF::Vector{Float64}
     IPC::Vector{Float64}
+    CCF::Vector{Float64}  # consumo de capital fixo, preços correntes (item UKCT)
 
     # Finanças Públicas
     receitas_governo::Vector{Float64}

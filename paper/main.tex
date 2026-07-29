@@ -40,20 +40,26 @@ model directly from official European statistical sources (Eurostat and
 AMECO, via their SDMX REST APIs), replacing the synthetic or ad hoc
 calibration common in the computational Marxian literature. Applying this
 pipeline to Portugal, we document a sectoral profile for 2022 and an
-aggregate profit-rate series for 1996--2022, and in the process surface a
-measurement artifact the pipeline itself lets us diagnose and correct:
-AMECO's capital-stock series is valued at constant (2020) prices while its
-wage and output series are valued at current prices, and combining them
-without adjustment produces a spuriously large rise in the profit rate,
-driven by an organic composition that appears to fall only because it is
-divided by a nominally inflated wage bill. Once wages and output are
-deflated onto the same price basis as the capital stock, Portugal's
-profit rate is roughly flat to mildly declining over 1996--2022, and the
-same correction applied to Spain shows a clearer decline --- closer to
-the classical tendential expectation than the uncorrected series
-suggests. We report both the naive and the valuation-consistent series
-side by side, as a methodological illustration of a mistake this kind of
-automated pipeline makes easy to avoid, not only as an empirical result.
+aggregate profit-rate series for 1996--2022, and in doing so surface and
+correct two distinct measurement problems rather than one. External
+review of an earlier draft identified a genuine stock-flow conflation in
+the model itself: gross output was computed as $O_i=C_i+V_i+S_i$, adding
+a capital \emph{stock} directly to two annual \emph{flows}. We correct
+this --- output now uses the capital \emph{transferred} in a period,
+$O_i=\delta_iC_i+V_i+S_i$ --- and replace an aggregate depreciation term
+that used a flat 10\% of the capital stock with AMECO's own
+consumption-of-fixed-capital series. The correction has a clean,
+checkable consequence: the rate of exploitation, computed as $(Y-V)/V$,
+becomes exactly invariant under a common deflator applied to $Y$ and $V$,
+as the algebra requires, which it was not before the fix. With this in
+place, Portugal's profit rate for 1996--2022 sits in an $8$--$12\%$ band
+under three deflation conventions we test, modestly rising or mildly
+declining depending on which is used, rather than the dramatic swing an
+earlier, buggy version of this calibration reported. We treat this
+two-stage correction --- catching a stock-flow error, then re-measuring
+valuation sensitivity correctly on top of it --- as a contribution in its
+own right, alongside the specific empirical numbers, and report it in
+that spirit.
 \end{abstract}
 
 \section{Introduction}
@@ -96,20 +102,31 @@ requested.
 We use this pipeline to calibrate the model for Portugal and report two
 sets of results: a detailed 19-sector profile for 2022, and an aggregate
 time series of the rate of exploitation, organic composition, and profit
-rate for 1996--2022. Read naively --- combining AMECO's current-price wage
-and output series with its constant-price capital-stock series, as a
-first pass at the raw data would do --- the latter shows a profit rate
-rising sharply, driven by an organic composition that appears to fall.
-We show this is substantially a valuation artifact: deflating the wage
-and output series onto the same price basis as the capital stock removes
-most of the apparent trend, leaving a profit rate that is roughly flat to
-mildly declining for Portugal, and clearly declining for Spain under the
-same correction. We treat this finding as a methodological result in its
-own right --- a concrete demonstration of how an automated pipeline that
-mixes valuation conventions across variables can manufacture a
-statistically salient but spurious trend --- alongside the more modest
-substantive conclusion that neither country shows the sharp profit-rate
-recovery a naive reading of the same official data would suggest.
+rate for 1996--2022. An earlier draft of this paper reported the latter
+series with a genuine defect: gross output throughout the model,
+$O_i=C_i+V_i+S_i$, added a capital \emph{stock} ($C_i$) to two annual
+\emph{flows} ($V_i,S_i$), and the aggregate time series used a flat 10\%
+of the capital stock as its depreciation deduction rather than reported
+data. External review caught both. The stock-flow fix replaces $C_i$ in
+every output-facing formula with $\delta_iC_i$, the capital
+\emph{transferred} in a period; the depreciation fix replaces the flat
+10\% with AMECO's own consumption-of-fixed-capital series. Together they
+have a checkable algebraic consequence, which we verify directly: the
+rate of exploitation $e=(Y-V)/V$ is now exactly invariant under a common
+deflator applied to $Y$ and $V$, as it must be, which it demonstrably was
+not under the earlier, buggy formula. With the fix in place, we
+re-examine the same valuation question the earlier draft raised ---
+whether AMECO's mixed-valuation capital and flow series distort the
+measured trend --- and find a real but much more modest effect than
+before: Portugal's profit rate sits in an $8$--$12\%$ band across three
+deflation conventions over 1996--2022, moving mildly in either direction
+depending on which is used, with the residual sensitivity now
+concentrated in the profit rate (through the classical
+capital-advanced denominator $C+V$) rather than in the rate of
+exploitation. We report the whole sequence --- the bug, the fix, and the
+correctly-measured residual sensitivity --- rather than only the final
+numbers, since the sequence is itself the more durable methodological
+lesson.
 
 The remainder of the paper is organized as follows. Section~2 situates the
 model in the relevant theoretical literature. Section~3 presents the model
@@ -167,7 +184,18 @@ $k_d = C_d/V_d$, and profit rate $r_d = e_d/(k_d+1)$. Accumulation follows
 \end{align}
 where $\sigma_{c,d}+\sigma_{v,d}+\gamma_d=1$ splits surplus value between
 reinvestment in constant capital, reinvestment in variable capital, and
-capitalist consumption, and $\delta_d$ is a depreciation rate. Intersectoral
+capitalist consumption, and $\delta_d$ is a depreciation rate. Throughout,
+$C_d$ denotes constant capital \emph{advanced} --- a stock, the state
+variable accumulating in the equation above, on which organic composition
+and profit rate are conventionally computed. This is distinct from the
+constant capital \emph{transferred} to output during a single period,
+$\delta_dC_d$ under the model's single depreciation rate --- the quantity
+that belongs in a period's value-of-product identity, $W_d=\delta_dC_d+
+V_d+S_d$, not $C_d$ itself. An earlier version of this paper conflated
+the two (using $C_d+V_d+S_d$ as gross output throughout), which produces
+a value-of-product figure dominated by a stock rather than a period flow;
+Section~3.3 and Section~6.2 discuss the fix and its consequences.
+Intersectoral
 consistency (does Department~I's wage and unaccumulated-surplus income
 suffice to buy Department~II's output, and vice versa) is checked
 \emph{a posteriori} by a dedicated consistency function, not imposed
@@ -221,12 +249,22 @@ through the mechanisms below.
 
 \paragraph{Capital mobility.} The term $\mu(r_i-\bar r)C_i$ reallocates
 investment toward above-average-profit sectors, a direct computational
-analogue of capital's tendency to flow toward higher returns.
+analogue of capital's tendency to flow toward higher returns. We note
+without resolving it that this term is not guaranteed to conserve
+aggregate constant capital: $\sum_i\mu(r_i-\bar r)C_i=0$ requires $\bar r$
+to equal the $C_i$-weighted average of the $r_i$, whereas $\bar r$ is
+computed as the aggregate ratio $\sum_iS_i/\sum_i(C_i+V_i)$ (Equation
+above), which need not coincide with that weighted average since each
+$r_i$'s own denominator includes $V_i$ as well as $C_i$. Mobility can
+therefore create or destroy aggregate constant capital rather than
+purely reallocating it; we flag this as an open modeling question in
+Section~6.2 rather than a resolved design choice.
 
 \paragraph{Aggregate realization pressure.} Setting $\kappa_i \equiv
 \min(\rho_{\text{real}},1)$ uniformly across sectors, with
 $\rho_{\text{real}} = \sum_i \min(O_i,(AO)_i) / \sum_i (AO)_i$ and gross
-output $O_i=C_i+V_i+S_i$, dampens planned reinvestment economy-wide
+output $O_i=\delta_iC_i+V_i+S_i$ (capital \emph{transferred}, not the
+stock $C_i$ --- Section~3.1), dampens planned reinvestment economy-wide
 whenever aggregate intermediate demand implied by $A$ and current outputs
 exceeds what those same outputs can supply. This is a coarse,
 aggregate approximation --- it does not distinguish which sectors are
@@ -248,7 +286,20 @@ fixed point is
   D_i &= \sum_j A_{ij}\,\kappa_j\,\sigma_{c,j}S_j, &
   \rho_i &= \min\!\left(1, \frac{O_i}{D_i}\right). \label{eq:rationing}
 \end{align}
-We solve this by damped (under-relaxed) fixed-point iteration inside the
+Two modeling simplifications in Equation~\eqref{eq:rationing} deserve
+comment. First, $A_{ij}$ multiplies planned constant-capital
+\emph{expenditure} $\kappa_j\sigma_{c,j}S_j$ directly, as if a unit of
+investment expenditure by sector $j$ requires the same input mix as a
+unit of $j$'s physical output; we do not separately track a
+capital-output conversion, and this identification should be read as an
+explicit simplifying assumption, not a derived relationship. Second, the
+full supply $O_i$ is treated as available to meet investment demand,
+though in reality output must also replace intermediate inputs and meet
+consumption and other final demand first; the mechanism therefore
+represents an upper bound on investable supply, and is best read as
+constraining the investment-goods side of reproduction specifically (we
+return to this in Section~6.2's discussion of final-demand
+microfoundations). We solve this by damped (under-relaxed) fixed-point iteration inside the
 right-hand side of the ODE at every solver evaluation, in exactly the same
 spirit as the Sraffa-price linear solve above, rather than exposing
 $(\rho,\kappa)$ as differential-algebraic state to the solver. This choice
@@ -275,12 +326,27 @@ map, and, as we show below, it does not by itself bound $F$'s local
 behavior. What can be established is more specific to $F$'s own
 structure.
 
-\emph{Existence is unconditional.} Because $D_i$ is bounded away from
-zero and $\kappa$, $D$, $\rho(\cdot)$ are continuous, $F$ is a continuous
-self-map of the compact convex set $[0,1]^N$. Brouwer's fixed-point
-theorem therefore guarantees a fixed point exists for every admissible
-$(A,\sigma_c,S,O)$, independent of whether any particular iterative
-scheme converges to it.
+\emph{Existence is unconditional.} $D_i$ is clamped away from zero
+($\max(D_i,\varepsilon)$ for a small $\varepsilon>0$, avoiding division
+by zero when a sector's rationed suppliers deliver no input at all), and
+$\kappa_j$ is defined as $1$ when $j$'s input column is empty (no
+supplier to be rationed by). With these two conventions stated
+explicitly, $\kappa$, $D$, $\rho(\cdot)$ are continuous on $[0,1]^N$, so
+$F$ is a continuous self-map of this compact convex set. Brouwer's
+fixed-point theorem therefore guarantees \emph{a} fixed point exists for
+every admissible $(A,\sigma_c,S,O)$, independent of whether any
+particular iterative scheme converges to it. Existence does not imply
+uniqueness: because $F$ is antitone (below), the model could in
+principle admit multiple fixed points or a genuine two-cycle rather than
+converging under damping. We do not have a uniqueness proof; what we
+have is a direct empirical check, run against a real 19-sector matrix
+under a synthetic demand shock tight enough to bind every sector
+($\kappa_i<1$ for all $i$), varying the initial $\rho$ (50 uniform draws
+on $(0.1,1]^N$), the sector ordering (20 permutations, unpermuted after
+solving), and the convergence tolerance ($10^{-4}$ to $10^{-12}$): the
+damped iteration reached the same fixed point to numerical precision
+($<10^{-6}$) in every case. This is evidence of practical uniqueness in
+the regime we test, not a proof of uniqueness in general.
 
 \emph{$F$ is antitone (order-reversing) in $\rho$.} $\kappa_j(\rho)=
 \min_{i:A_{ij}>0}\rho_i$ is isotone (a minimum is monotone in each
@@ -289,10 +355,13 @@ argument); $D_i(\kappa)=\sum_jA_{ij}\kappa_j\sigma_{c,j}S_j$ is isotone
 antitone (decreasing in $D_i$). Composing two isotone maps with one
 antitone map yields an antitone map. This is the structural reason
 undamped Picard iteration oscillates rather than diverging or slowly
-converging: iterating an antitone map is exactly the setting in which
-two-cycles, not convergence, are the generic outcome, because $F\circ F$
---- not $F$ itself --- is isotone. Our two-sector example is not an
-unlucky special case; it is the typical behavior of this class of map.
+converging: iterating an antitone map is a setting in which two-cycles,
+rather than convergence, are a characteristic possible failure mode,
+because $F\circ F$ --- not $F$ itself --- is isotone. Our two-sector
+example instantiates this known qualitative behavior of order-reversing
+maps; it is not evidence that every antitone map in this class
+oscillates, only that oscillation is a real and structurally-explained
+possibility rather than an unexplained curiosity.
 
 \emph{Damping relocates a real eigenvalue, exactly.} At an interior
 fixed point $\rho^*$ (no $\rho_i$ pinned at a boundary), differentiating
@@ -306,8 +375,13 @@ $\kappa_j$ --- confirming antitonicity locally, in agreement with the
 global argument above. For the damped step $\rho\mapsto(1-\alpha)\rho+
 \alpha F(\rho)$, a real Jacobian eigenvalue $\lambda$ of $F$ at $\rho^*$
 maps to $\mu(\alpha)=(1-\alpha)+\alpha\lambda$, and
-$\alpha^\star=1/(1-\lambda)$ sets $\mu(\alpha^\star)=0$, i.e.\ locally
-superlinear convergence. This is not hypothetical: for the closed-form
+$\alpha^\star=1/(1-\lambda)$ sets $\mu(\alpha^\star)=0$: damping at
+$\alpha^\star$ exactly annihilates the local linear error mode
+associated with $\lambda$. This is a statement about one eigenvalue, not
+a claim that the full damped iteration converges superlinearly in
+general --- that would additionally require every other eigenvalue of
+the local Jacobian to vanish or to already lie well inside the unit
+disc at $\alpha^\star$, conditions we have not checked in general. This is not hypothetical: for the closed-form
 two-sector example above, the Jacobian collapses to a single active
 eigenvalue $\lambda=-1$ exactly (verified both algebraically from the
 formula above and numerically), for which
@@ -402,34 +476,72 @@ The aggregate AMECO capital-stock series used in Section~5.2 (item
 \texttt{OKND}, ``net capital stock at 2020 prices'') is, by contrast,
 already a constant-price (volume) series, whereas AMECO's wage
 (\texttt{UWCD}) and output (\texttt{UVGD}) series are current-price. The
-pipeline exposes both the raw combination and a valuation-consistent
-alternative that deflates the wage and output series by AMECO's own GDP
-deflator (\texttt{PVGD}$=$\texttt{UVGD}/\texttt{OVGD}$\times100$) onto the
-same basis as the capital stock; Section~5.2 reports both.
+pipeline exposes both the raw combination and valuation-consistent
+alternatives that deflate the wage and output series by AMECO's own GDP
+deflator (\texttt{PVGD}$=$\texttt{UVGD}/\texttt{OVGD}$\times100$) or
+investment-goods deflator (\texttt{PIGT}) onto the same basis as the
+capital stock; Section~5.2 reports all three. The period's surplus in
+this aggregate calculation, $Y-V-\text{CCF}$, uses AMECO's own
+consumption-of-fixed-capital series (item \texttt{UKCT}, current-price,
+deflated consistently with $V$ and $Y$ in each convention) rather than an
+assumed fraction of the capital stock; an earlier version of this
+calculation used a flat $10\%$ of the (constant-price) capital stock,
+which breaks the algebraic invariance of $e=(Y-V)/V$ under a common
+deflator applied to $Y$ and $V$ --- an inconsistency we found via
+external review and verify is now resolved in Section~5.2.
+
+Sectoral estimates of $e$ (Section~5.1) impose a floor of $0.1$: a small
+number of sectors have business income, net of consumption of fixed
+capital, close to zero or negative relative to compensation, which the
+model's positivity requirement on $e$ (Section~3.1) does not allow. This
+is an imposed value, not a purely empirical one, and the pipeline now
+reports explicitly how many sectors hit it (Section~5.1) rather than
+leaving the floor invisible in the reported figures.
 
 \section{Results: Portugal}
 
 \subsection{Sectoral profile, 2022}
 
 Table~\ref{tab:sectors} reports the calibrated rate of exploitation, organic composition,
-and profit rate for all 19 sections, ranked by profit rate. The
-value-added-weighted means are $e\approx0.89$, $k\approx24.8$, and
-$r\approx10.0\%$; the mean organic composition is dominated by a single
-outlier, real estate activities ($k\approx334$), which reflects the
+profit rate, and gross value added (VAB, sourced directly from the
+underlying Eurostat data, not reconstructed from model parameters) for
+all 19 sections, ranked by profit rate. Sectoral VAB sums to
+$\approx\mkern1mu209.8$ thousand~M\texteuro, matching Portugal's 2022
+national accounts total by construction --- an accounting identity the
+pipeline checks and that an earlier, buggy version of this table
+violated by two orders of magnitude, because it reconstructed a stand-in
+for VAB as $C_i+V_i+e_iV_i$ (adding a capital \emph{stock} to two flows,
+the same conflation discussed in Section~3.1) instead of reporting the
+real underlying series.
+
+Three different summary statistics for the sectoral rates are worth
+distinguishing, since they answer different questions and can diverge
+substantially: the simple (unweighted) mean across the 19 sectors is
+$e\approx0.89$, $k\approx24.8$, $r\approx10.0\%$; the VAB-weighted mean
+is $e\approx1.45$, $k\approx44.2$, $r\approx10.7\%$; and the properly
+aggregated rate, $\sum_iS_i/\sum_i(C_i+V_i)$ (summing numerators and
+denominators separately before dividing, rather than averaging ratios),
+is $r\approx6.1\%$. The gap between these is driven substantially by a
+single outlier, real estate activities ($k\approx334$), reflecting the
 well-known effect of imputed owner-occupied rents inflating capital
 intensity in this sector's national-accounts treatment rather than a
-genuine production characteristic, and should be discounted accordingly
-when interpreting the sectoral mean. Excluding real estate, sectoral
-profit rates range from financial and insurance activities at the top
-($r\approx36\%$) to public administration and utilities near the bottom
-($r$ below 2\%), a dispersion consistent with the classical expectation
-that market prices, not labor values, equalize profit rates across
-sectors of differing organic composition --- which Section~5.3 examines
-directly.
+genuine production characteristic; it should be discounted when
+interpreting any of the three summary figures. Four of the 19 sectors
+hit the $e=0.1$ floor described in Section~4.3 (business income net of
+depreciation close to zero or negative relative to compensation) ---
+an imposed value in those four cases, not a purely empirical
+observation. Excluding real estate, sectoral profit rates range from
+financial and insurance activities at the top ($r\approx36\%$) to public
+administration and utilities near the bottom ($r$ below 2\%), a
+dispersion consistent with the classical expectation that market prices,
+not labor values, equalize profit rates across sectors of differing
+organic composition --- which Section~5.3 examines directly.
 
 \begin{table}[htbp]
 \centering
-\caption{Sectoral calibration, Portugal, 2022 (real Eurostat data).}
+\caption{Sectoral calibration, Portugal, 2022 (real Eurostat data). VAB
+is the sector's real gross value added, not a quantity reconstructed
+from other columns.}
 \label{tab:sectors}
 \input{figures/table1_sectors.tex}
 \end{table}
@@ -443,19 +555,36 @@ solid line combines AMECO's current-price wage and output series with its
 constant-price capital-stock series without adjustment (\emph{current-price
 V, VAB}); the dashed line first deflates the wage and output series onto
 the same constant-price basis as the capital stock (\emph{deflated V,
-VAB}), using AMECO's own GDP deflator. Under the unadjusted convention,
-the rate of exploitation rises from $0.21$ to $0.61$, the organic
-composition falls from $8.99$ to $5.40$, and the profit rate rises
-correspondingly from $2.1\%$ to $9.5\%$. Under the valuation-consistent
-convention, all three series are markedly less dramatic: the rate of
-exploitation moves from $0.58$ to $0.57$, the organic composition rises
-slightly from $5.24$ to $5.80$, and the profit rate declines mildly from
-$9.4\%$ to $8.4\%$. Figure~\ref{fig:ptvses} repeats the valuation-consistent
-calculation for Spain, using the identical pipeline: the profit rate
-declines more clearly, from $7.0\%$ to $4.3\%$, with the rate of
-exploitation falling from $0.49$ to $0.36$ and the organic composition
-rising from $6.10$ to $7.34$. We discuss the implications of this
-valuation sensitivity in Section~6.1.
+VAB}), using AMECO's own GDP deflator, with the surplus computed from
+real consumption-of-fixed-capital data (Section~4.3), not an assumed
+depreciation rate. Under both conventions the rate of exploitation moves
+identically, from $0.785$ in 1996 to $0.739$ in 2022 (ranging $0.68$ to
+$0.91$ over the period, dipping sharply in 2020) --- \emph{exactly}
+identically, as the algebra in Section~4.3 requires once $Y$, $V$, and
+the depreciation deduction are deflated by a common index, and as we
+verify directly (maximum difference across all 27 years: $0$, to
+floating-point precision). This was not the case in an earlier, buggy
+version of this calibration, where the two conventions diverged sharply
+($0.21\to0.61$ vs.\ $0.58\to0.57$) --- the divergence was itself the
+symptom of the flat-depreciation bug, not a property of the underlying
+valuation question, and disappears once the bug is fixed. What remains
+convention-sensitive is the profit rate, through the capital-advanced
+denominator $C+V$: under the unadjusted convention it rises modestly
+from $7.9\%$ to $11.6\%$; under the GDP-deflated convention it moves from
+$12.6\%$ to $10.9\%$; under an investment-deflator convention
+(\texttt{PIGT} in place of \texttt{PVGD}, Section~6.1) from $15.0\%$ to
+$12.3\%$. Across all three and all 27 years, the profit rate stays within
+an $8$--$12\%$ band, rising mildly under one convention and declining
+mildly under the other two --- a real but modest sensitivity, not the
+near-fivefold artifact the earlier, buggy calibration reported.
+Figure~\ref{fig:ptvses} repeats the GDP-deflated calculation for Spain,
+using the identical pipeline: the rate of exploitation again moves
+identically to the unadjusted convention (verified the same way), from
+$0.85$ to $0.76$, while the profit rate moves from $12.0\%$ to $9.1\%$ under
+the deflated convention (vs.\ $7.9\%$ to $9.6\%$ unadjusted) --- the same
+qualitative picture as Portugal: a real but modest level of
+convention-sensitivity confined to the profit rate. We discuss the
+implications of this in Section~6.1.
 
 \begin{figure}[htbp]
 \centering
@@ -469,7 +598,7 @@ valuation-consistent (deflated) conventions.}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.65\textwidth]{figures/fig1b_pt_vs_es.pdf}
-\caption{Profit rate under the valuation-consistent convention, Portugal
+\caption{Profit rate under the GDP-deflated convention, Portugal
 vs.\ Spain, 1996--2022 (real AMECO data).}
 \label{fig:ptvses}
 \end{figure}
@@ -484,9 +613,19 @@ vs.\ Spain, 1996--2022 (real AMECO data).}
 \subsection{The transformation problem on the real economy}
 
 Figure~\ref{fig:transformation} compares labor values with Sraffian production prices computed
-on the real calibrated matrix, for three illustrative uniform profit rates
-($\bar r = 0$, $0.3R_{\max}$, $0.6R_{\max}$, with $R_{\max}\approx691\%$
-for this economy). As $\bar r$ rises, sectors with above-average organic
+on the real calibrated matrix, for three empirically plausible uniform
+profit rates ($\bar r=5\%,10\%,15\%$). We deliberately do not plot
+against fractions of $R_{\max}$: the matrix's maximum feasible rate is
+$R_{\max}\approx691\%$ for this economy, implausibly high for a real
+profit rate and itself a symptom of the low spectral radius
+($\rho(A)\approx0.13$) flagged as an open question about the matrix
+construction in Section~6.2; plotting at, say, $0.3R_{\max}\approx207\%$
+would make the transformation effect visually striking but at a profit
+rate with no empirical meaning. We checked, without including a second
+figure, that the qualitative pattern below is unchanged at those higher
+fractions of $R_{\max}$; the concern about the matrix's plausible scale
+is a separate, open issue from whether the transformation-problem
+mechanics themselves are implemented correctly. As $\bar r$ rises, sectors with above-average organic
 composition see their production price rise relative to their labor
 value, and vice versa, the qualitative signature the transformation
 problem predicts, now shown on a real rather than a randomly generated
@@ -539,70 +678,88 @@ real data).}
 
 \section{Discussion}
 
-\subsection{A valuation artifact, and what survives it}
+\subsection{Two bugs, not one: a stock-flow conflation and a valuation artifact}
 
 A first pass at the raw AMECO series appears to show a profit rate rising
 sharply for Portugal over 1996--2022, driven by an organic composition
 that falls even as the rate of exploitation nearly triples. This is the
-pattern we originally reported; it does not survive a closer look. The
-issue is not the classical \emph{value-composition-vs-technical-composition}
-distinction --- the concern that a current-price capital stock can fall
-relative to labor purely from capital-goods price deflation, independent
-of any real change in the capital/labor ratio \citep{shaikh2016capitalism,
-basu2013reserve} --- because AMECO's capital-stock series (\texttt{OKND})
-turns out to already be a constant-price (2020) volume series, not a
-current-price one. The actual problem is narrower and, once identified,
-unambiguous: AMECO's wage and output series (\texttt{UWCD}, \texttt{UVGD})
-\emph{are} current-price, so combining them directly with the
-constant-price capital stock divides an inflation-adjusted numerator by a
-nominally inflated denominator. Over 26 years of cumulative wage and
-price inflation, this alone is enough to manufacture a large apparent
-fall in $k=C/V$ and a correspondingly large apparent rise in $r$, with no
-requirement that anything about the underlying economy changed.
+pattern we originally reported. It does not survive a closer look, and
+tracing why it does not survive turned out to require finding two
+separate defects, not one.
 
-Once wages and output are deflated onto the same constant-price basis as
-the capital stock (Section~4.3, Figure~\ref{fig:timeseries}, dashed lines), the picture
-changes substantially: Portugal's profit rate is roughly flat, moving
-from $9.4\%$ to $8.4\%$ over the period rather than from $2.1\%$ to
-$9.5\%$, and the organic composition is roughly flat as well. Applying
-the identical correction to Spain (Figure~\ref{fig:ptvses}) shows a clearer decline,
-from $7.0\%$ to $4.3\%$, driven by both a falling rate of exploitation and
-a rising organic composition --- closer to the classical tendential-fall
-pattern than either country's uncorrected series suggested. We do not
-read this as proof of a general tendential fall from a two-country,
-single-source comparison; national-accounts profit-rate estimates are
-sensitive to depreciation conventions, sectoral composition, and the
-specific deflator used, which we discuss further in Section~6.2.
+\emph{The first defect was in the model, not the data.} Gross output
+throughout MarxKapital was computed as $O_i=C_i+V_i+S_i$ (Section~3.3),
+adding a capital \emph{stock} to two annual \emph{flows}; the aggregate
+AMECO calculation used the same conflation implicitly, deducting a flat
+$10\%$ of the (constant-price) capital stock as ``depreciation'' from a
+current-price surplus. External review of an earlier draft caught this.
+It matters here specifically because the flat-depreciation term breaks
+an algebraic identity that should otherwise hold: if $Y$ (output) and $V$
+(wages) are both deflated by a common price index, $e=(Y-V)/V$ is
+invariant under that deflation --- the common factor cancels. Once a
+depreciation term denominated in a \emph{different}, unscaled basis
+(the constant-price capital stock) is subtracted from the numerator,
+that invariance breaks, and it breaks in a way that depends on how much
+the deflator itself has moved --- which changes over 26 years of
+cumulative inflation, producing not just a level shift between
+conventions but a diverging \emph{trend}. This, not a genuine valuation
+difference, is what generated the original $e:0.21\to0.61$ figure.
 
-A natural objection to the correction itself: AMECO's capital stock is a
-chain-linked volume series built from investment flows using an
-investment-specific price index, not the general GDP deflator we used
-above, so deflating wages and output by the GDP deflator (\texttt{PVGD})
-does not guarantee the same price basis as the capital stock. We checked
-this directly rather than leaving it as a caveat. AMECO publishes a
-gross-fixed-capital-formation deflator (\texttt{PIGT}), also indexed to
-2020, that better reflects the capital stock's own price basis; repeating
-the deflation with \texttt{PIGT} in place of \texttt{PVGD} gives a profit
-rate for Portugal moving from $11.2\%$ to $9.4\%$ --- a somewhat higher
-level than the GDP-deflator correction, but the same qualitative
-conclusion: flat to mildly declining, nowhere close to the near-fivefold
-rise the uncorrected series showed. We take this as evidence that the
-correction is not an artifact of which deflator was chosen, though we
-could not find, and do not believe AMECO publishes, a current-price
+We fixed the underlying conflation directly (Section~3.1, Section~4.3):
+output-facing formulas now use $\delta_iC_i$ (capital \emph{transferred}
+in a period) rather than $C_i$ (capital \emph{advanced}, a stock), and
+the aggregate calculation now uses AMECO's own consumption-of-fixed-capital
+series rather than an assumed rate. The predicted consequence is
+checkable, and we checked it directly rather than asserting it: with the
+fix, $e=(Y-V)/V$ is now \emph{exactly} identical between the unadjusted
+and GDP-deflated conventions for every year in the 1996--2022 series,
+for both Portugal and Spain (Section~5.2). This is not a small
+improvement in agreement --- it is exact equality to floating-point
+precision, which is what the algebra predicts once the numerator and
+denominator share a common deflation factor, and is the strongest kind
+of internal-consistency check a reader could ask for: not ``the numbers
+look more reasonable now,'' but ``the two conventions are now provably
+required to agree, and they do.''
+
+\emph{The second, genuine question is the one we originally set out to
+answer:} does AMECO's capital stock (constant-price) versus wage and
+output series (current-price) distort the measured profit rate once the
+depreciation bug is out of the way? It does, but modestly. Portugal's
+profit rate now sits in an $8\%$--$12\%$ band across three deflation
+conventions over the full period (Section~5.2) --- rising mildly from
+$7.9\%$ to $11.6\%$ unadjusted, declining mildly from $12.6\%$ to
+$10.9\%$ under the GDP deflator, and from $15.0\%$ to $12.3\%$ under an
+investment-goods deflator. We checked the investment-deflator variant
+specifically because AMECO's capital stock is a chain-linked series built
+from investment flows using an investment-specific price index
+(\texttt{PIGT}), not the general GDP deflator (\texttt{PVGD}); the two
+give different \emph{levels} but the same qualitative shape (mild
+decline), evidence the residual sensitivity is not an artifact of which
+deflator was picked. Applying the GDP-deflated convention to Spain
+(Figure~\ref{fig:ptvses}) shows the same modest pattern: a profit rate
+moving from $12.0\%$ to $9.1\%$ against $7.9\%$ to $9.6\%$ unadjusted. We
+do not read either country's series as proof of a general tendential
+pattern from a two-country, single-source comparison; national-accounts
+profit-rate estimates remain sensitive to depreciation conventions and
+sectoral composition, discussed further in Section~6.2. We also could
+not find, and do not believe AMECO publishes, a current-price
 (replacement-cost) capital-stock series that would let us skip deflation
-entirely and compare wages, output, and capital stock at a common
-same-year current valuation, which would be the cleaner check in
-principle. But it does mean the headline finding of this paper is methodological
-rather than substantive: an automated calibration pipeline that pulls
-several series from the same database without checking that they share a
-valuation convention can manufacture a large, statistically salient, and
-entirely spurious trend, and we think this is a more useful and more
-honest result to report than the uncorrected series would have been on
-its own. Disaggregating the corrected aggregate trend by sector, and
-comparing it against the 2022 cross-section of Table~\ref{tab:sectors}, is beyond the
-scope of this paper --- complicated further by the single-year nature of
-the sectoral calibration versus the time-series nature of the aggregate
-result --- and is left for future work.
+entirely and compare all three quantities at a common current-year
+valuation, which would be the cleanest check in principle.
+
+We report the full sequence --- the original artifact, the stock-flow bug
+that substantially manufactured it, the fix, and the smaller genuine
+sensitivity that remains --- rather than only the corrected numbers,
+because the sequence is the more durable methodological finding here: an
+automated pipeline that conflates a stock with a flow, or mixes
+valuation conventions across variables pulled from the same database,
+can each independently manufacture a statistically salient but spurious
+trend, and the two can compound. Disaggregating the corrected aggregate
+trend by sector, and comparing it against the 2022 cross-section of
+Table~\ref{tab:sectors}, is beyond the scope of this paper ---
+complicated further by the single-year nature of the sectoral
+calibration versus the time-series nature of the aggregate result ---
+and is left for future work.
 
 \subsection{Limitations}
 
@@ -647,52 +804,109 @@ investment-deflated; Section~5.2 and Section~6.1) and for two countries
 (Portugal and Spain), which is enough to show the corrected finding is
 not a single-country, single-deflator artifact, but not enough to
 establish a general pattern across peripheral EU economies, nor to rule
-out sensitivity to the depreciation-rate assumption (a flat 10\% here,
-Section~5.2) or to sectoral composition effects that an aggregate series
-cannot separate from a genuine average-rate change. The sectoral
+out sectoral composition effects that an aggregate series cannot
+separate from a genuine average-rate change. The sectoral
 profile (Table~\ref{tab:sectors}) still uses a single set of choices: net capital stock
 rather than perpetual-inventory, and, for the coupling mechanisms of
 Section~3.3, a single value of the mobility coefficient $\mu$ and a
-single random seed for the synthetic illustration. Section~3.3
+single random seed for the synthetic illustration; a systematic sweep
+across many random technical matrices (rather than the single seed used
+in Figure~\ref{fig:coupling}), reporting convergence rates, iteration
+counts, and dispersion outcomes as a distribution rather than a point
+estimate, is left for future work. Section~3.3
 establishes that a fixed point always exists (Brouwer), explains
 structurally why undamped iteration oscillates rather than converges
-(the map is antitone), and proves the default damping is locally
-superlinear for the closed-form two-sector case (the Jacobian
-eigenvalue there is exactly $-1$, and $\alpha=0.5$ zeroes it exactly).
-What remains open is a global convergence-\emph{rate} guarantee across
-all admissible $(A,\sigma,S,O)$ and initial conditions --- and
-Section~3.3's own negative result suggests the obvious route to one, a
-global Lipschitz bound in the spirit of $\rho(A)<1$, cannot supply it:
-we showed algebraically that its tightest admissible form always
-exceeds $1$ whenever any sector is actually rationed. Closing this gap,
-if it can be closed at all, likely requires a different technique ---
-possibly exploiting the antitone structure directly (e.g.\ bounding
-$F\circ F$) rather than a Banach-style argument on $F$ itself --- and we
-continue to rely on the empirical sweep (twenty-plus parameter
-combinations at $N=8$ and $N=19$, no failures) for the general case in
-the meantime. We regard extending the valuation-consistent comparison to
-more EU economies, and testing perpetual-inventory capital stock against
-the aggregate trend, as the most direct next steps before treating either
-result as more than suggestive.
+(the map is antitone), gives direct empirical evidence of practical
+uniqueness under variation in initial conditions, sector ordering, and
+tolerance in one genuinely-rationed test case, and shows the default
+damping annihilates the dominant local error mode exactly in the
+closed-form two-sector case. What remains open is a uniqueness
+\emph{proof} and a global convergence-\emph{rate} guarantee across all
+admissible $(A,\sigma,S,O)$ and initial conditions --- and Section~3.3's
+own negative result suggests the obvious route to the latter, a global
+Lipschitz bound in the spirit of $\rho(A)<1$, cannot supply it: we
+showed algebraically that its tightest admissible form always exceeds
+$1$ whenever any sector is actually rationed. Closing this gap, if it
+can be closed at all, likely requires a different technique --- possibly
+exploiting the antitone structure directly (e.g.\ bounding $F\circ F$)
+rather than a Banach-style argument on $F$ itself --- and we continue to
+rely on the empirical evidence above for the general case in the
+meantime.
+
+\emph{The technical matrix construction has not been fully audited.}
+Section~4.2 describes clipping negative margin-accounting cells to zero
+before aggregation, but we have not reported the total magnitude
+clipped, which cells and sectors are affected, or the effect on column
+sums and the matrix's spectral radius; nor have we validated the
+19-sector matrix's row and column sums against Eurostat's own published
+totals, or documented the CPA-to-NACE concordance between the
+product-by-product symmetric table and the industry-organized sectoral
+accounts it is combined with, or distinguished a domestic-use matrix
+from a total-use matrix (imported intermediate inputs are not currently
+modeled as distinct from domestically-supplied ones). The matrix's very
+low spectral radius ($\rho(A)\approx0.13$, implying
+$R_{\max}\approx691\%$, Section~5.3) is plausible but unusually low for
+an economy-wide input-output matrix, and we flag it here as a genuine
+open question about whether the construction under-states
+intermediate-input intensity, rather than asserting the matrix is
+correctly scaled. A full audit against published row/column totals, with
+an explicit accounting-reconciliation assertion built into the pipeline
+(failing loudly if sectoral aggregates do not reconcile with national
+totals, in the spirit of the VAB check in Section~5.1), is the most
+important remaining item of future work on the empirical side of this
+paper.
+
+\emph{The mobility term's conservation properties are unresolved}
+(Section~3.3): $\sum_i\mu(r_i-\bar r)C_i$ need not vanish under the
+model's definition of $\bar r$, so capital mobility may not purely
+reallocate aggregate constant capital. \emph{The rationing mechanism's
+demand term treats planned investment expenditure as if it required the
+same input mix as a unit of physical output}, an explicit simplifying
+assumption (Section~3.3) rather than a derived capital-output
+relationship, and treats the full sectoral supply $O_i$ as available for
+investment before intermediate replacement and consumption demand are
+met --- overstating investable supply, in the same direction as, and
+compounding, the final-demand microfoundation gap noted above.
+
+\emph{Reproducibility is live-query reproducibility, not archival
+reproducibility.} Every result in this paper is produced by re-running
+\texttt{gerar\_resultados.jl} against the live Eurostat and AMECO SDMX
+APIs (Availability, below), which is re-runnable but not immune to
+retroactive revisions in the underlying series, dataset vintages, or API
+structure --- a live query today is not guaranteed to reproduce a number
+reported here indefinitely. A stronger reproducibility architecture
+would pair a tagged package release with cached raw API responses (or a
+frozen archival snapshot, e.g.\ on Zenodo) alongside the live-query path,
+letting a reader choose between reproducing this paper's exact reported
+numbers from frozen data and refreshing the analysis against current
+data; we have not built this yet.
 
 \section{Conclusion}
 
 MarxKapital demonstrates that a real, live, officially sourced data
 pipeline for Marxian value-theoretic calibration is practical using
-current European statistical infrastructure, and that exact per-sector
-market-clearing dynamics can be added to a reproduction-schema model
-without the numerical overhead of a formal differential-algebraic
-formulation. Applied to Portugal and Spain, the pipeline surfaces --- and
-lets us diagnose --- a valuation artifact that would otherwise have
-manufactured a large, spurious rise in the measured profit rate; once
-corrected, the underlying trend is far more modest, and closer to the
-classical tendential-fall pattern than the raw series suggested. We think
-this exercise is itself a useful illustration of what a live, multi-source
-statistical pipeline buys a computational Marxian model: not just
-convenience, but the ability to catch exactly this kind of measurement
-error before it is mistaken for an economic finding. Extending the
-valuation-consistent comparison to more economies and testing it against
-alternative capital-stock constructions is left for future work.
+current European statistical infrastructure, and that an exact per-sector
+quantity-rationing mechanism --- solving a genuine fixed point, though
+not imposing hard market clearing at every instant (Section~3.3) --- can
+be added to a reproduction-schema model without the numerical overhead
+of a formal differential-algebraic formulation. Applied to Portugal and
+Spain, the pipeline surfaces --- and lets us diagnose and fix --- two
+distinct measurement problems: a stock-flow conflation in the model's
+own output formula, caught by external review, and a resulting
+valuation artifact in the aggregate profit-rate series that we had
+originally overstated because of it. Corrected, the underlying trend is
+real but modest --- an $8$--$12\%$ band for Portugal across three
+deflation conventions, not the near-fivefold swing an earlier, buggy
+version of this calibration reported. We think this exercise is itself a
+useful illustration of what a live, multi-source statistical pipeline
+buys a computational Marxian model: not just convenience, but the
+ability to catch exactly this kind of measurement and modeling error
+before it is mistaken for an economic finding --- provided the pipeline
+is checked as carefully as the theory it implements. Extending the
+valuation-consistent comparison to more economies, auditing the
+technical matrix construction more thoroughly, and archiving frozen data
+snapshots for stronger reproducibility guarantees (Section~6.2) are left
+for future work.
 
 \section*{Availability}
 

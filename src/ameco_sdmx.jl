@@ -103,6 +103,7 @@ const MAPA_AMECO_SDMX = Dict(
     "custos_unit_trabalho"         => ("AMECO_CHAPTER07-07", "PLCD",  1.0,    3),
     "dívida_pública"               => ("AMECO_CHAPTER18-02", "UDGGL", 1000.0, 1),
     "deflator_FBCF"                => ("AMECO_CHAPTER03-01", "PIGT",  1.0,    3),
+    "CCF"                          => ("AMECO_CHAPTER03-05", "UKCT",  1000.0, 1),
 )
 
 """

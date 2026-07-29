@@ -88,7 +88,12 @@ function analisar_convergencia(sol, depts, p)
          title = "Convergência das taxas de lucro", lw = 2, legend = false)
 end
 
-"""Verifica a condição de equilíbrio intersetorial do modelo de 2 departamentos."""
+"""
+Verifica a condição de equilíbrio intersetorial do esquema clássico de 2
+departamentos: V1+(1-σc1)S1 = C2+σc2·S2. `C1`,`C2` denotam aqui, tal como no
+esquema clássico de Marx, o capital constante \\emph{consumido/transferido}
+no período (não o stock avançado) — a magnitude que precisa de ser
+substituída por compras ao Departamento I."""
 function verificar_equilibrio_2dept(C1, V1, C2, V2, e1, e2, σ_c1, σ_c2)
     S1 = e1 * V1
     S2 = e2 * V2
@@ -108,7 +113,10 @@ não realimenta `sistema_2dept!`) se os níveis de output correntes conseguem
 sustentar a procura intermédia implícita na matriz técnica `p.A`.
 
 Para o instante `t_idx` (por omissão, o último), calcula o output bruto por
-setor `Oᵢ = Cᵢ+Vᵢ+Sᵢ` e a procura intermédia `(A·O)ᵢ`; devolve o desvio por
+setor `Oᵢ = δᵢCᵢ+Vᵢ+Sᵢ` (capital constante \emph{transferido}, δᵢCᵢ — não o
+stock Cᵢ, que é uma magnitude de dimensão temporal distinta de Vᵢ,Sᵢ; ver
+`capital_transferido`/`valor_produto` em `estruturas.jl`) e a procura
+intermédia `(A·O)ᵢ`; devolve o desvio por
 setor (`Oᵢ − (A·O)ᵢ`, positivo quando o setor produz mais do que a economia
 precisa dele como input, negativo quando produz menos) e a razão de
 realização agregada `ρ_real = Σ min(Oᵢ,(A·O)ᵢ) / Σ(A·O)ᵢ` (≤ 1; = 1 sem
@@ -123,7 +131,7 @@ function verificar_equilibrio_Ndept(sol, p; t_idx = length(sol.t))
     C = X[1:N]
     V = X[N+1:2N]
     S = p.e .* V
-    O = C .+ V .+ S
+    O = p.δ .* C .+ V .+ S
     procura_intermédia = p.A * O
     desvio = O .- procura_intermédia
     soma_procura = sum(procura_intermédia)

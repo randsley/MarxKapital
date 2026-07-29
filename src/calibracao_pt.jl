@@ -189,13 +189,24 @@ function processar_qre(dados::DadosINE)
     return df
 end
 
-"""Estima os parâmetros marxianos por setor a partir do QRE processado."""
+"""
+Estima os parâmetros marxianos por setor a partir do QRE processado.
+
+`e` impõe um piso de 0.1: setores cujo rendimento empresarial (após CCF)
+é próximo de zero ou negativo relativamente às remunerações (tipicamente
+por margens finas ou custos de depreciação elevados face ao excedente
+bruto) produziriam `e` nulo ou negativo, o que o modelo não aceita
+(`Departamento` exige `e>0`). Este piso é um valor imposto, não uma
+observação empírica pura — reportado explicitamente abaixo."""
 function estimar_parametros_setoriais(df::DataFrame, A::Matrix{Float64})
     println("\n📐 Estimando parâmetros...")
     N = nrow(df)
     C = df.stock_capital
     V = df.remunerações
     e = max.(0.1, df.taxa_mais_valia)
+    n_saturados = count(df.taxa_mais_valia .< 0.1)
+    n_saturados > 0 && println("  ⚠ e saturado no piso 0.1 em $n_saturados/$N setores " *
+                                "(taxa_mais_valia < 0.1 antes do piso)")
     k = C ./ V
     r = e ./ (k .+ 1)
 
@@ -314,7 +325,7 @@ function calibrar_modelo_portugal(; ano = 2022, agregação = :detalhada,
 
     fonte = fonte_dados == :eurostat ? "INE/Eurostat (dados reais)" : "INE (sintético)"
     resultado = ParâmetrosCalibrados(N, df.setor, df.código_cae,
-        p.C, p.V, p.e, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
+        p.C, p.V, df.VAB, p.e, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
         fonte, ano, now(), 0.85)
 
     println("\n✅ CALIBRAÇÃO CONCLUÍDA — $N setores | PIB: $(round(sum(df.VAB)/1000, digits=1)) mil M€")

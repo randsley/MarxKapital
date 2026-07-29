@@ -80,6 +80,32 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test all(0.0 .<= κ .<= 1.0)
     end
 
+    @testset "Racionamento — sensibilidade a ρ inicial, ordem e tolerância" begin
+        # Verifica empiricamente unicidade prática do ponto fixo (a antitonicidade
+        # do mapa não a garante em teoria — ver paper/main.tex) num regime com
+        # racionamento genuíno (não trivial, κ<1 para todos os setores).
+        Random.seed!(11)
+        N = 12
+        A = criar_matriz_tecnica(N, densidade = 0.5)
+        σ_c = fill(0.5, N)
+        S = 5.0 .+ 10 * rand(N)
+        O = 0.3 .+ rand(N) * 0.5
+        base = _resolver_racionamento(A, σ_c, S, O)
+        @test count(base .< 0.999) == N   # racionamento genuíno em todos os setores
+
+        for _ in 1:20
+            ρ0 = rand(N) .* 0.9 .+ 0.1
+            κ = _resolver_racionamento(A, σ_c, S, O; ρ_inicial = ρ0)
+            @test maximum(abs.(κ .- base)) < 1e-6
+        end
+
+        for _ in 1:10
+            perm = randperm(N)
+            κp = _resolver_racionamento(A[perm, perm], σ_c[perm], S[perm], O[perm])
+            @test maximum(abs.(κp[invperm(perm)] .- base)) < 1e-6
+        end
+    end
+
     @testset "Simulação N-dept com racionamento" begin
         Random.seed!(5)
         sol_sem, _, p_sem = simular_Ndept(6, T = 200.0, seed = 5, acoplado = true, μ = 0.5)
@@ -164,16 +190,17 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
     end
 
     @testset "Série temporal AMECO — valorização consistente vs. corrente" begin
-        # Caso de mão: PIB_corrente = 2×PIB_real (deflator = 200), logo
-        # remunerações deflacionadas para :consistente ficam a metade do
-        # valor :corrente, com C (stock de capital) fixo.
+        # Caso de mão: PIB_corrente=200, PIB_real=100 (deflator_PIB=200);
+        # remunerações=80, CCF=20 (ambos a preços correntes); C=400 (stock,
+        # já a preços constantes). deflator_FBCF=400 (índice distinto, para
+        # testar sensibilidade ao deflator escolhido).
         z = fill(0.0, 1)
         dados = DadosAMECO(
             "Teste", "TST", [2020],
             fill(200.0, 1), fill(100.0, 1), z, z, z, z, z,       # PIB, PIB_real, ...
             z, z, z, z,                                          # mercado de trabalho
             fill(80.0, 1), z, z,                                 # remunerações, produtividade, custos
-            fill(200.0, 1), fill(400.0, 1), z,                   # deflator_PIB, deflator_FBCF, IPC
+            fill(200.0, 1), fill(400.0, 1), z, fill(20.0, 1),    # deflator_PIB, deflator_FBCF, IPC, CCF
             z, z, z, z,                                          # finanças públicas
             z, z,                                                # setor externo
             fill(400.0, 1),                                      # stock_capital_total
@@ -188,6 +215,18 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test st_consistente.k[1] ≈ 2 * st_corrente.k[1]
         @test st_fbcf.k[1] ≈ 400.0 / 20.0          # 80 deflacionado por 400/100
         @test st_fbcf.k[1] ≈ 4 * st_corrente.k[1]
+
+        # A parte (VAB-V)/V de e é algebricamente invariante sob um deflator
+        # comum aplicado a V e VAB (CCF é deflacionado pelo mesmo índice que
+        # V, preservando essa invariância) — confirma a álgebra: dividir
+        # ambos por um fator comum não muda a razão (Y-V)/V.
+        @test st_corrente.e[1] ≈ (200.0 - 80.0 - 20.0) / 80.0  # = 1.25
+        @test st_consistente.e[1] ≈ st_corrente.e[1]
+        # :consistente_fbcf usa um índice diferente (deflator_FBCF) para V e
+        # CCF mas mantém PIB_real (deflacionado por deflator_PIB) para VAB —
+        # não estão na mesma base, pelo que a invariância NÃO se aplica aqui,
+        # de propósito (é precisamente o teste de sensibilidade ao deflator).
+        @test !(st_fbcf.e[1] ≈ st_corrente.e[1])
     end
 
     @testset "Bateria interna" begin
