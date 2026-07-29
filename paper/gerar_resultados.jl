@@ -63,6 +63,12 @@ println("  ✓ Spain [consistente] e: $(round(st_es.e[1],digits=3)) -> $(round(s
         "k: $(round(st_es.k[1],digits=2)) -> $(round(st_es.k[end],digits=2))  ",
         "r: $(round(st_es.r[1]*100,digits=2))% -> $(round(st_es.r[end]*100,digits=2))%")
 
+println("\n[1c/5] Robustness: GDP deflator vs. investment-goods deflator, Portugal...")
+st_fbcf = analisar_série_temporal_com_dados(dados_pt; valorização = :consistente_fbcf)
+println("  ✓ [consistente_fbcf] e: $(round(st_fbcf.e[1],digits=3)) -> $(round(st_fbcf.e[end],digits=3))  ",
+        "k: $(round(st_fbcf.k[1],digits=2)) -> $(round(st_fbcf.k[end],digits=2))  ",
+        "r: $(round(st_fbcf.r[1]*100,digits=2))% -> $(round(st_fbcf.r[end]*100,digits=2))%")
+
 # ----------------------------------------------------------------------------
 # Table 1 — 19-sector calibration profile, Portugal 2022 (real Eurostat data)
 # ----------------------------------------------------------------------------

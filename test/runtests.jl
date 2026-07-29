@@ -173,7 +173,7 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
             fill(200.0, 1), fill(100.0, 1), z, z, z, z, z,       # PIB, PIB_real, ...
             z, z, z, z,                                          # mercado de trabalho
             fill(80.0, 1), z, z,                                 # remunerações, produtividade, custos
-            fill(200.0, 1), z,                                   # deflator_PIB, IPC
+            fill(200.0, 1), fill(400.0, 1), z,                   # deflator_PIB, deflator_FBCF, IPC
             z, z, z, z,                                          # finanças públicas
             z, z,                                                # setor externo
             fill(400.0, 1),                                      # stock_capital_total
@@ -181,10 +181,13 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
 
         st_corrente = analisar_série_temporal_com_dados(dados; valorização = :corrente)
         st_consistente = analisar_série_temporal_com_dados(dados; valorização = :consistente)
+        st_fbcf = analisar_série_temporal_com_dados(dados; valorização = :consistente_fbcf)
 
         @test st_corrente.k[1] ≈ 400.0 / 80.0
         @test st_consistente.k[1] ≈ 400.0 / 40.0  # 80 deflacionado por 200/100
         @test st_consistente.k[1] ≈ 2 * st_corrente.k[1]
+        @test st_fbcf.k[1] ≈ 400.0 / 20.0          # 80 deflacionado por 400/100
+        @test st_fbcf.k[1] ≈ 4 * st_corrente.k[1]
     end
 
     @testset "Bateria interna" begin

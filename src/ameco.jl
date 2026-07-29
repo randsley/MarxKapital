@@ -115,7 +115,7 @@ function gerar_dados_sintéticos_ameco(código_país::String, anos::Vector{Int})
     return DadosAMECO(nome_país, código_país, anos,
         PIB, PIB_real, consumo_privado, consumo_público, FBCF, exportações, importações,
         emprego, emprego_assalariado, desemprego, população_ativa,
-        remunerações, produtividade, custos_unit, deflator, IPC,
+        remunerações, produtividade, custos_unit, deflator, deflator, IPC,
         receitas, despesas, saldo, dívida, bal_corrente, bal_comercial,
         stock_capital, "AMECO (sintético)", now(), notas)
 end
@@ -129,7 +129,7 @@ function construir_dados_ameco(código_país, anos, dados::Dict, fonte)
         g("FBCF"), g("exportações"), g("importações"), g("emprego_total"),
         g("emprego_assalariado"), g("taxa_desemprego"), g("população_ativa"),
         g("remunerações"), g("produtividade_trabalho"), g("custos_unit_trabalho"),
-        g("deflator_PIB"), g("IPC"), g("receitas_governo"), g("despesas_governo"),
+        g("deflator_PIB"), g("deflator_FBCF"), g("IPC"), g("receitas_governo"), g("despesas_governo"),
         g("saldo_orçamental"), g("dívida_pública"), g("balança_corrente"),
         g("balança_comercial", NaN), g("stock_capital_líquido"),
         fonte, now(), Dict{String, String}())
@@ -399,6 +399,15 @@ e `PIB` (`UVGD`) são, pelo contrário, séries a preços correntes.
   `PIB` (corrente), colocando `C`, `V` e `VAB` na mesma base de preços
   constantes — a comparação correta para isolar se a queda de `k` é um
   efeito real ou um artefacto de valorização.
+- `valorização=:consistente_fbcf`: variante de `:consistente` que deflaciona
+  `V` pelo `deflator_FBCF` (item `PIGT`, "Price deflator gross fixed
+  capital formation", também indexado a 2020=100) em vez do deflator do
+  PIB. `stock_capital_total` é construído por acumulação de FBCF a preços
+  constantes (inventário perpétuo implícito da AMECO), pelo que o deflator
+  do investimento — não o deflator geral do PIB — é o que efetivamente
+  determina a base de preços de `C`; esta variante testa se a conclusão de
+  `:consistente` é sensível a essa escolha (preços de bens de capital
+  tendem a cair, historicamente, face ao deflator do PIB geral).
 """
 function analisar_série_temporal_com_dados(dados::DadosAMECO; valorização::Symbol = :corrente)
     n = length(dados.anos)
@@ -411,8 +420,12 @@ function analisar_série_temporal_com_dados(dados::DadosAMECO; valorização::Sy
             def = dados.deflator_PIB[i]
             V = (!isnan(def) && def > 0) ? dados.remunerações[i] / (def / 100) : NaN
             VAB = dados.PIB_real[i]
+        elseif valorização == :consistente_fbcf
+            def = dados.deflator_FBCF[i]
+            V = (!isnan(def) && def > 0) ? dados.remunerações[i] / (def / 100) : NaN
+            VAB = dados.PIB_real[i]
         else
-            error("valorização desconhecida: $valorização (use :corrente ou :consistente)")
+            error("valorização desconhecida: $valorização (use :corrente, :consistente ou :consistente_fbcf)")
         end
         if !isnan(V) && !isnan(C) && !isnan(VAB) && V > 0 && C > 0
             rend = VAB - V - C * 0.10

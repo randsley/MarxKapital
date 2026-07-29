@@ -315,7 +315,7 @@ aggregating, when a coarser grouping is needed, using the standard
 Leontief aggregation formula (value-added-weighted averaging of already
 non-negative coefficients) rather than re-aggregating raw flows. The
 resulting 19-sector matrix for Portugal is well behaved: non-negative
-throughout, with spectral radius $\rho(A) \approx 0.13$ (Figure~2),
+throughout, with spectral radius $\rho(A) \approx 0.13$ (Figure~\ref{fig:matrixA}),
 comfortably below unity.
 
 \subsection{Depreciation and capital stock}
@@ -342,7 +342,7 @@ same basis as the capital stock; Section~5.2 reports both.
 
 \subsection{Sectoral profile, 2022}
 
-Table~1 reports the calibrated rate of exploitation, organic composition,
+Table~\ref{tab:sectors} reports the calibrated rate of exploitation, organic composition,
 and profit rate for all 19 sections, ranked by profit rate. The
 value-added-weighted means are $e\approx0.89$, $k\approx24.8$, and
 $r\approx10.0\%$; the mean organic composition is dominated by a single
@@ -361,12 +361,13 @@ directly.
 \begin{table}[htbp]
 \centering
 \caption{Sectoral calibration, Portugal, 2022 (real Eurostat data).}
+\label{tab:sectors}
 \input{figures/table1_sectors.tex}
 \end{table}
 
 \subsection{Aggregate profit-rate trend, 1996--2022}
 
-Figure~1 shows the aggregate rate of exploitation, organic composition,
+Figure~\ref{fig:timeseries} shows the aggregate rate of exploitation, organic composition,
 and profit rate for Portugal over 1996--2022, calibrated entirely from
 real AMECO series, under two valuation conventions (Section~4.3): the
 solid line combines AMECO's current-price wage and output series with its
@@ -380,7 +381,7 @@ correspondingly from $2.1\%$ to $9.5\%$. Under the valuation-consistent
 convention, all three series are markedly less dramatic: the rate of
 exploitation moves from $0.58$ to $0.57$, the organic composition rises
 slightly from $5.24$ to $5.80$, and the profit rate declines mildly from
-$9.4\%$ to $8.4\%$. Figure~1b repeats the valuation-consistent
+$9.4\%$ to $8.4\%$. Figure~\ref{fig:ptvses} repeats the valuation-consistent
 calculation for Spain, using the identical pipeline: the profit rate
 declines more clearly, from $7.0\%$ to $4.3\%$, with the rate of
 exploitation falling from $0.49$ to $0.36$ and the organic composition
@@ -393,6 +394,7 @@ valuation sensitivity in Section~6.1.
 \caption{Rate of exploitation, organic composition, and profit rate,
 Portugal, 1996--2022 (real AMECO data), under current-price and
 valuation-consistent (deflated) conventions.}
+\label{fig:timeseries}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -400,17 +402,19 @@ valuation-consistent (deflated) conventions.}
 \includegraphics[width=0.65\textwidth]{figures/fig1b_pt_vs_es.pdf}
 \caption{Profit rate under the valuation-consistent convention, Portugal
 vs.\ Spain, 1996--2022 (real AMECO data).}
+\label{fig:ptvses}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.7\textwidth]{figures/fig2_matrix_A.pdf}
 \caption{Real technical matrix $A$, Portugal, 2022 (19 NACE sections).}
+\label{fig:matrixA}
 \end{figure}
 
 \subsection{The transformation problem on the real economy}
 
-Figure~3 compares labor values with Sraffian production prices computed
+Figure~\ref{fig:transformation} compares labor values with Sraffian production prices computed
 on the real calibrated matrix, for three illustrative uniform profit rates
 ($\bar r = 0$, $0.3R_{\max}$, $0.6R_{\max}$, with $R_{\max}\approx691\%$
 for this economy). As $\bar r$ rises, sectors with above-average organic
@@ -421,7 +425,7 @@ technical structure. The comparison is qualitative only: labor values
 are expressed in labor-time units and production prices in the
 wage-numeraire monetary units of Equation~2, and we do not fix an
 explicit monetary expression of labor time (MELT) to convert between
-them. Figure~3 therefore reports each series normalized to sum to one
+them. Figure~\ref{fig:transformation} therefore reports each series normalized to sum to one
 and compares relative deviations, which is sufficient to display the
 sign and ordering of the transformation effect but does not license a
 literal price-value comparison in a common unit --- a well-known
@@ -433,12 +437,13 @@ difficulty in empirical Marxian value theory
 \includegraphics[width=0.75\textwidth]{figures/fig3_transformation.pdf}
 \caption{Labor values vs.\ Sraffian production prices, real technical
 matrix, Portugal 2022, at three illustrative profit rates.}
+\label{fig:transformation}
 \end{figure}
 
 \subsection{Illustrative comparison of coupling mechanisms}
 
 Because no real per-sector accumulation time series exists to calibrate
-the dynamic coupling mechanisms of Section~3.3 empirically, Figure~4
+the dynamic coupling mechanisms of Section~3.3 empirically, Figure~\ref{fig:coupling}
 illustrates their qualitative behavior on a synthetic six-sector economy
 under a common random technical matrix and seed. Capital mobility alone
 reduces cross-sector profit-rate dispersion over time, as expected.
@@ -460,6 +465,7 @@ economies is left for future work.
 \caption{Cross-sector profit-rate dispersion over time under three
 coupling mechanisms (illustrative synthetic economy, not calibrated to
 real data).}
+\label{fig:coupling}
 \end{figure}
 
 \section{Discussion}
@@ -486,26 +492,45 @@ fall in $k=C/V$ and a correspondingly large apparent rise in $r$, with no
 requirement that anything about the underlying economy changed.
 
 Once wages and output are deflated onto the same constant-price basis as
-the capital stock (Section~4.3, Figure~1, dashed lines), the picture
+the capital stock (Section~4.3, Figure~\ref{fig:timeseries}, dashed lines), the picture
 changes substantially: Portugal's profit rate is roughly flat, moving
 from $9.4\%$ to $8.4\%$ over the period rather than from $2.1\%$ to
 $9.5\%$, and the organic composition is roughly flat as well. Applying
-the identical correction to Spain (Figure~1b) shows a clearer decline,
+the identical correction to Spain (Figure~\ref{fig:ptvses}) shows a clearer decline,
 from $7.0\%$ to $4.3\%$, driven by both a falling rate of exploitation and
 a rising organic composition --- closer to the classical tendential-fall
 pattern than either country's uncorrected series suggested. We do not
 read this as proof of a general tendential fall from a two-country,
 single-source comparison; national-accounts profit-rate estimates are
 sensitive to depreciation conventions, sectoral composition, and the
-specific deflator used, all of which we discuss further in Section~6.2.
-But it does mean the headline finding of this paper is methodological
+specific deflator used, which we discuss further in Section~6.2.
+
+A natural objection to the correction itself: AMECO's capital stock is a
+chain-linked volume series built from investment flows using an
+investment-specific price index, not the general GDP deflator we used
+above, so deflating wages and output by the GDP deflator (\texttt{PVGD})
+does not guarantee the same price basis as the capital stock. We checked
+this directly rather than leaving it as a caveat. AMECO publishes a
+gross-fixed-capital-formation deflator (\texttt{PIGT}), also indexed to
+2020, that better reflects the capital stock's own price basis; repeating
+the deflation with \texttt{PIGT} in place of \texttt{PVGD} gives a profit
+rate for Portugal moving from $11.2\%$ to $9.4\%$ --- a somewhat higher
+level than the GDP-deflator correction, but the same qualitative
+conclusion: flat to mildly declining, nowhere close to the near-fivefold
+rise the uncorrected series showed. We take this as evidence that the
+correction is not an artifact of which deflator was chosen, though we
+could not find, and do not believe AMECO publishes, a current-price
+(replacement-cost) capital-stock series that would let us skip deflation
+entirely and compare wages, output, and capital stock at a common
+same-year current valuation, which would be the cleaner check in
+principle. But it does mean the headline finding of this paper is methodological
 rather than substantive: an automated calibration pipeline that pulls
 several series from the same database without checking that they share a
 valuation convention can manufacture a large, statistically salient, and
 entirely spurious trend, and we think this is a more useful and more
 honest result to report than the uncorrected series would have been on
 its own. Disaggregating the corrected aggregate trend by sector, and
-comparing it against the 2022 cross-section of Table~1, is beyond the
+comparing it against the 2022 cross-section of Table~\ref{tab:sectors}, is beyond the
 scope of this paper --- complicated further by the single-year nature of
 the sectoral calibration versus the time-series nature of the aggregate
 result --- and is left for future work.
@@ -548,11 +573,15 @@ but likely understates services' true role as an input supplier to other
 sectors.
 
 \emph{Limited robustness and sensitivity analysis.} We report the
-aggregate trend under two valuation conventions (Section~5.2) and for two
-countries (Portugal and Spain), which is enough to show the finding is
-not a single-country, single-valuation artifact, but not enough to
-establish a general pattern across peripheral EU economies. The sectoral
-profile (Table~1) still uses a single set of choices: net capital stock
+aggregate trend under three valuation conventions (unadjusted, GDP-deflated,
+investment-deflated; Section~5.2 and Section~6.1) and for two countries
+(Portugal and Spain), which is enough to show the corrected finding is
+not a single-country, single-deflator artifact, but not enough to
+establish a general pattern across peripheral EU economies, nor to rule
+out sensitivity to the depreciation-rate assumption (a flat 10\% here,
+Section~5.2) or to sectoral composition effects that an aggregate series
+cannot separate from a genuine average-rate change. The sectoral
+profile (Table~\ref{tab:sectors}) still uses a single set of choices: net capital stock
 rather than perpetual-inventory, and, for the coupling mechanisms of
 Section~3.3, a single value of the mobility coefficient $\mu$ and a
 single random seed for the synthetic illustration. The fixed-point

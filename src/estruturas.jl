@@ -176,6 +176,7 @@ struct DadosAMECO
 
     # Preços
     deflator_PIB::Vector{Float64}
+    deflator_FBCF::Vector{Float64}
     IPC::Vector{Float64}
 
     # Finanças Públicas
