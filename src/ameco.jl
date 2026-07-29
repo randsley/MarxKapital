@@ -377,12 +377,43 @@ end
 # Séries temporais
 # ----------------------------------------------------------------------------
 
-"""Calcula indicadores marxianos ano a ano a partir de DadosAMECO."""
-function analisar_série_temporal_com_dados(dados::DadosAMECO)
+"""
+    analisar_série_temporal_com_dados(dados; valorização=:corrente)
+
+Calcula indicadores marxianos ano a ano a partir de `DadosAMECO`.
+
+`stock_capital_total` (item AMECO `OKND`) é reportado a **preços constantes
+de 2020** ("Net capital stock at 2020 prices"), não a preços correntes —
+confirmado junto do codelist SDMX (`CL_AMECO_ITEM`), que não tem nenhum
+equivalente de stock de capital a preços correntes. `remunerações` (`UWCD`)
+e `PIB` (`UVGD`) são, pelo contrário, séries a preços correntes.
+
+- `valorização=:corrente` (por omissão, compatível com versões anteriores):
+  usa `V` e `VAB` a preços correntes tal como reportados, mesmo sabendo que
+  isto mistura a valorização de `C` (constante) com a de `V`/`VAB`
+  (corrente) — um desfasamento que, por si só, pode empurrar `k=C/V` para
+  baixo ao longo de décadas de inflação salarial nominal, sem que a
+  composição orgânica real tenha mudado.
+- `valorização=:consistente`: deflaciona `V` pelo `deflator_PIB` (=
+  `PIB_corrente/PIB_constante×100`) e usa `PIB_real` (constante) em vez de
+  `PIB` (corrente), colocando `C`, `V` e `VAB` na mesma base de preços
+  constantes — a comparação correta para isolar se a queda de `k` é um
+  efeito real ou um artefacto de valorização.
+"""
+function analisar_série_temporal_com_dados(dados::DadosAMECO; valorização::Symbol = :corrente)
     n = length(dados.anos)
     e_t = fill(NaN, n); k_t = fill(NaN, n); r_t = fill(NaN, n); q_t = fill(NaN, n)
     for i in 1:n
-        V, C, VAB = dados.remunerações[i], dados.stock_capital_total[i], dados.PIB[i]
+        C = dados.stock_capital_total[i]
+        if valorização == :corrente
+            V, VAB = dados.remunerações[i], dados.PIB[i]
+        elseif valorização == :consistente
+            def = dados.deflator_PIB[i]
+            V = (!isnan(def) && def > 0) ? dados.remunerações[i] / (def / 100) : NaN
+            VAB = dados.PIB_real[i]
+        else
+            error("valorização desconhecida: $valorização (use :corrente ou :consistente)")
+        end
         if !isnan(V) && !isnan(C) && !isnan(VAB) && V > 0 && C > 0
             rend = VAB - V - C * 0.10
             e_t[i] = rend / V
@@ -400,14 +431,15 @@ end
 Obtém dados e produz a análise temporal (4 painéis) dos indicadores marxianos.
 """
 function analisar_série_temporal_ameco(país::String; anos = 1995:2023,
-                                       método = :sintético, ficheiro = nothing)
+                                       método = :sintético, ficheiro = nothing,
+                                       valorização::Symbol = :corrente)
     println("\n" * "="^70)
     println("ANÁLISE DE SÉRIE TEMPORAL — $país | $(first(anos))-$(last(anos))")
     println("="^70)
 
     dados = obter_dados_ameco(país, anos = anos, método = método,
                               ficheiro = ficheiro)
-    st = analisar_série_temporal_com_dados(dados)
+    st = analisar_série_temporal_com_dados(dados; valorização = valorização)
 
     p1 = plot(st.anos, st.e, xlabel = "Ano", ylabel = "e",
               title = "Taxa de Exploração", lw = 2, label = "", color = :blue)

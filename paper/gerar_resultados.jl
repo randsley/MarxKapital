@@ -23,20 +23,45 @@ println("="^70)
 # Figure 1 — aggregate profit-rate trend, Portugal, 1996-2022 (real AMECO data)
 # ----------------------------------------------------------------------------
 
-println("\n[1/5] Time series (e, k, r), Portugal 1996-2022...")
-st = analisar_série_temporal_ameco("Portugal", anos = 1996:2022, método = :sdmx)
+println("\n[1/5] Time series (e, k, r), Portugal 1996-2022, two valuation conventions...")
+anos = 1996:2022
+dados_pt = obter_dados_ameco("Portugal", anos = anos, método = :sdmx)
+st_corrente    = analisar_série_temporal_com_dados(dados_pt; valorização = :corrente)
+st_consistente = analisar_série_temporal_com_dados(dados_pt; valorização = :consistente)
 
-p1 = plot(st.dados.anos, st.e, xlabel = "Year", ylabel = "e", title = "Rate of exploitation",
-          legend = false, lw = 2, color = :steelblue)
-p2 = plot(st.dados.anos, st.k, xlabel = "Year", ylabel = "k", title = "Organic composition",
-          legend = false, lw = 2, color = :firebrick)
-p3 = plot(st.dados.anos, st.r .* 100, xlabel = "Year", ylabel = "r (%)", title = "Profit rate",
-          legend = false, lw = 2, color = :seagreen)
-fig1 = plot(p1, p2, p3, layout = (1, 3), size = (1200, 320), margin = 5Plots.mm)
+p1 = plot(anos, st_corrente.e, xlabel = "Year", ylabel = "e", title = "Rate of exploitation",
+          label = "current-price V, VAB", lw = 2, color = :steelblue)
+plot!(p1, anos, st_consistente.e, label = "deflated V, VAB", lw = 2, color = :steelblue,
+      linestyle = :dash)
+p2 = plot(anos, st_corrente.k, xlabel = "Year", ylabel = "k", title = "Organic composition",
+          label = "current-price V, VAB", lw = 2, color = :firebrick)
+plot!(p2, anos, st_consistente.k, label = "deflated V, VAB", lw = 2, color = :firebrick,
+      linestyle = :dash)
+p3 = plot(anos, st_corrente.r .* 100, xlabel = "Year", ylabel = "r (%)", title = "Profit rate",
+          label = "current-price V, VAB", lw = 2, color = :seagreen)
+plot!(p3, anos, st_consistente.r .* 100, label = "deflated V, VAB", lw = 2, color = :seagreen,
+      linestyle = :dash)
+fig1 = plot(p1, p2, p3, layout = (1, 3), size = (1350, 380), margin = 6Plots.mm,
+            legend = :outerbottom, legendcolumns = 2)
 savefig(fig1, joinpath(FIG_DIR, "fig1_time_series.pdf"))
-println("  ✓ e: $(round(st.e[1],digits=3)) -> $(round(st.e[end],digits=3))  ",
-        "k: $(round(st.k[1],digits=2)) -> $(round(st.k[end],digits=2))  ",
-        "r: $(round(st.r[1]*100,digits=2))% -> $(round(st.r[end]*100,digits=2))%")
+println("  ✓ [corrente]    e: $(round(st_corrente.e[1],digits=3)) -> $(round(st_corrente.e[end],digits=3))  ",
+        "k: $(round(st_corrente.k[1],digits=2)) -> $(round(st_corrente.k[end],digits=2))  ",
+        "r: $(round(st_corrente.r[1]*100,digits=2))% -> $(round(st_corrente.r[end]*100,digits=2))%")
+println("  ✓ [consistente] e: $(round(st_consistente.e[1],digits=3)) -> $(round(st_consistente.e[end],digits=3))  ",
+        "k: $(round(st_consistente.k[1],digits=2)) -> $(round(st_consistente.k[end],digits=2))  ",
+        "r: $(round(st_consistente.r[1]*100,digits=2))% -> $(round(st_consistente.r[end]*100,digits=2))%")
+
+println("\n[1b/5] Portugal vs. Spain, consistent valuation...")
+dados_es = obter_dados_ameco("Espanha", anos = anos, método = :sdmx)
+st_es = analisar_série_temporal_com_dados(dados_es; valorização = :consistente)
+fig1b = plot(anos, st_consistente.r .* 100, xlabel = "Year", ylabel = "r (%)",
+             title = "Profit rate, consistent valuation: Portugal vs. Spain",
+             label = "Portugal", lw = 2, color = :seagreen, size = (700, 420), margin = 5Plots.mm)
+plot!(fig1b, anos, st_es.r .* 100, label = "Spain", lw = 2, color = :darkorange)
+savefig(fig1b, joinpath(FIG_DIR, "fig1b_pt_vs_es.pdf"))
+println("  ✓ Spain [consistente] e: $(round(st_es.e[1],digits=3)) -> $(round(st_es.e[end],digits=3))  ",
+        "k: $(round(st_es.k[1],digits=2)) -> $(round(st_es.k[end],digits=2))  ",
+        "r: $(round(st_es.r[1]*100,digits=2))% -> $(round(st_es.r[end]*100,digits=2))%")
 
 # ----------------------------------------------------------------------------
 # Table 1 — 19-sector calibration profile, Portugal 2022 (real Eurostat data)

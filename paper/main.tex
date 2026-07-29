@@ -40,11 +40,20 @@ model directly from official European statistical sources (Eurostat and
 AMECO, via their SDMX REST APIs), replacing the synthetic or ad hoc
 calibration common in the computational Marxian literature. Applying this
 pipeline to Portugal, we document a sectoral profile for 2022 and an
-aggregate profit-rate series for 1996--2022 in which the rate of
-exploitation rises markedly while the organic composition of capital
-falls, yielding a rising profit rate over the period --- a finding we
-discuss critically rather than as a settled conclusion, given the
-measurement conventions and simplifications involved.
+aggregate profit-rate series for 1996--2022, and in the process surface a
+measurement artifact the pipeline itself lets us diagnose and correct:
+AMECO's capital-stock series is valued at constant (2020) prices while its
+wage and output series are valued at current prices, and combining them
+without adjustment produces a spuriously large rise in the profit rate,
+driven by an organic composition that appears to fall only because it is
+divided by a nominally inflated wage bill. Once wages and output are
+deflated onto the same price basis as the capital stock, Portugal's
+profit rate is roughly flat to mildly declining over 1996--2022, and the
+same correction applied to Spain shows a clearer decline --- closer to
+the classical tendential expectation than the uncorrected series
+suggests. We report both the naive and the valuation-consistent series
+side by side, as a methodological illustration of a mistake this kind of
+automated pipeline makes easy to avoid, not only as an empirical result.
 \end{abstract}
 
 \section{Introduction}
@@ -87,12 +96,20 @@ requested.
 We use this pipeline to calibrate the model for Portugal and report two
 sets of results: a detailed 19-sector profile for 2022, and an aggregate
 time series of the rate of exploitation, organic composition, and profit
-rate for 1996--2022. The latter shows a profit rate that rises over the
-period, driven by a rate of exploitation that rises faster than the
-organic composition falls. We present this as a genuine empirical finding
-from real, unmodified official data, but discuss it critically: it runs
-against the classical tendential-fall expectation, and we consider several
-candidate explanations without asserting any of them as established.
+rate for 1996--2022. Read naively --- combining AMECO's current-price wage
+and output series with its constant-price capital-stock series, as a
+first pass at the raw data would do --- the latter shows a profit rate
+rising sharply, driven by an organic composition that appears to fall.
+We show this is substantially a valuation artifact: deflating the wage
+and output series onto the same price basis as the capital stock removes
+most of the apparent trend, leaving a profit rate that is roughly flat to
+mildly declining for Portugal, and clearly declining for Spain under the
+same correction. We treat this finding as a methodological result in its
+own right --- a concrete demonstration of how an automated pipeline that
+mixes valuation conventions across variables can manufacture a
+statistically salient but spurious trend --- alongside the more modest
+substantive conclusion that neither country shows the sharp profit-rate
+recovery a naive reading of the same official data would suggest.
 
 The remainder of the paper is organized as follows. Section~2 situates the
 model in the relevant theoretical literature. Section~3 presents the model
@@ -312,6 +329,15 @@ capital to stock in that base year rather than assumed. This uses a
 single depreciation rate per sector, not differentiated by asset type; we
 return to this simplification in Section~6.2.
 
+The aggregate AMECO capital-stock series used in Section~5.2 (item
+\texttt{OKND}, ``net capital stock at 2020 prices'') is, by contrast,
+already a constant-price (volume) series, whereas AMECO's wage
+(\texttt{UWCD}) and output (\texttt{UVGD}) series are current-price. The
+pipeline exposes both the raw combination and a valuation-consistent
+alternative that deflates the wage and output series by AMECO's own GDP
+deflator (\texttt{PVGD}$=$\texttt{UVGD}/\texttt{OVGD}$\times100$) onto the
+same basis as the capital stock; Section~5.2 reports both.
+
 \section{Results: Portugal}
 
 \subsection{Sectoral profile, 2022}
@@ -342,16 +368,38 @@ directly.
 
 Figure~1 shows the aggregate rate of exploitation, organic composition,
 and profit rate for Portugal over 1996--2022, calibrated entirely from
-real AMECO series. The rate of exploitation rises from $0.21$ to $0.61$;
-the organic composition falls from $8.99$ to $5.40$; the profit rate rises
-correspondingly from $2.1\%$ to $9.5\%$. We discuss this finding in
-Section~6.1.
+real AMECO series, under two valuation conventions (Section~4.3): the
+solid line combines AMECO's current-price wage and output series with its
+constant-price capital-stock series without adjustment (\emph{current-price
+V, VAB}); the dashed line first deflates the wage and output series onto
+the same constant-price basis as the capital stock (\emph{deflated V,
+VAB}), using AMECO's own GDP deflator. Under the unadjusted convention,
+the rate of exploitation rises from $0.21$ to $0.61$, the organic
+composition falls from $8.99$ to $5.40$, and the profit rate rises
+correspondingly from $2.1\%$ to $9.5\%$. Under the valuation-consistent
+convention, all three series are markedly less dramatic: the rate of
+exploitation moves from $0.58$ to $0.57$, the organic composition rises
+slightly from $5.24$ to $5.80$, and the profit rate declines mildly from
+$9.4\%$ to $8.4\%$. Figure~1b repeats the valuation-consistent
+calculation for Spain, using the identical pipeline: the profit rate
+declines more clearly, from $7.0\%$ to $4.3\%$, with the rate of
+exploitation falling from $0.49$ to $0.36$ and the organic composition
+rising from $6.10$ to $7.34$. We discuss the implications of this
+valuation sensitivity in Section~6.1.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig1_time_series.pdf}
 \caption{Rate of exploitation, organic composition, and profit rate,
-Portugal, 1996--2022 (real AMECO data).}
+Portugal, 1996--2022 (real AMECO data), under current-price and
+valuation-consistent (deflated) conventions.}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.65\textwidth]{figures/fig1b_pt_vs_es.pdf}
+\caption{Profit rate under the valuation-consistent convention, Portugal
+vs.\ Spain, 1996--2022 (real AMECO data).}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -416,43 +464,51 @@ real data).}
 
 \section{Discussion}
 
-\subsection{Interpreting the rising profit rate}
+\subsection{A valuation artifact, and what survives it}
 
-The rising profit rate found for Portugal over 1996--2022 runs counter to
-the classical tendential-fall expectation, in which a rising organic
-composition is expected to depress the profit rate faster than a rising
-rate of exploitation can offset it. Here the opposite pattern holds: the
-organic composition \emph{falls} over the period, and the rate of
-exploitation rises enough on its own to more than compensate. We consider
-this a genuine empirical finding from unmodified official data, not an
-artifact of the calibration pipeline, but we do not consider it a settled
-interpretation of underlying economic processes. Several non-exclusive
-candidate explanations are worth further investigation: intensified
-exploitation associated with wage moderation and labor-market
-liberalization over the period, including during the 2011--2014 assistance
-programme; capital-saving technical change, plausible given the economy's
-structural shift toward less capital-intensive services; compositional
-effects from Portugal's deepening integration into EU-wide production
-networks; and a measurement effect specific to how the organic
-composition is constructed here. AMECO's capital-stock series is
-expressed in current prices, and the organic composition it implies is
-therefore a \emph{value} composition, not a \emph{technical} one: decades
-of relative price decline in capital goods --- computing equipment,
-machinery, software --- can push a current-price capital/labor ratio
-down even with no change, or an increase, in the underlying physical
-capital/labor ratio, a distinction long stressed in the empirical
-Marxian literature \citep{shaikh2016capitalism,basu2013reserve}. We
-cannot rule this out with the current pipeline, since it does not yet
-support a constant-price capital stock; repeating the calibration with a
-volume-deflated series, rather than the current-price AMECO default, is
-the most direct way to test whether the falling organic composition
-survives a switch from value to technical composition, and is a natural
-next step before treating the finding as more than suggestive.
-Distinguishing between these is beyond the
-scope of this paper and would require disaggregating the aggregate series
-by sector and comparing against the 2022 cross-section of
-Table~1 --- itself complicated by the single-year nature of the sectoral
-calibration versus the time-series nature of the aggregate result.
+A first pass at the raw AMECO series appears to show a profit rate rising
+sharply for Portugal over 1996--2022, driven by an organic composition
+that falls even as the rate of exploitation nearly triples. This is the
+pattern we originally reported; it does not survive a closer look. The
+issue is not the classical \emph{value-composition-vs-technical-composition}
+distinction --- the concern that a current-price capital stock can fall
+relative to labor purely from capital-goods price deflation, independent
+of any real change in the capital/labor ratio \citep{shaikh2016capitalism,
+basu2013reserve} --- because AMECO's capital-stock series (\texttt{OKND})
+turns out to already be a constant-price (2020) volume series, not a
+current-price one. The actual problem is narrower and, once identified,
+unambiguous: AMECO's wage and output series (\texttt{UWCD}, \texttt{UVGD})
+\emph{are} current-price, so combining them directly with the
+constant-price capital stock divides an inflation-adjusted numerator by a
+nominally inflated denominator. Over 26 years of cumulative wage and
+price inflation, this alone is enough to manufacture a large apparent
+fall in $k=C/V$ and a correspondingly large apparent rise in $r$, with no
+requirement that anything about the underlying economy changed.
+
+Once wages and output are deflated onto the same constant-price basis as
+the capital stock (Section~4.3, Figure~1, dashed lines), the picture
+changes substantially: Portugal's profit rate is roughly flat, moving
+from $9.4\%$ to $8.4\%$ over the period rather than from $2.1\%$ to
+$9.5\%$, and the organic composition is roughly flat as well. Applying
+the identical correction to Spain (Figure~1b) shows a clearer decline,
+from $7.0\%$ to $4.3\%$, driven by both a falling rate of exploitation and
+a rising organic composition --- closer to the classical tendential-fall
+pattern than either country's uncorrected series suggested. We do not
+read this as proof of a general tendential fall from a two-country,
+single-source comparison; national-accounts profit-rate estimates are
+sensitive to depreciation conventions, sectoral composition, and the
+specific deflator used, all of which we discuss further in Section~6.2.
+But it does mean the headline finding of this paper is methodological
+rather than substantive: an automated calibration pipeline that pulls
+several series from the same database without checking that they share a
+valuation convention can manufacture a large, statistically salient, and
+entirely spurious trend, and we think this is a more useful and more
+honest result to report than the uncorrected series would have been on
+its own. Disaggregating the corrected aggregate trend by sector, and
+comparing it against the 2022 cross-section of Table~1, is beyond the
+scope of this paper --- complicated further by the single-year nature of
+the sectoral calibration versus the time-series nature of the aggregate
+result --- and is left for future work.
 
 \subsection{Limitations}
 
@@ -491,21 +547,22 @@ aggregating (Section~4.2); the coarser matrix is non-negative and usable,
 but likely understates services' true role as an input supplier to other
 sectors.
 
-\emph{No systematic robustness or sensitivity analysis.} The results
-above are reported for a single set of parameter choices: net capital
-stock rather than perpetual-inventory, current-price rather than
-volume-deflated valuation, and, for the coupling mechanisms of
+\emph{Limited robustness and sensitivity analysis.} We report the
+aggregate trend under two valuation conventions (Section~5.2) and for two
+countries (Portugal and Spain), which is enough to show the finding is
+not a single-country, single-valuation artifact, but not enough to
+establish a general pattern across peripheral EU economies. The sectoral
+profile (Table~1) still uses a single set of choices: net capital stock
+rather than perpetual-inventory, and, for the coupling mechanisms of
 Section~3.3, a single value of the mobility coefficient $\mu$ and a
-single random seed. We likewise report the 1996--2022 trend for
-Portugal alone; whether the pattern is Portugal-specific or shared
-across peripheral EU economies (Spain being the obvious comparator,
-using the identical AMECO pipeline) is untested. The fixed-point
+single random seed for the synthetic illustration. The fixed-point
 convergence claim in Section~3.3 is empirical, based on a finite set of
-parameter combinations, not a proof; a formal contraction argument
-under stated conditions on $A$, $\sigma$, and $\delta$ would strengthen
-it considerably. We regard all of these as the most direct next steps
-before treating either the empirical trend or the rationing mechanism's
-qualitative behavior as more than suggestive.
+parameter combinations, not a proof; a formal contraction argument under
+stated conditions on $A$, $\sigma$, and $\delta$ would strengthen it
+considerably. We regard extending the valuation-consistent comparison to
+more EU economies, and testing perpetual-inventory capital stock against
+the aggregate trend, as the most direct next steps before treating either
+result as more than suggestive.
 
 \section{Conclusion}
 
@@ -514,11 +571,17 @@ pipeline for Marxian value-theoretic calibration is practical using
 current European statistical infrastructure, and that exact per-sector
 market-clearing dynamics can be added to a reproduction-schema model
 without the numerical overhead of a formal differential-algebraic
-formulation. Applied to Portugal, the pipeline surfaces a genuine and, we
-think, under-examined empirical pattern --- a rising profit rate driven by
-rising exploitation outweighing falling organic composition --- that
-merits further sectoral and comparative investigation beyond the scope of
-this paper.
+formulation. Applied to Portugal and Spain, the pipeline surfaces --- and
+lets us diagnose --- a valuation artifact that would otherwise have
+manufactured a large, spurious rise in the measured profit rate; once
+corrected, the underlying trend is far more modest, and closer to the
+classical tendential-fall pattern than the raw series suggested. We think
+this exercise is itself a useful illustration of what a live, multi-source
+statistical pipeline buys a computational Marxian model: not just
+convenience, but the ability to catch exactly this kind of measurement
+error before it is mistaken for an economic finding. Extending the
+valuation-consistent comparison to more economies and testing it against
+alternative capital-stock constructions is left for future work.
 
 \section*{Availability}
 
