@@ -653,11 +653,24 @@ cannot separate from a genuine average-rate change. The sectoral
 profile (Table~\ref{tab:sectors}) still uses a single set of choices: net capital stock
 rather than perpetual-inventory, and, for the coupling mechanisms of
 Section~3.3, a single value of the mobility coefficient $\mu$ and a
-single random seed for the synthetic illustration. The fixed-point
-convergence claim in Section~3.3 is empirical, based on a finite set of
-parameter combinations, not a proof; a formal contraction argument under
-stated conditions on $A$, $\sigma$, and $\delta$ would strengthen it
-considerably. We regard extending the valuation-consistent comparison to
+single random seed for the synthetic illustration. Section~3.3
+establishes that a fixed point always exists (Brouwer), explains
+structurally why undamped iteration oscillates rather than converges
+(the map is antitone), and proves the default damping is locally
+superlinear for the closed-form two-sector case (the Jacobian
+eigenvalue there is exactly $-1$, and $\alpha=0.5$ zeroes it exactly).
+What remains open is a global convergence-\emph{rate} guarantee across
+all admissible $(A,\sigma,S,O)$ and initial conditions --- and
+Section~3.3's own negative result suggests the obvious route to one, a
+global Lipschitz bound in the spirit of $\rho(A)<1$, cannot supply it:
+we showed algebraically that its tightest admissible form always
+exceeds $1$ whenever any sector is actually rationed. Closing this gap,
+if it can be closed at all, likely requires a different technique ---
+possibly exploiting the antitone structure directly (e.g.\ bounding
+$F\circ F$) rather than a Banach-style argument on $F$ itself --- and we
+continue to rely on the empirical sweep (twenty-plus parameter
+combinations at $N=8$ and $N=19$, no failures) for the general case in
+the meantime. We regard extending the valuation-consistent comparison to
 more EU economies, and testing perpetual-inventory capital stock against
 the aggregate trend, as the most direct next steps before treating either
 result as more than suggestive.
