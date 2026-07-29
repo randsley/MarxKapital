@@ -169,24 +169,91 @@ function _secção_do_código_a64(código::String)
     return string(uppercase(s[1]))
 end
 
+"""Anos de referência conhecidos em que o Eurostat publica NAIO_10_CP1700
+(tabela simétrica completa) — esta tabela é um produto de referência
+("benchmark"), não uma série anual como NAMA_10_A64; confirmado com uma
+consulta real (2026-07) que só devolve dados para Portugal nestes anos.
+`_ano_iot_mais_próximo` escolhe o ano disponível mais próximo do pedido,
+sem assumir que a lista se mantém estática — falha para uma consulta ao
+vivo primeiro (ver `construir_matriz_io_eurostat`)."""
+const ANOS_IOT_CONHECIDOS = [2010, 2013, 2015, 2017, 2020]
+
+"""Escolhe, de entre os anos disponíveis devolvidos pela API para
+NAIO_10_CP1700/`código_país`, o mais próximo de `ano`. Devolve `nothing`
+se a consulta falhar ou não houver nenhum ano disponível."""
+function _ano_iot_mais_próximo(código_país::String, ano::Int)
+    url = "$URL_BASE_EUROSTAT_SDMX/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR.DOM.CPA_A01.B1G.$código_país" *
+          "?format=SDMX-CSV"
+    resp = HTTP.get(url, ["Accept-Encoding" => "identity"],
+                    retry = true, readtimeout = 30, status_exception = false)
+    resp.status == 200 || return nothing
+    df = CSV.read(IOBuffer(resp.body), DataFrame)
+    nrow(df) == 0 && return nothing
+    anos = Int.(df.TIME_PERIOD)
+    isempty(anos) && return nothing
+    return anos[argmin(abs.(anos .- ano))]
+end
+
 """
     construir_matriz_io_eurostat(código_país, ano, grupos, vab_por_secção)
 
 Constrói uma matriz técnica G×G a partir do IOT simétrico real do Eurostat
-(NAIO_10_CP1620) para `código_país`/`ano`, agregando os códigos A64 em
-`grupos` (cada elemento é uma lista de secções NACE — `[["A"],["B"],...]`
-para 19 setores, ou `[["A"],["B","C","D","E","F"],[...]]` para 3 setores
-macro). `vab_por_secção` (de `obter_vab_remuneracoes_ccf_eurostat`) fornece
-o VAB para completar a identidade oferta-uso.
+(**NAIO_10_CP1700**, "Symmetric input-output table at basic prices, product
+by product"), agregando os códigos A64 em `grupos` (cada elemento é uma
+lista de secções NACE — `[["A"],["B"],...]` para 19 setores, ou
+`[["A"],["B","C","D","E","F"],[...]]` para 3 setores macro).
+`vab_por_secção` (de `obter_vab_remuneracoes_ccf_eurostat`) fornece o VAB
+para completar a identidade oferta-uso, usado apenas como reserva quando o
+próprio IOT não devolve a sua linha `P1` (output bruto) para uma secção.
+
+**Nota histórica importante:** uma versão anterior deste código usava
+`NAIO_10_CP1620` — que, confirmado junto do Eurostat, não é a tabela
+simétrica em si, mas sim a "Table of trade and transport margins", uma
+tabela satélite pequena usada para decompor o *use table at purchasers'
+prices* nas suas componentes (tabela a preços base + margens +
+impostos-subsídios). Usar essa tabela como se fosse o IOT simétrico
+produzia fluxos intersetoriais subavaliados por mais de uma ordem de
+grandeza (consumo intermédio total ≈ 11 mil M€ contra o verdadeiro
+≈ 262 mil M€ implícito em P1-VAB, PT/2022) e todas as células negativas
+observadas eram simplesmente a mecânica de realocação de margens dessa
+tabela satélite, não uma característica do IOT real — o que por sua vez
+explicava a matriz implausivelmente esparsa (ρ(A)≈0.13) e o R_max
+implausivelmente alto (≈691%) reportados antes desta correção. Com
+NAIO_10_CP1700, PT/2020: zero células negativas, resíduo de reconciliação
+tipicamente <5% (`paper/matrix_audit.jl`), ρ(A)≈0.52 (stk_flow=DOM) ou
+≈0.60 (stk_flow=TOTAL).
+
+**Nota sobre importações:** NAIO_10_CP1700 publica três variantes por
+`stk_flow` — `DOM` (só uso doméstico), `IMP` (só importado) e `TOTAL`
+(soma das duas) — confirmado com uma consulta real, ao contrário de
+`NAIO_10_CP1620` (que só publicava `TOTAL`). Usa-se `DOM`: a matriz A
+deve representar interdependência produtiva \emph{doméstica} (que setor
+fornece a que setor dentro da economia modelada); inputs intermédios
+importados não são produzidos por nenhum setor doméstico, pelo que
+incluí-los em `A` implicaria uma relação de fornecimento doméstico
+inexistente. Esta escolha resolve diretamente a preocupação, levantada
+em revisão externa, de que a matriz misturava fornecimento doméstico e
+importado sem distinção.
+
+**Nota de vintage:** NAIO_10_CP1700 é uma tabela de referência publicada
+para anos-base específicos (não anual como as restantes séries usadas
+neste pacote) — `_ano_iot_mais_próximo` escolhe o ano disponível mais
+próximo de `ano`; a matriz devolvida pode portanto ter um vintage
+diferente do resto da calibração (ex. A de 2020 combinada com VAB/e/k/r
+de 2022), o que deve ser lido explicitamente como tal, não como um
+perfil de um único ano coerente.
 
 Coeficiente técnico: `A[i,j] = fluxo(i→j) / output_bruto(j)`, com
-`output_bruto(j) = Σᵢ fluxo(i→j) + VAB(j)`. Reforça produtividade (ρ(A)<1)
-com a mesma regra de `criar_matriz_tecnica` (`src/nucleo.jl`).
+`output_bruto(j)` lido diretamente da linha `P1` do próprio IOT quando
+disponível (reconciliação por construção), com reserva para
+`Σᵢ fluxo(i→j) + VAB(j)` quando não. Reforça produtividade (ρ(A)<1) com
+a mesma regra de `criar_matriz_tecnica` (`src/nucleo.jl`).
 
-Lança erro se o IOT não tiver dados para o país/ano — ao contrário das
-séries setoriais (que degradam secção a secção), sem o IOT não há matriz
-real possível; quem chama deve tratar isto como falha da via `:eurostat`
-e cair para o caminho de reserva (`criar_matriz_tecnica`).
+Lança erro se o IOT não tiver dados para o país (nenhum ano disponível)
+— ao contrário das séries setoriais (que degradam secção a secção), sem
+o IOT não há matriz real possível; quem chama deve tratar isto como
+falha da via `:eurostat` e cair para o caminho de reserva
+(`criar_matriz_tecnica`).
 """
 function construir_matriz_io_eurostat(código_país::String, ano::Int,
                                       grupos::Vector{Vector{String}},
@@ -197,49 +264,50 @@ function construir_matriz_io_eurostat(código_país::String, ano::Int,
         secção_para_grupo[s] = gi
     end
 
-    url = "$URL_BASE_EUROSTAT_SDMX/data/ESTAT,NAIO_10_CP1620,1.0/A.MIO_EUR.TOTAL...$código_país" *
-          "?format=SDMX-CSV&startPeriod=$ano&endPeriod=$ano"
+    ano_iot = _ano_iot_mais_próximo(código_país, ano)
+    isnothing(ano_iot) && error("IOT Eurostat (NAIO_10_CP1700) indisponível para $código_país.")
+    ano_iot != ano && @warn "NAIO_10_CP1700 não publica $ano para $código_país; a usar o ano " *
+                            "de referência mais próximo, $ano_iot (ver docstring sobre vintage)."
+
+    url = "$URL_BASE_EUROSTAT_SDMX/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR.DOM...$código_país" *
+          "?format=SDMX-CSV&startPeriod=$ano_iot&endPeriod=$ano_iot"
     resp = HTTP.get(url, ["Accept-Encoding" => "identity"],
                     retry = true, readtimeout = 60, status_exception = false)
-    resp.status == 200 || error("IOT Eurostat indisponível para $código_país/$ano (status $(resp.status)).")
+    resp.status == 200 || error("IOT Eurostat indisponível para $código_país/$ano_iot (status $(resp.status)).")
     df = CSV.read(IOBuffer(resp.body), DataFrame)
-    nrow(df) == 0 && error("IOT Eurostat sem dados para $código_país/$ano.")
+    nrow(df) == 0 && error("IOT Eurostat sem dados para $código_país/$ano_iot.")
 
-    # `ind_use` (colunas) inclui não só indústrias mas categorias de procura
-    # final (P3_S14 consumo, P51G FBCF, P6 exportações, ...) cujo código
-    # colide por primeira letra com secções reais (ex. "P3_S14" → "P",
-    # confundido com a secção P "Educação"). Restringe-se `ind_use` ao
-    # conjunto de códigos que também aparecem como produto (`cpa2_1`) — só
-    # esses são indústrias reais no IOT simétrico.
-    códigos_indústria = Set(replace(String(c), "CPA_" => "")
-                            for c in df.cpa2_1 if c != "CPA_TOTAL")
-
-    # O IOT simétrico a preços base regista as margens de comércio/transporte
-    # (produtos CPA_G45-47/H49-53) como fluxos por vezes negativos — a
-    # realocação da margem para o produto realmente comprado é uma célula
-    # negativa na própria linha do produto de comércio/transporte, uma
-    # convenção normal de contabilidade nacional nestas tabelas, não um erro.
-    # Confirmado nos dados reais: as 317 células negativas de PT/2022 estão
-    # TODAS confinadas a essas duas secções como fornecedoras — nenhuma outra
-    # célula é negativa. Um coeficiente técnico negativo não é interpretável
-    # no sentido de Leontief usado no resto do código (calcular_valores_trabalho,
-    # calcular_precos_producao assumem A ≥ 0), mas colapsar a MATRIZ AGREGADA
-    # a zero apagaria também os fluxos genuínos de outras secções de serviços
-    # somadas no mesmo grupo (ex. no agrupamento de 3 setores, isto zerava a
-    # linha inteira do Terciário). Em vez disso, cada célula bruta é colapsada
-    # a zero ANTES de somar por grupo, para que só a margem seja descartada.
     F = zeros(G, G)
+    P1 = zeros(G)
     for row in eachrow(df)
         ismissing(row.OBS_VALUE) && continue
-        String(row.ind_use) in códigos_indústria || continue
-        si = _secção_do_código_a64(String(row.cpa2_1))
-        sj = _secção_do_código_a64(String(row.ind_use))
+        v = Float64(row.OBS_VALUE)
+        pu, pa = String(row.prd_use), String(row.prd_ava)
+        # A linha `P1` (output bruto) do próprio IOT, por indústria compradora
+        # (`prd_use`) — usada para reconciliação direta, sem depender de VAB
+        # externo. Ver `paper/matrix_audit.jl` para a reconciliação verificada.
+        if pa == "P1" && startswith(pu, "CPA_")
+            sj = _secção_do_código_a64(pu)
+            haskey(secção_para_grupo, sj) && (P1[secção_para_grupo[sj]] += v)
+            continue
+        end
+        # Só células produto×indústria (ambas prefixadas `CPA_`) são fluxos
+        # intersetoriais; `prd_ava` inclui também linhas de componentes do
+        # valor acrescentado (B1G, D1, ...) e `prd_use` inclui categorias de
+        # procura final (P3, P5, P6, ...) e totais (T, U, TOTAL) — excluídos.
+        (startswith(pa, "CPA_") && startswith(pu, "CPA_")) || continue
+        si, sj = _secção_do_código_a64(pa), _secção_do_código_a64(pu)
         (haskey(secção_para_grupo, si) && haskey(secção_para_grupo, sj)) || continue
-        F[secção_para_grupo[si], secção_para_grupo[sj]] += max(Float64(row.OBS_VALUE), 0.0)
+        # Ao contrário da tabela de margens usada antes desta correção, o IOT
+        # simétrico real não deveria ter fluxos produto×indústria negativos;
+        # `max(v,0.0)` fica como salvaguarda (nunca ativada nos dados reais
+        # verificados), não como tratamento esperado de uma convenção de
+        # contabilidade nacional.
+        F[secção_para_grupo[si], secção_para_grupo[sj]] += max(v, 0.0)
     end
 
     VAB_grupo = [sum(get(vab_por_secção, s, 0.0) for s in secções) for secções in grupos]
-    output_bruto = [sum(F[:, j]) + VAB_grupo[j] for j in 1:G]
+    output_bruto = [P1[j] > 0 ? P1[j] : sum(F[:, j]) + VAB_grupo[j] for j in 1:G]
 
     A = zeros(G, G)
     for i in 1:G, j in 1:G

@@ -31,10 +31,11 @@ sectoral accumulation through the technical matrix~$A$ --- capital
 mobility, an aggregate realization-pressure heuristic, and an exact
 per-sector quantity-rationing scheme solved by fixed-point iteration ---
 without recourse to differential-algebraic equation (DAE) solvers; the
-rationing mechanism is validated numerically and demonstrated
-qualitatively on a synthetic economy, but not yet against real
-per-sector accumulation data, for which no suitable time series
-currently exists. We
+rationing mechanism's convergence (270 random trials, $N\in\{6,12,19\}$)
+and its qualitative effect on cross-sector dispersion (50 random
+economies) are both checked systematically rather than on a single
+hand-picked example, though not yet against real per-sector accumulation
+data, for which no suitable time series currently exists. We
 further present a live, reproducible empirical pipeline that calibrates the
 model directly from official European statistical sources (Eurostat and
 AMECO, via their SDMX REST APIs), replacing the synthetic or ad hoc
@@ -57,11 +58,20 @@ $15\%$ across three deflation conventions we test, clustering lower under
 the unadjusted convention and higher under the investment-deflator
 convention, moving mildly rather than dramatically within each, in
 contrast to the dramatic swing an
-earlier, buggy version of this calibration reported. We treat this
-two-stage correction --- catching a stock-flow error, then re-measuring
-valuation sensitivity correctly on top of it --- as a contribution in its
-own right, alongside the specific empirical numbers, and report it in
-that spirit.
+earlier, buggy version of this calibration reported. A separate audit of
+the sectoral technical matrix, prompted by review of an implausibly low
+spectral radius, found something more serious than a scaling issue: the
+pipeline had been pulling from the wrong Eurostat dataflow entirely (a
+trade-margins satellite table, not the symmetric input-output table),
+understating intermediate flows by more than an order of magnitude.
+Corrected, the matrix has zero negative cells, reconciles exactly
+against the source table's own published output figures, and gives an
+economically plausible spectral radius and maximum profit rate in place
+of implausible ones. We treat this progression --- three distinct
+defects found by auditing rather than assuming correctness, each
+disclosed alongside its fix and its quantified consequence --- as a
+contribution in its own right, alongside the specific empirical numbers,
+and report it in that spirit.
 \end{abstract}
 
 \section{Introduction}
@@ -434,7 +444,7 @@ themselves.
 \subsection{Data sources}
 
 MarxKapital fetches four families of real sectoral and macroeconomic data
-\citep{eurostat_nama10a64,eurostat_naio10cp1620,ameco2026}, each via an
+\citep{eurostat_nama10a64,eurostat_naio10cp1700,ameco2026}, each via an
 official SDMX REST API rather than a static file:
 
 \begin{itemize}
@@ -445,9 +455,10 @@ official SDMX REST API rather than a static file:
     from the companion Eurostat datasets \texttt{NAMA\_10\_A64\_E} and
     \texttt{NAMA\_10\_A64\_P5}.
   \item \textbf{A real technical matrix} from Eurostat's symmetric
-    input-output table at basic prices (\texttt{NAIO\_10\_CP1620}),
-    product by product, aggregated to Leontief technical coefficients
-    weighted by sectoral value added.
+    input-output table at basic prices, product by product
+    (\texttt{NAIO\_10\_CP1700}), domestic-use flows only, aggregated to
+    Leontief technical coefficients reconciled directly against the
+    table's own published gross-output row (Section~4.2).
   \item \textbf{Aggregate macroeconomic series} (GDP, employment,
     compensation, capital stock, and eighteen further variables) from the
     European Commission's AMECO database.
@@ -459,21 +470,79 @@ migrated to
 official SDMX REST APIs, which MarxKapital uses directly, with the legacy
 static-file parsers retained only as a manual fallback.
 
-\subsection{Constructing the technical matrix}
+\subsection{Constructing the technical matrix: a second bug, found by auditing rather than assuming correctness}
 
-The symmetric input-output table records trade and transport margins as
-part of national-accounting convention, which can produce negative entries
-in the trade and transport product rows when the raw flows are aggregated
-naively to a coarser sectoral grouping. We avoid this by building the
-technical matrix at the full 19-sector resolution first --- where the
-margin artifacts are confined to individual cells and can be clipped to
-zero without discarding genuine flows from other sectors --- and only then
-aggregating, when a coarser grouping is needed, using the standard
-Leontief aggregation formula (value-added-weighted averaging of already
-non-negative coefficients) rather than re-aggregating raw flows. The
-resulting 19-sector matrix for Portugal is well behaved: non-negative
-throughout, with spectral radius $\rho(A) \approx 0.13$ (Figure~\ref{fig:matrixA}),
-comfortably below unity.
+An earlier version of this pipeline, and of this paper, built the
+technical matrix from \texttt{NAIO\_10\_CP1620}. External review asked us
+to audit this construction --- quantify the effect of a margin-clipping
+step, reconcile row/column totals against published data, document how
+product and industry classifications are matched, and resolve whether
+imports are treated as domestic supply. Carrying out that audit
+(\texttt{paper/matrix\_audit.jl}) surfaced something more fundamental
+than any of those individual questions: \texttt{NAIO\_10\_CP1620} is not
+the symmetric input-output table. Its Eurostat title is ``Table of trade
+and transport margins'' --- a small satellite table used to decompose the
+use table at purchasers' prices into its components (basic-price flows
+plus margins plus taxes less subsidies), not the symmetric table itself.
+Building $A$ from it produced flows understated by more than an order of
+magnitude (total intermediate consumption implied $\approx\mkern1mu$
+\texteuro11.5\,bn against a true economy-wide figure of
+$\approx\mkern1mu$\texteuro262\,bn, computed as published output less
+published value added for Portugal, 2022), and every negative cell we
+had previously attributed to a margin-reallocation accounting convention
+was simply the mechanics of that satellite table, not a property of the
+real input-output structure at all. This is the direct explanation for
+the implausibly low spectral radius ($\rho(A)\approx0.13$) and
+implausibly high $R_{\max}$ ($\approx691\%$) reported in earlier
+versions of this paper, which the review correctly flagged as suspicious
+without yet knowing why.
+
+The real table is \texttt{NAIO\_10\_CP1700}, ``Symmetric input-output
+table at basic prices (product by product).'' Rebuilding $A$ from it,
+for Portugal, gives zero negative cells (not 272--317 clipped, as
+before) and reconciles \emph{exactly} against the table's own published
+gross-output row (item \texttt{P1}, available for all 19 sections), which
+we now use directly as the output denominator rather than approximating
+it from value added and intermediate-flow sums. The corrected matrix has
+spectral radius $\rho(A)\approx0.52$ and implied $R_{\max}\approx91\%$
+(Section~5.3) --- both economically plausible, unlike their predecessors.
+
+Two further questions the review raised are resolved directly rather
+than left as caveats. \emph{Imports:} \texttt{NAIO\_10\_CP1700} publishes
+domestic-use (\texttt{DOM}), imports-use (\texttt{IMP}), and combined
+(\texttt{TOTAL}) variants --- confirmed by querying the API with the
+\texttt{stk\_flow} dimension unconstrained, something
+\texttt{NAIO\_10\_CP1620} did not offer (it published \texttt{TOTAL}
+only). We use \texttt{DOM}: $A$ is meant to represent domestic
+inter-sectoral production dependence, and an imported input is not
+supplied by any domestic sector, so including it in $A$ would assert a
+domestic supply relationship that does not exist. \emph{Classification:}
+the symmetric table is genuinely product-by-product, using the same CPA
+product code on both the row (\texttt{prd\_ava}) and column
+(\texttt{prd\_use}) dimensions at the resolution we use --- there is no
+CPA-to-NACE concordance to document for this step, since no NACE-classified
+dimension is involved in constructing $A$ itself; NACE enters only
+through the separately-sourced sectoral value-added weights
+(\texttt{NAMA\_10\_A64}), a different and already-documented join.
+
+One limitation the audit could not resolve, and reports rather than
+hides: \texttt{NAIO\_10\_CP1700} is a benchmark table, published for
+specific reference years (2010, 2013, 2015, 2017, 2020 for Portugal, not
+annually), not a series like the rest of the pipeline. Requesting a
+matrix for 2022 silently returns the nearest available reference year
+--- 2020 for Portugal, which we now log explicitly as a warning at
+calibration time. Table~\ref{tab:sectors}'s sectoral $e$, $k$, $r$, and
+VAB figures do not themselves depend on $A$ and remain genuinely 2022
+(Section~5.1); it is specifically the matrix used in
+Figures~\ref{fig:matrixA} and~\ref{fig:transformation} (the heatmap and
+the transformation-problem comparison) that carries this 2020 vintage
+while being computed alongside 2022 labor coefficients, an explicit
+two-year mismatch rather than a single coherent one-year snapshot. This
+is a genuine remaining data-vintage issue, not a bug we can fix by
+writing more code; the only real fix is waiting for Eurostat's next
+benchmark table or restricting the affected figures to 2020 throughout,
+which we did not do here to keep them on the same most-recent year as
+the rest of the paper's empirical results.
 
 \subsection{Depreciation and capital stock}
 
@@ -658,7 +727,9 @@ vs.\ Spain, 1996--2022 (real AMECO data).}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.7\textwidth]{figures/fig2_matrix_A.pdf}
-\caption{Real technical matrix $A$, Portugal, 2022 (19 NACE sections).}
+\caption{Real technical matrix $A$, Portugal (19 NACE sections). Built
+from the nearest available benchmark input-output table (2020, not
+2022 --- Section~4.2).}
 \label{fig:matrixA}
 \end{figure}
 
@@ -666,18 +737,16 @@ vs.\ Spain, 1996--2022 (real AMECO data).}
 
 Figure~\ref{fig:transformation} compares labor values with Sraffian production prices computed
 on the real calibrated matrix, for three empirically plausible uniform
-profit rates ($\bar r=5\%,10\%,15\%$). We deliberately do not plot
-against fractions of $R_{\max}$: the matrix's maximum feasible rate is
-$R_{\max}\approx691\%$ for this economy, implausibly high for a real
-profit rate and itself a symptom of the low spectral radius
-($\rho(A)\approx0.13$) flagged as an open question about the matrix
-construction in Section~6.2; plotting at, say, $0.3R_{\max}\approx207\%$
-would make the transformation effect visually striking but at a profit
-rate with no empirical meaning. We checked, without including a second
-figure, that the qualitative pattern below is unchanged at those higher
-fractions of $R_{\max}$; the concern about the matrix's plausible scale
-is a separate, open issue from whether the transformation-problem
-mechanics themselves are implemented correctly. As $\bar r$ rises, sectors with above-average organic
+profit rates ($\bar r=5\%,10\%,15\%$). With the corrected technical
+matrix (Section~4.2), $R_{\max}\approx91\%$ for this economy --- still
+higher than any plausible real profit rate, but no longer the
+$\approx691\%$ an earlier, buggy version of the matrix construction
+implied, and squarely in an economically interpretable range for a
+maximum feasible rate. We still plot at concrete empirical rates rather
+than fractions of $R_{\max}$, since $R_{\max}$ itself is not a rate any
+real economy operates at; we checked that the qualitative pattern below
+is unchanged at $0.3R_{\max}\approx27\%$ and $0.6R_{\max}\approx54\%$
+without including a second figure. As $\bar r$ rises, sectors with above-average organic
 composition see their production price rise relative to their labor
 value, and vice versa, the qualitative signature the transformation
 problem predicts, now shown on a real rather than a randomly generated
@@ -696,7 +765,8 @@ difficulty in empirical Marxian value theory
 \centering
 \includegraphics[width=0.75\textwidth]{figures/fig3_transformation.pdf}
 \caption{Labor values vs.\ Sraffian production prices, real technical
-matrix, Portugal 2022, at three illustrative profit rates.}
+matrix (Portugal, 2020 vintage --- Section~4.2), labor coefficients from
+2022, at three illustrative profit rates.}
 \label{fig:transformation}
 \end{figure}
 
@@ -942,28 +1012,43 @@ rather than a Banach-style argument on $F$ itself --- and we continue to
 rely on the empirical evidence above for the general case in the
 meantime.
 
-\emph{The technical matrix construction has not been fully audited.}
-Section~4.2 describes clipping negative margin-accounting cells to zero
-before aggregation, but we have not reported the total magnitude
-clipped, which cells and sectors are affected, or the effect on column
-sums and the matrix's spectral radius; nor have we validated the
-19-sector matrix's row and column sums against Eurostat's own published
-totals, or documented the CPA-to-NACE concordance between the
-product-by-product symmetric table and the industry-organized sectoral
-accounts it is combined with, or distinguished a domestic-use matrix
-from a total-use matrix (imported intermediate inputs are not currently
-modeled as distinct from domestically-supplied ones). The matrix's very
-low spectral radius ($\rho(A)\approx0.13$, implying
-$R_{\max}\approx691\%$, Section~5.3) is plausible but unusually low for
-an economy-wide input-output matrix, and we flag it here as a genuine
-open question about whether the construction under-states
-intermediate-input intensity, rather than asserting the matrix is
-correctly scaled. A full audit against published row/column totals, with
-an explicit accounting-reconciliation assertion built into the pipeline
-(failing loudly if sectoral aggregates do not reconcile with national
-totals, in the spirit of the VAB check in Section~5.1), is the most
-important remaining item of future work on the empirical side of this
-paper.
+\emph{The technical matrix construction was audited, and the audit found
+a bigger problem than expected.} We set out to quantify a margin-clipping
+step's effect, reconcile row/column totals, document the CPA-to-NACE
+concordance, and resolve the domestic-vs-total-use question
+(\texttt{paper/matrix\_audit.jl}). Instead we found the pipeline had been
+pulling from the wrong Eurostat dataflow entirely (Section~4.2):
+\texttt{NAIO\_10\_CP1620} is a trade-and-transport-margins satellite
+table, not the symmetric input-output table, and building $A$ from it
+understated intermediate flows by more than an order of magnitude ---
+the direct cause of the implausibly low $\rho(A)\approx0.13$ and
+implausibly high $R_{\max}\approx691\%$ this paper previously reported,
+and of every negative cell we had attributed to a margin-accounting
+convention. Rebuilt from the correct table (\texttt{NAIO\_10\_CP1700}),
+the matrix has zero negative cells, reconciles \emph{exactly} against
+the table's own published output row for all 19 sections, and gives
+$\rho(A)\approx0.52$, $R_{\max}\approx91\%$ --- both economically
+plausible. The domestic-vs-total-use question is also resolved rather
+than left open: the correct table publishes a genuine domestic-use
+variant, which we use, directly addressing the concern that imported
+inputs were being modeled as domestic supply. The CPA-to-NACE
+concordance question dissolved rather than needing documentation: the
+symmetric table is genuinely product-by-product on both dimensions, so
+no product/industry classification join happens inside the matrix
+construction itself (Section~4.2). What remains unresolved, and cannot
+be fixed by writing more code: \texttt{NAIO\_10\_CP1700} is a benchmark
+table published for specific reference years (2010, 2013, 2015, 2017,
+2020 for Portugal), not annually, so the matrix used in
+Figures~\ref{fig:matrixA} and~\ref{fig:transformation} has an actual
+vintage of 2020 while being computed alongside 2022 labor coefficients
+--- a real, disclosed data-vintage mismatch, logged as a warning at
+calibration time (Table~\ref{tab:sectors}'s own $e$, $k$, $r$, VAB
+figures do not depend on $A$ and remain genuinely 2022). An
+explicit accounting-reconciliation assertion in the pipeline (failing
+loudly if a sector's computed output does not match the table's own
+\texttt{P1} row, in the spirit of the VAB check in Section~5.1) would be
+a reasonable next hardening step, though the reconciliation is already
+exact in the cases we checked.
 
 \emph{The mobility term's conservation was fixed} (Section~3.3): an
 earlier draft's $\bar r$ did not guarantee $\sum_i\mu(r_i-\bar r)C_i=0$;
@@ -1012,15 +1097,24 @@ merely asserted: the capital-mobility term now conserves aggregate
 constant capital exactly by construction, and the rationing mechanism's
 convergence and dispersion claims (Section~5.4) now rest on systematic
 sweeps of 270 and 50 random economies respectively, not a single
-hand-picked illustration. We think this exercise is itself a
+hand-picked illustration. A fourth audit, of the technical matrix
+itself, found the most serious defect of the four: the pipeline had been
+using the wrong Eurostat dataflow, understating intermediate flows by
+more than an order of magnitude and producing an implausible spectral
+radius and maximum profit rate that this paper had, in an earlier
+version, reported without knowing why they looked wrong. Rebuilt from
+the correct table, the matrix reconciles exactly against its own
+published output figures and gives economically plausible values
+throughout (Section~4.2, Section~6.2). We think this exercise is itself a
 useful illustration of what a live, multi-source statistical pipeline
 buys a computational Marxian model: not just convenience, but the
 ability to catch exactly this kind of measurement and modeling error
 before it is mistaken for an economic finding --- provided the pipeline
-is checked as carefully as the theory it implements. Extending the
-valuation-consistent comparison to more economies, auditing the
-technical matrix construction more thoroughly (Section~6.2's single
-largest remaining open item), and archiving frozen data
+is checked as carefully as the theory it implements, and provided
+implausible intermediate results (a spectral radius an order of
+magnitude too low, in this case) are investigated rather than reported
+with a caveat and left for later. Extending the
+valuation-consistent comparison to more economies and archiving frozen data
 snapshots for stronger reproducibility guarantees (Section~6.2) are left
 for future work.
 
