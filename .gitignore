@@ -18,6 +18,18 @@ data/*.xlsx
 *.pdf
 *.svg
 /output/
+!/paper/main.pdf
+!/paper/figures/*.pdf
+
+# LaTeX (paper/)
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
 
 # Sistema
 .DS_Store
