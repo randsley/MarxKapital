@@ -30,7 +30,11 @@ schemes, the package implements three complementary mechanisms for coupling
 sectoral accumulation through the technical matrix~$A$ --- capital
 mobility, an aggregate realization-pressure heuristic, and an exact
 per-sector quantity-rationing scheme solved by fixed-point iteration ---
-without recourse to differential-algebraic equation (DAE) solvers. We
+without recourse to differential-algebraic equation (DAE) solvers; the
+rationing mechanism is validated numerically and demonstrated
+qualitatively on a synthetic economy, but not yet against real
+per-sector accumulation data, for which no suitable time series
+currently exists. We
 further present a live, reproducible empirical pipeline that calibrates the
 model directly from official European statistical sources (Eurostat and
 AMECO, via their SDMX REST APIs), replacing the synthetic or ad hoc
@@ -67,7 +71,10 @@ accumulation dynamics through the technical matrix, culminating in an
 exact quantity-rationing scheme in the spirit of the disequilibrium-macro
 literature \citep{barro1971general,benassy1975neokeynesian}, implemented
 without the numerical machinery a literal differential-algebraic
-formulation would require. It is, second, an empirical contribution: a
+formulation would require. This last mechanism is validated
+numerically and demonstrated on a synthetic economy (Section~5.4); it
+has not yet been tested against real per-sector accumulation data. It
+is, second, an empirical contribution: a
 live data pipeline that fetches real sectoral national accounts,
 input-output tables, and macroeconomic series from Eurostat and the
 European Commission's AMECO database via their official SDMX REST APIs,
@@ -110,7 +117,17 @@ On the empirical side, \citet{shaikh2016capitalism} and
 \citet{dumenil1993economics} are the standard references for long-run
 profit-rate estimation from national accounts; our approach differs mainly
 in emphasizing a fully automated, re-runnable data pipeline over manual
-series construction. The exact quantity-rationing mechanism introduced in
+series construction. Closer in spirit is the strand of empirical Marxian
+work that estimates the profit rate and its components econometrically
+from official national-accounts series over long time spans
+\citep{basu2013reserve}, and the broader program of Marxian estimation
+from harmonized international input-output databases such as the World
+Input-Output Database; MarxKapital shares the latter's emphasis on a
+real technical matrix rather than a value-only aggregate calibration,
+but differs in coupling that matrix to explicit accumulation dynamics
+rather than using it for static decomposition alone. The monetary-expression-of-labor-time
+problem we flag in Section~5.3 is treated at length in
+\citet{freeman1996marx}. The exact quantity-rationing mechanism introduced in
 Section~3.3 draws on the disequilibrium-macroeconomics literature on
 short-side rationing rules, in particular \citet{barro1971general} and
 \citet{benassy1975neokeynesian}, applied here to a Leontief-technology
@@ -352,7 +369,16 @@ for this economy). As $\bar r$ rises, sectors with above-average organic
 composition see their production price rise relative to their labor
 value, and vice versa, the qualitative signature the transformation
 problem predicts, now shown on a real rather than a randomly generated
-technical structure.
+technical structure. The comparison is qualitative only: labor values
+are expressed in labor-time units and production prices in the
+wage-numeraire monetary units of Equation~2, and we do not fix an
+explicit monetary expression of labor time (MELT) to convert between
+them. Figure~3 therefore reports each series normalized to sum to one
+and compares relative deviations, which is sufficient to display the
+sign and ordering of the transformation effect but does not license a
+literal price-value comparison in a common unit --- a well-known
+difficulty in empirical Marxian value theory
+\citep{freeman1996marx,basu2013reserve}.
 
 \begin{figure}[htbp]
 \centering
@@ -405,9 +431,24 @@ candidate explanations are worth further investigation: intensified
 exploitation associated with wage moderation and labor-market
 liberalization over the period, including during the 2011--2014 assistance
 programme; capital-saving technical change, plausible given the economy's
-structural shift toward less capital-intensive services; and
-compositional effects from Portugal's deepening integration into
-EU-wide production networks. Distinguishing between these is beyond the
+structural shift toward less capital-intensive services; compositional
+effects from Portugal's deepening integration into EU-wide production
+networks; and a measurement effect specific to how the organic
+composition is constructed here. AMECO's capital-stock series is
+expressed in current prices, and the organic composition it implies is
+therefore a \emph{value} composition, not a \emph{technical} one: decades
+of relative price decline in capital goods --- computing equipment,
+machinery, software --- can push a current-price capital/labor ratio
+down even with no change, or an increase, in the underlying physical
+capital/labor ratio, a distinction long stressed in the empirical
+Marxian literature \citep{shaikh2016capitalism,basu2013reserve}. We
+cannot rule this out with the current pipeline, since it does not yet
+support a constant-price capital stock; repeating the calibration with a
+volume-deflated series, rather than the current-price AMECO default, is
+the most direct way to test whether the falling organic composition
+survives a switch from value to technical composition, and is a natural
+next step before treating the finding as more than suggestive.
+Distinguishing between these is beyond the
 scope of this paper and would require disaggregating the aggregate series
 by sector and comparing against the 2022 cross-section of
 Table~1 --- itself complicated by the single-year nature of the sectoral
@@ -449,6 +490,22 @@ whose margin-accounting convention we clip at the finer resolution before
 aggregating (Section~4.2); the coarser matrix is non-negative and usable,
 but likely understates services' true role as an input supplier to other
 sectors.
+
+\emph{No systematic robustness or sensitivity analysis.} The results
+above are reported for a single set of parameter choices: net capital
+stock rather than perpetual-inventory, current-price rather than
+volume-deflated valuation, and, for the coupling mechanisms of
+Section~3.3, a single value of the mobility coefficient $\mu$ and a
+single random seed. We likewise report the 1996--2022 trend for
+Portugal alone; whether the pattern is Portugal-specific or shared
+across peripheral EU economies (Spain being the obvious comparator,
+using the identical AMECO pipeline) is untested. The fixed-point
+convergence claim in Section~3.3 is empirical, based on a finite set of
+parameter combinations, not a proof; a formal contraction argument
+under stated conditions on $A$, $\sigma$, and $\delta$ would strengthen
+it considerably. We regard all of these as the most direct next steps
+before treating either the empirical trend or the rationing mechanism's
+qualitative behavior as more than suggestive.
 
 \section{Conclusion}
 
