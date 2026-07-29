@@ -246,7 +246,7 @@ fixed point is
 \begin{align}
   \kappa_j &= \min_{i:\,A_{ij}>0} \rho_i, &
   D_i &= \sum_j A_{ij}\,\kappa_j\,\sigma_{c,j}S_j, &
-  \rho_i &= \min\!\left(1, \frac{O_i}{D_i}\right).
+  \rho_i &= \min\!\left(1, \frac{O_i}{D_i}\right). \label{eq:rationing}
 \end{align}
 We solve this by damped (under-relaxed) fixed-point iteration inside the
 right-hand side of the ODE at every solver evaluation, in exactly the same
@@ -262,6 +262,75 @@ We emphasize that undamped iteration is \emph{not} reliable here: we
 verified by hand that a small two-sector example oscillates indefinitely
 between two states without under-relaxation, a concrete instance of the
 well-known failure mode of naive Picard iteration on $\min$-based maps.
+
+\paragraph{Mathematical structure of the fixed point.} The convergence
+claim above is empirical, but three structural facts about the map in
+Equation~\eqref{eq:rationing}, $F:\rho\mapsto\rho(D(\kappa(\rho)))$, can be
+established directly rather than left as an unexplained regularity. The
+natural first instinct --- following the spectral-radius condition
+$\rho(A)<1$ that already governs the linear Leontief/Sraffa system of
+Section~3.2 --- is to look for an analogous Banach-contraction argument
+for $F$. This does not transfer: $\rho(A)<1$ bounds a different, linear
+map, and, as we show below, it does not by itself bound $F$'s local
+behavior. What can be established is more specific to $F$'s own
+structure.
+
+\emph{Existence is unconditional.} Because $D_i$ is bounded away from
+zero and $\kappa$, $D$, $\rho(\cdot)$ are continuous, $F$ is a continuous
+self-map of the compact convex set $[0,1]^N$. Brouwer's fixed-point
+theorem therefore guarantees a fixed point exists for every admissible
+$(A,\sigma_c,S,O)$, independent of whether any particular iterative
+scheme converges to it.
+
+\emph{$F$ is antitone (order-reversing) in $\rho$.} $\kappa_j(\rho)=
+\min_{i:A_{ij}>0}\rho_i$ is isotone (a minimum is monotone in each
+argument); $D_i(\kappa)=\sum_jA_{ij}\kappa_j\sigma_{c,j}S_j$ is isotone
+(a nonnegative linear combination); and $D\mapsto\min(1,O_i/D_i)$ is
+antitone (decreasing in $D_i$). Composing two isotone maps with one
+antitone map yields an antitone map. This is the structural reason
+undamped Picard iteration oscillates rather than diverging or slowly
+converging: iterating an antitone map is exactly the setting in which
+two-cycles, not convergence, are the generic outcome, because $F\circ F$
+--- not $F$ itself --- is isotone. Our two-sector example is not an
+unlucky special case; it is the typical behavior of this class of map.
+
+\emph{Damping relocates a real eigenvalue, exactly.} At an interior
+fixed point $\rho^*$ (no $\rho_i$ pinned at a boundary), differentiating
+Equation~\eqref{eq:rationing} gives Jacobian entries
+\begin{equation}
+  \frac{\partial F_i}{\partial\rho_k} =
+  -\frac{O_i}{D_i^2}\sum_{j:\,i^*(j)=k} A_{ij}\,\sigma_{c,j}S_j \;\le\; 0,
+\end{equation}
+where $i^*(j)$ denotes a supplier attaining the minimum defining
+$\kappa_j$ --- confirming antitonicity locally, in agreement with the
+global argument above. For the damped step $\rho\mapsto(1-\alpha)\rho+
+\alpha F(\rho)$, a real Jacobian eigenvalue $\lambda$ of $F$ at $\rho^*$
+maps to $\mu(\alpha)=(1-\alpha)+\alpha\lambda$, and
+$\alpha^\star=1/(1-\lambda)$ sets $\mu(\alpha^\star)=0$, i.e.\ locally
+superlinear convergence. This is not hypothetical: for the closed-form
+two-sector example above, the Jacobian collapses to a single active
+eigenvalue $\lambda=-1$ exactly (verified both algebraically from the
+formula above and numerically), for which
+$\alpha^\star=1/(1-(-1))=0.5$ --- precisely the relaxation value the
+package uses by default, not a value tuned after the fact to make this
+example converge.
+
+We also checked directly whether a global, $\rho(A)$-style Lipschitz
+bound exists for $F$, rather than assuming one does not. Write
+$L_i=\sum_jA_{ij}\sigma_{c,j}S_j$ for the full (unrationed) demand on
+good $i$ and $r_i=O_i/L_i$. A global Lipschitz constant for $F$ on the
+box $[\rho_{\min},1]^N$ is $K=\max_iO_i/(\rho_{\min}^2L_i)=\max_ir_i/
+\rho_{\min}^2$; requiring $F$ to map the box into itself forces
+$\rho_{\min}\le\min_ir_i$, and at the tightest admissible choice
+$\rho_{\min}=\min_ir_i$ the bound gives $K\ge1/\min_ir_i>1$ whenever any
+sector is actually rationed ($r_i<1$ for some $i$) --- i.e.\ this style
+of global bound is provably vacuous in exactly the regime the mechanism
+is designed for. We report this as a genuine negative result rather
+than omit it: no clean global contraction constant in the spirit of
+$\rho(A)<1$ exists for this map by this route, which is why we rely on
+the local analysis above, together with the empirical convergence sweep
+reported earlier in this section (twenty-plus parameter combinations at
+$N=8$ and $N=19$, no failures), rather than a single global theorem.
 
 None of the three mechanisms imposes exact market clearing at every
 instant for every sector as a hard constraint solved simultaneously with
