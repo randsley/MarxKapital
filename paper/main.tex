@@ -32,7 +32,8 @@ mobility (conserving aggregate constant capital exactly by construction),
 an aggregate realization-pressure heuristic, and an exact per-sector
 quantity-rationing scheme solved by fixed-point iteration --- without
 recourse to differential-algebraic equation (DAE) solvers. Both
-mechanisms operate on gross output reconstructed from the model's own
+supply-constrained mechanisms --- realization pressure and quantity
+rationing --- operate on gross output reconstructed from the model's own
 state and technical matrix, not a value-added-type proxy: circulating
 constant capital, initially omitted, is recovered from the model's own
 cost identity without adding new state, and investment demand is
@@ -241,8 +242,15 @@ It is \emph{not} generally true of the empirical technical matrix
 (Section~4.2), which we deliberately build from domestic-use flows only
 and which therefore, by definition, omits imported intermediate inputs;
 applying Equation~\eqref{eq:output-bruto} to that matrix would
-understate reconstructed output by exactly the imported share of
-intermediate consumption. We do not do this: Section~4's empirical
+understate reconstructed output, because imported intermediate
+requirements are omitted from the domestic column sum entirely; writing
+$a_j^D=\sum_iA^D_{ij}$ and $a_j^M=\sum_iA^M_{ij}$ for the domestic and
+imported input shares, the true identity is
+$W_j=(1-a_j^D-a_j^M)x_j$, so reconstructing with only $A^D$ gives
+$\hat x_j=W_j/(1-a_j^D)=x_j(1-a_j^D-a_j^M)/(1-a_j^D)$ --- an
+understatement of $x_j-\hat x_j=a_j^M x_j/(1-a_j^D)$, not simply
+$a_j^Mx_j$; the bias depends jointly on the domestic and imported input
+shares, not on the imported share alone. We do not do this: Section~4's empirical
 calibration uses Eurostat's own published $x_i$ directly and never
 invokes Equation~\eqref{eq:output-bruto}, which is used exclusively for
 the closed synthetic economies of Section~3.3 and Section~5.4, where the
@@ -557,6 +565,8 @@ official SDMX REST API rather than a static file:
   \item \textbf{Sectoral employment and gross fixed capital formation}
     from the companion Eurostat datasets \texttt{NAMA\_10\_A64\_E} and
     \texttt{NAMA\_10\_A64\_P5}.
+  \item \textbf{Sectoral net capital stock} (the default series used in
+    Section~4.3) from \texttt{NAMA\_10\_NFA\_ST}, item \texttt{N11N}.
   \item \textbf{A real technical matrix} from Eurostat's symmetric
     input-output table at basic prices, product by product
     (\texttt{NAIO\_10\_CP1700}), domestic-use flows only, aggregated to
@@ -588,10 +598,12 @@ and transport margins'' --- a small satellite table used to decompose the
 use table at purchasers' prices into its components (basic-price flows
 plus margins plus taxes less subsidies), not the symmetric table itself.
 Building $A$ from it produced flows understated by more than an order of
-magnitude (total intermediate consumption implied $\approx\mkern1mu$
-\texteuro11.5\,bn against a true economy-wide figure of
-$\approx\mkern1mu$\texteuro262\,bn, computed as published output less
-published value added for Portugal, 2022), and every negative cell we
+magnitude: for Portugal, 2020 (the same reference year as the corrected
+matrix below, for a like-for-like comparison), total intermediate
+consumption implied by \texttt{NAIO\_10\_CP1620} is
+$\approx\mkern1mu$\texteuro8.8\,bn, against a true economy-wide figure of
+$\approx\mkern1mu$\texteuro177.8\,bn (published output less published
+value added, summed across all NACE sections). Every negative cell we
 had previously attributed to a margin-reallocation accounting convention
 was simply the mechanics of that satellite table, not a property of the
 real input-output structure at all. This is the direct explanation for
