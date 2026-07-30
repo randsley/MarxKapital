@@ -11,7 +11,8 @@ países da base).
 > Estado: **v0.6.1** — funcional para demonstração,
 > desenvolvimento metodológico e um artigo académico em `paper/`, com
 > testes automáticos em CI
-> ([![Testes](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml)).
+> ([![Testes](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml))
+> ([![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705370.svg)](https://doi.org/10.5281/zenodo.21705370)).
 > Dados setoriais e da AMECO **reais** estão disponíveis como opção (via
 > APIs SDMX oficiais), mas os valores por omissão continuam **sintéticos**.
 > Antes de qualquer uso empírico sério, leia

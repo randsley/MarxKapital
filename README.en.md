@@ -11,7 +11,8 @@ INE) and European (**AMECO**, all countries in the database) data.
 > Status: **v0.6.1** — functional for demonstration,
 > methodological development, and an academic paper in `paper/`, with
 > automated tests in CI
-> ([![Tests](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml)).
+> ([![Tests](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml))
+> ([![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705370.svg)](https://doi.org/10.5281/zenodo.21705370)).
 > **Real** sectoral and AMECO data are available as an option (via
 > official SDMX APIs), but the defaults remain **synthetic**.
 > Before any serious empirical use, read

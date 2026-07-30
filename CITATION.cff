@@ -7,6 +7,7 @@ authors:
     given-names: "Nigel"
 version: 0.6.1
 date-released: "2026-07-30"
+doi: 10.5281/zenodo.21705370
 url: "https://github.com/randsley/MarxKapital"
 repository-code: "https://github.com/randsley/MarxKapital"
 license: MIT
