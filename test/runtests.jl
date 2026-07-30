@@ -140,6 +140,30 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test sum(sol_com[end]) <= sum(sol_sem[end])
     end
 
+    @testset "Output bruto reconstruído (x) vs. fluxo tipo valor-acrescentado (W)" begin
+        # x = W/(1-colsum(A)) deve exceder W sempre que a coluna correspondente
+        # de A for positiva (há consumo intermédio circulante a explicar), e
+        # igualar W exatamente quando a coluna é nula (setor sem inputs).
+        Random.seed!(5)
+        sol_com, _, p_com = simular_Ndept(6, T = 20.0, seed = 5, acoplado = true, μ = 0.5,
+                                          racionamento = true)
+        eq = verificar_equilibrio_Ndept(sol_com, p_com)
+        N = 6
+        C = sol_com[end][1:N]; V = sol_com[end][N+1:2N]
+        S = p_com.e .* V
+        W = p_com.δ .* C .+ V .+ S
+        x = eq.output
+        @test all(x .>= W .- 1e-9)
+        colsum = vec(sum(p_com.A, dims = 1))
+        for j in 1:N
+            if colsum[j] ≈ 0.0
+                @test x[j] ≈ W[j] atol = 1e-6
+            else
+                @test x[j] > W[j]
+            end
+        end
+    end
+
     @testset "Agregação de matriz técnica (Leontief)" begin
         A = [0.1 0.2 0.3 0.4; 0.5 0.6 0.7 0.8; 0.1 0.1 0.1 0.1; 0.2 0.2 0.2 0.2]
         secções = ["a", "b", "c", "d"]

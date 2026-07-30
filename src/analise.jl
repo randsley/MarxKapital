@@ -112,18 +112,22 @@ posteriori (não realimenta a dinâmica — tal como a versão de 2 departamento
 não realimenta `sistema_2dept!`) se os níveis de output correntes conseguem
 sustentar a procura intermédia implícita na matriz técnica `p.A`.
 
-Para o instante `t_idx` (por omissão, o último), calcula o output bruto por
-setor `Oᵢ = δᵢCᵢ+Vᵢ+Sᵢ` (capital constante \emph{transferido}, δᵢCᵢ — não o
-stock Cᵢ, que é uma magnitude de dimensão temporal distinta de Vᵢ,Sᵢ; ver
-`capital_transferido`/`valor_produto` em `estruturas.jl`) e a procura
-intermédia `(A·O)ᵢ`; devolve o desvio por
-setor (`Oᵢ − (A·O)ᵢ`, positivo quando o setor produz mais do que a economia
-precisa dele como input, negativo quando produz menos) e a razão de
-realização agregada `ρ_real = Σ min(Oᵢ,(A·O)ᵢ) / Σ(A·O)ᵢ` (≤ 1; = 1 sem
-estrangulamento). Usada por `sistema_Ndept_io!` (`realização=true`,
-`src/nucleo.jl`) como base do fator de amortecimento do reinvestimento —
-aqui exposta para inspecionar o resultado fora da EDO, à semelhança de
-`calcular_taxas_lucro_precos`.
+Para o instante `t_idx` (por omissão, o último), reconstrói primeiro o
+fluxo tipo valor-acrescentado `Wᵢ = δᵢCᵢ+Vᵢ+Sᵢ` (capital constante
+\emph{transferido}, δᵢCᵢ — não o stock Cᵢ; ver `capital_transferido`/
+`valor_produto` em `estruturas.jl`) e depois o output bruto genuíno
+`xᵢ = Wᵢ/(1-Σⱼ A[j,i])` a partir da identidade custo-output do modelo
+(mesma reconstrução usada em `sistema_Ndept_io!`, `src/nucleo.jl`) —
+`Wᵢ` sozinho omite o consumo intermédio circulante e não é diretamente
+comparável a `(A··)ᵢ`, que é procura de input por unidade de output
+bruto. Com `xᵢ`, calcula-se a procura intermédia `(A·x)ᵢ`; devolve o
+desvio por setor (`xᵢ − (A·x)ᵢ`, positivo quando o setor produz mais do
+que a economia precisa dele como input, negativo quando produz menos) e
+a razão de realização agregada `ρ_real = Σ min(xᵢ,(A·x)ᵢ) / Σ(A·x)ᵢ`
+(≤ 1; = 1 sem estrangulamento). Usada por `sistema_Ndept_io!`
+(`realização=true`, `src/nucleo.jl`) como base do fator de amortecimento
+do reinvestimento — aqui exposta para inspecionar o resultado fora da
+EDO, à semelhança de `calcular_taxas_lucro_precos`.
 """
 function verificar_equilibrio_Ndept(sol, p; t_idx = length(sol.t))
     N = length(p.e)
@@ -131,7 +135,9 @@ function verificar_equilibrio_Ndept(sol, p; t_idx = length(sol.t))
     C = X[1:N]
     V = X[N+1:2N]
     S = p.e .* V
-    O = p.δ .* C .+ V .+ S
+    W = p.δ .* C .+ V .+ S
+    colsum = min.(vec(sum(p.A, dims = 1)), 0.95)
+    O = W ./ (1 .- colsum)
     procura_intermédia = p.A * O
     desvio = O .- procura_intermédia
     soma_procura = sum(procura_intermédia)

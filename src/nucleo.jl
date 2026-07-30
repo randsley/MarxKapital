@@ -222,19 +222,35 @@ function sistema_Ndept_io!(dX, X, p, t)
     r̄ = sum(r .* C) / sum(C)
 
     κ = ones(N)
-    # Output bruto de um período soma o valor de capital constante
-    # TRANSFERIDO (δ.*C, depreciação do stock avançado), não o stock C em
-    # si — C é uma magnitude de stock, V e S são fluxos anuais; somá-los
-    # diretamente misturaria dimensões temporais distintas (ver
-    # `estruturas.jl`, `capital_transferido`/`valor_produto`).
-    if p.racionamento
-        O = p.δ .* C .+ V .+ S
-        κ = _resolver_racionamento(p.A, p.σ_c, S, O)
-    elseif p.realização
-        O = p.δ .* C .+ V .+ S
-        procura_intermédia = p.A * O
-        soma_procura = sum(procura_intermédia)
-        soma_procura > 0 && (κ .= min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0))
+    if p.racionamento || p.realização
+        # W = fluxo tipo valor-acrescentado do período (capital constante
+        # TRANSFERIDO, δ.*C, não o stock C — ver `capital_transferido` em
+        # `estruturas.jl`). Não é output bruto: falta o consumo intermédio
+        # circulante zᵢ. Recupera-se x (output bruto) a partir da própria
+        # identidade custo-output do modelo, xⱼ = zⱼ+Wⱼ com zⱼ=Σᵢ A[i,j]·xⱼ
+        # (A é definida por unidade de output bruto do comprador), donde
+        # xⱼ = Wⱼ/(1-Σᵢ A[i,j]) — sem introduzir novo estado. `colsum` é
+        # limitado a 0.95 por segurança numérica (ρ(A)<1 não garante
+        # nenhuma soma de coluna individual <1).
+        W = p.δ .* C .+ V .+ S
+        colsum = min.(vec(sum(p.A, dims = 1)), 0.95)
+        x = W ./ (1 .- colsum)
+        O = x  # output bruto genuíno, não W — corrige a crítica de revisão
+                # externa de que O omitia consumo intermédio circulante.
+        if p.racionamento
+            # Expansão de output desejada implícita no reinvestimento
+            # planeado σ_c,ⱼSⱼ, via o rácio capital/output corrente Cⱼ/xⱼ
+            # (Δxⱼ = investimento planeado ÷ rácio capital-output) — Aᵢⱼ
+            # aplica-se a esta expansão de OUTPUT, não a despesa de
+            # investimento diretamente (a simplificação anterior, já
+            # documentada como tal no artigo).
+            Δx = p.σ_c .* S .* x ./ C
+            κ = _resolver_racionamento(p.A, ones(N), Δx, O)
+        else
+            procura_intermédia = p.A * O
+            soma_procura = sum(procura_intermédia)
+            soma_procura > 0 && (κ .= min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0))
+        end
     end
 
     dX[1:N]    = κ .* p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C

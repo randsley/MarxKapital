@@ -31,7 +31,13 @@ sectoral accumulation through the technical matrix~$A$ --- capital
 mobility (conserving aggregate constant capital exactly by construction),
 an aggregate realization-pressure heuristic, and an exact per-sector
 quantity-rationing scheme solved by fixed-point iteration --- without
-recourse to differential-algebraic equation (DAE) solvers. The rationing
+recourse to differential-algebraic equation (DAE) solvers. Both
+mechanisms operate on gross output reconstructed from the model's own
+state and technical matrix, not a value-added-type proxy: circulating
+constant capital, initially omitted, is recovered from the model's own
+cost identity without adding new state, and investment demand is
+converted to output-scale units via each sector's capital-output ratio
+before the technical matrix is applied to it. The rationing
 mechanism's convergence (270 random trials, $N\in\{6,12,19\}$) and its
 effect on cross-sector dispersion (50 random economies) are checked
 systematically rather than on a single hand-picked example, though not
@@ -40,27 +46,34 @@ time series currently exists. We further present a live, reproducible
 empirical pipeline that calibrates the model directly from official
 European statistical sources (Eurostat and AMECO, via their SDMX REST
 APIs), replacing the synthetic or ad hoc calibration common in the
-computational Marxian literature, and apply it to Portugal: a
-sectoral profile for 2022 (19 sectors, real value added, a technical
-matrix reconciled exactly against Eurostat's own published output
-figures) and an aggregate profit-rate series for 1996--2022, which
+computational Marxian literature, and apply it to Portugal: a 2022
+sectoral national-accounts profile (19 sectors, real value added), a
+coherent 2020 production-structure calibration (a technical matrix
+reconciled exactly against Eurostat's own published output figures,
+paired with 2020 labor coefficients rather than mixing vintages), and
+an aggregate profit-rate series for 1996--2022, which
 ranges $7.9\%$--$15.1\%$ across three deflation conventions we test ---
 a real but modest sensitivity, not the dramatic artifact an earlier,
 internally inconsistent version of this calibration produced.
 
-That earlier inconsistency is itself part of what we report. Three
+That earlier inconsistency is itself part of what we report. Four
 defects, each found by auditing rather than assuming correctness and
 each disclosed alongside its fix and quantified consequence: a
 stock-flow conflation in the model's own output formula (a capital
 \emph{stock} was being added directly to annual \emph{flows}); a
 depreciation term that broke an algebraic invariance the corrected rate
 of exploitation now satisfies exactly, verified directly rather than
-asserted; and a technical-matrix construction that, on audit, turned out
+asserted; a technical-matrix construction that, on audit, turned out
 to be reading the wrong Eurostat dataflow entirely (a trade-margins
 satellite table, not the symmetric input-output table), understating
 intermediate flows by more than an order of magnitude and explaining an
 implausible spectral radius and maximum profit rate reported in earlier
-versions of this work. We treat this progression as a contribution in
+versions of this work; and, in the dynamical model itself, a supply-side
+flow that omitted circulating constant capital entirely and an
+investment-demand term that applied the technical matrix to expenditure
+rather than output, both corrected by reconstructing genuine gross
+output from the model's own state at every solver evaluation. We treat
+this progression as a contribution in
 its own right, alongside the corrected empirical numbers, on the view
 that a live statistical pipeline's value lies as much in surfacing and
 fixing exactly this kind of error as in the numbers it ultimately
@@ -199,28 +212,38 @@ and profit rate are conventionally computed. This is distinct from the
 constant capital \emph{transferred} to output during a single period,
 $\delta_dC_d$ under the model's single depreciation rate. An earlier
 version of this paper called $W_d=\delta_dC_d+V_d+S_d$ ``gross output'';
-that label is still not accurate, and we correct it here rather than
-merely renaming a symbol. The model tracks only \emph{fixed} constant
-capital $C_d$ (a depreciating stock) and its period-transferred portion
-$\delta_dC_d$; it has no separate state for \emph{circulating} constant
-capital (raw materials, energy, purchased services, and other
-intermediate inputs consumed within the period without being
-capitalized as a stock). True gross output is
-$x_d=z_d+\delta_dC_d+V_d+S_d$, where $z_d$ is circulating intermediate
-consumption --- a term this model does not represent. $W_d$ is therefore
-best understood as a \emph{value-added-type} flow (fixed-capital
-consumption plus the two income flows), structurally analogous to a
-sector's contribution to GDP, not as gross output in the input-output
-sense used in Section~4 to construct $A$ from real data. We use $W_d$
-(via $O_i$ in Section~3.3) purely as the supply-side quantity the
-model's own dynamics can compute period by period from its own state
-variables; where a genuine gross-output figure is available from data
+that label was not accurate, since the model tracks only \emph{fixed}
+constant capital $C_d$ (a depreciating stock) and has no separate state
+for \emph{circulating} constant capital $z_d$ --- raw materials, energy,
+purchased services, and other intermediate inputs consumed within the
+period without being capitalized as a stock. True gross output is
+$x_d=z_d+W_d$. Rather than leave $z_d$ unrepresented, we recover it from
+the model's own cost structure: since $A_{id}$ is defined as input $i$
+per unit of \emph{gross output} of sector $d$ (Section~3.2), a sector's
+circulating consumption is $z_d=\bigl(\sum_iA_{id}\bigr)x_d$, so
+\begin{equation}
+  x_d = z_d + W_d = \Bigl(\textstyle\sum_iA_{id}\Bigr)x_d + W_d
+  \;\;\Longrightarrow\;\;
+  x_d = \frac{W_d}{1-\sum_iA_{id}},
+  \label{eq:output-bruto}
+\end{equation}
+solved without introducing new state: $x_d$ is reconstructed at every
+solver evaluation from $W_d$ (itself a function of the state
+$C_d,V_d$) and the fixed matrix $A$, the same way Sraffa prices are
+recomputed at every evaluation rather than tracked as state
+(Section~3.2). The column sum $\sum_iA_{id}$ is clamped below $0.95$ for
+numerical safety, since $\rho(A)<1$ bounds the matrix's spectral radius
+but not any individual column sum. Section~3.3's coupling mechanisms use
+$x_d$, not $W_d$, as the supply-side quantity --- resolving, rather than
+merely disclosing, the gap between a value-added-type flow and genuine
+gross output that an earlier version of this paper left as an open
+limitation. Where a genuine gross-output figure is available from real
+data instead of reconstructed from the model's own dynamics
 (Section~4's calibration, which uses Eurostat's published $x_i$ directly
-to build $A$), we use that instead and do not substitute $W_d$ for it.
-This is a real, stated limitation of the dynamical model, not a
-resolved one: Section~6.2 returns to what it means for the rationing
-mechanism of Section~3.3, whose supply side is $O_i=W_i$, not $x_i$.
-Intersectoral
+to build $A$), we use that measured figure, not the reconstruction ---
+Equation~\eqref{eq:output-bruto} is specifically for the simulated
+$N$-department dynamics, where no measured $x_d$ exists period by
+period. Intersectoral
 consistency (does Department~I's wage and unaccumulated-surplus income
 suffice to buy Department~II's output, and vice versa) is checked
 \emph{a posteriori} by a dedicated consistency function, not imposed
@@ -241,6 +264,7 @@ follow the Leontief inverse, $\lambda = (I-A)^{-1}l$, and Sraffian
 production prices follow
 \begin{equation}
   p = w(1+\bar r)\left[I-(1+\bar r)A^\top\right]^{-1} l,
+  \label{eq:sraffa}
 \end{equation}
 valid for any uniform profit rate $\bar r$ below the maximum feasible rate
 $R_{\max} = 1/\lambda_{\max}(A^\top) - 1$, where $\lambda_{\max}$ denotes
@@ -289,11 +313,15 @@ than merely asserting algebraically.
 
 \paragraph{Aggregate realization pressure.} Setting $\kappa_i \equiv
 \min(\rho_{\text{real}},1)$ uniformly across sectors, with
-$\rho_{\text{real}} = \sum_i \min(O_i,(AO)_i) / \sum_i (AO)_i$ and gross
-output $O_i=\delta_iC_i+V_i+S_i$ (capital \emph{transferred}, not the
-stock $C_i$ --- Section~3.1), dampens planned reinvestment economy-wide
+$\rho_{\text{real}} = \sum_i \min(O_i,(AO)_i) / \sum_i (AO)_i$ and $O_i=x_i$
+the reconstructed gross output of Equation~\eqref{eq:output-bruto}
+(Section~3.1) --- not the value-added-type flow $W_i$ an earlier version
+of this paper used here --- dampens planned reinvestment economy-wide
 whenever aggregate intermediate demand implied by $A$ and current outputs
-exceeds what those same outputs can supply. This is a coarse,
+exceeds what those same outputs can supply. Because $O_i$ is now genuine
+gross output, $(AO)_i$ is dimensionally the correct intermediate demand
+implied by current production, not an approximation built on an
+understated supply figure. This mechanism is a coarse,
 aggregate approximation --- it does not distinguish which sectors are
 actually constrained --- but requires no iterative solution.
 
@@ -302,8 +330,8 @@ technical contribution replaces the aggregate heuristic with a genuine
 per-sector rationing scheme --- ``exact'' in the sense of solving the
 specified proportional short-side rationing rule exactly via its fixed
 point, not in the sense of a full, empirically validated model of
-sectoral reproduction balances (the simplifying assumptions this entails
-are stated below and revisited in Section~6.2). Under Leontief technology, a sector's planned
+sectoral reproduction balances (the remaining simplifying assumption is
+stated below and revisited in Section~6.2). Under Leontief technology, a sector's planned
 reinvestment cannot substitute a shortage of one input with more of
 another; realized investment is bounded by the scarcest required input,
 and a sector's own shortfall reduces its effective demand for \emph{all}
@@ -314,35 +342,39 @@ the realized fraction of planned reinvestment for \emph{buyer} $j$, the
 fixed point is
 \begin{align}
   \kappa_j &= \min_{i:\,A_{ij}>0} \rho_i, &
-  D_i &= \sum_j A_{ij}\,\kappa_j\,\sigma_{c,j}S_j, &
-  \rho_i &= \min\!\left(1, \frac{O_i}{D_i}\right). \label{eq:rationing}
+  D_i &= \sum_j A_{ij}\,\kappa_j\,\Delta x_j, &
+  \rho_i &= \min\!\left(1, \frac{x_i}{D_i}\right), \label{eq:rationing}
 \end{align}
-Three modeling simplifications in Equation~\eqref{eq:rationing} deserve
-comment. First, $A_{ij}$ multiplies planned constant-capital
-\emph{expenditure} $\kappa_j\sigma_{c,j}S_j$ directly, as if a unit of
-investment expenditure by sector $j$ requires the same input mix as a
-unit of $j$'s physical output; we do not separately track a
-capital-output conversion, and this identification should be read as an
-explicit simplifying assumption, not a derived relationship. Second, the
-supply side $O_i$ is the model's own value-added-type flow
-$W_i=\delta_iC_i+V_i+S_i$ (Section~3.1), not true gross output
-$x_i=z_i+W_i$ including circulating intermediate consumption $z_i$,
-which this dynamical model does not track as a separate state; $O_i$
-therefore \emph{omits} the very quantity ($z_i$, circulating constant
-capital) that $A$ is supposed to price the input requirements of,
-understating available supply relative to a genuine gross-output
-figure. Third, and independent of that omission, the full $O_i$ is
-treated as available to meet investment demand, though in reality output
-must also replace intermediate inputs and meet consumption and other
-final demand first; the mechanism therefore
-represents an upper bound on investable supply, and is best read as
-constraining the investment-goods side of reproduction specifically (we
-return to this in Section~6.2's discussion of final-demand
-microfoundations). The calibration in Section~4, by contrast, builds $A$
+where $\Delta x_j=\sigma_{c,j}S_j\cdot x_j/C_j$ is the \emph{desired
+expansion in gross output} implied by planned investment expenditure
+$\sigma_{c,j}S_j$, converted via sector $j$'s current capital-output
+ratio $C_j/x_j$. An earlier version of this paper applied $A_{ij}$
+directly to investment expenditure $\sigma_{c,j}S_j$, implicitly
+treating a unit of investment spending as if it required the same input
+mix as a unit of physical output; that conflated a value flow with a
+production-scale variable, a dimensional problem external review
+correctly identified as more serious than a disclosed simplification.
+$\Delta x_j$ resolves it: $A_{ij}$ now multiplies an output-scale
+quantity, consistent with $A$'s own definition (input $i$ per unit of
+gross output of $j$), and the supply side $x_i$ is genuine reconstructed
+gross output (Equation~\eqref{eq:output-bruto}), not the value-added-type
+$W_i$. One simplification remains, disclosed rather than resolved: the
+\emph{full} $x_i$ is treated as available to meet investment demand
+$D_i$, though in reality output must also replace intermediate inputs
+already counted in $z_i$ and meet consumption and other final demand
+first. Since no data source in the current pipeline provides
+sector-of-origin final-demand allocation, we do not net a consumption
+and replacement residual out of $x_i$ before comparing it to $D_i$; the
+mechanism therefore represents an upper bound on investable supply,
+constraining the investment-goods side of reproduction specifically, not
+full sectoral reproduction balances (Section~6.2). The calibration in
+Section~4, separately, builds $A$
 from Eurostat's real product flows and uses the table's own published
-gross output $x_i$ directly (Section~4.2) --- the dynamical model's
-$O_i=W_i$ substitution applies only to the simulated coupling mechanisms
-of this section, not to the empirical technical matrix itself. We solve this by damped (under-relaxed) fixed-point iteration inside the
+gross output $x_i$ directly (Section~4.2) --- Equation~\eqref{eq:output-bruto}'s
+reconstruction applies only to the simulated coupling mechanisms
+of this section, not to the empirical technical matrix itself.
+
+We solve this by damped (under-relaxed) fixed-point iteration inside the
 right-hand side of the ODE at every solver evaluation, in exactly the same
 spirit as the Sraffa-price linear solve above, rather than exposing
 $(\rho,\kappa)$ as differential-algebraic state to the solver. This choice
@@ -381,7 +413,7 @@ supplier to be rationed by). With these two conventions stated
 explicitly, $\kappa$, $D$, $\rho(\cdot)$ are continuous on $[0,1]^N$, so
 $F$ is a continuous self-map of this compact convex set. Brouwer's
 fixed-point theorem therefore guarantees \emph{a} fixed point exists for
-every admissible $(A,\sigma_c,S,O)$, independent of whether any
+every admissible $(A,\sigma_c,S,x)$, independent of whether any
 particular iterative scheme converges to it. Existence does not imply
 uniqueness: because $F$ is antitone (below), the model could in
 principle admit multiple fixed points or a genuine two-cycle rather than
@@ -397,8 +429,8 @@ the regime we test, not a proof of uniqueness in general.
 
 \emph{$F$ is antitone (order-reversing) in $\rho$.} $\kappa_j(\rho)=
 \min_{i:A_{ij}>0}\rho_i$ is isotone (a minimum is monotone in each
-argument); $D_i(\kappa)=\sum_jA_{ij}\kappa_j\sigma_{c,j}S_j$ is isotone
-(a nonnegative linear combination); and $D\mapsto\min(1,O_i/D_i)$ is
+argument); $D_i(\kappa)=\sum_jA_{ij}\kappa_j\Delta x_j$ is isotone
+(a nonnegative linear combination); and $D\mapsto\min(1,x_i/D_i)$ is
 antitone (decreasing in $D_i$). Composing two isotone maps with one
 antitone map yields an antitone map. This is the structural reason
 undamped Picard iteration oscillates rather than diverging or slowly
@@ -415,7 +447,7 @@ fixed point $\rho^*$ (no $\rho_i$ pinned at a boundary), differentiating
 Equation~\eqref{eq:rationing} gives Jacobian entries
 \begin{equation}
   \frac{\partial F_i}{\partial\rho_k} =
-  -\frac{O_i}{D_i^2}\sum_{j:\,i^*(j)=k} A_{ij}\,\sigma_{c,j}S_j \;\le\; 0,
+  -\frac{x_i}{D_i^2}\sum_{j:\,i^*(j)=k} A_{ij}\,\Delta x_j \;\le\; 0,
 \end{equation}
 where $i^*(j)$ denotes a supplier attaining the minimum defining
 $\kappa_j$ --- confirming antitonicity locally, in agreement with the
@@ -438,9 +470,9 @@ example converge.
 
 We also checked directly whether a global, $\rho(A)$-style Lipschitz
 bound exists for $F$, rather than assuming one does not. Write
-$L_i=\sum_jA_{ij}\sigma_{c,j}S_j$ for the full (unrationed) demand on
-good $i$ and $r_i=O_i/L_i$. A global Lipschitz constant for $F$ on the
-box $[\rho_{\min},1]^N$ is $K=\max_iO_i/(\rho_{\min}^2L_i)=\max_ir_i/
+$L_i=\sum_jA_{ij}\Delta x_j$ for the full (unrationed) demand on
+good $i$ and $r_i=x_i/L_i$. A global Lipschitz constant for $F$ on the
+box $[\rho_{\min},1]^N$ is $K=\max_ix_i/(\rho_{\min}^2L_i)=\max_ir_i/
 \rho_{\min}^2$; requiring $F$ to map the box into itself forces
 $\rho_{\min}\le\min_ir_i$, and at the tightest admissible choice
 $\rho_{\min}=\min_ir_i$ the bound gives $K\ge1/\min_ir_i>1$ whenever any
@@ -457,10 +489,12 @@ None of the three mechanisms imposes exact market clearing at every
 instant for every sector as a hard constraint solved simultaneously with
 the differential state --- that would require the DAE formulation we
 deliberately avoid. A dedicated consistency-check function generalizes the
-two-department \emph{a posteriori} check to $N$ sectors, reporting the
-per-sector gap $O_i - (AO)_i$ and the aggregate realization ratio at a
-given point in the trajectory, for diagnostic use outside the dynamics
-themselves.
+two-department \emph{a posteriori} check to $N$ sectors, reconstructing
+$x_i$ from the state via Equation~\eqref{eq:output-bruto} and reporting
+the per-sector gap $x_i - (Ax)_i$ and the aggregate realization ratio at
+a given point in the trajectory, for diagnostic use outside the dynamics
+themselves --- now a genuine gross-output gap, not a comparison built on
+the value-added-type $W_i$ an earlier version of this diagnostic used.
 
 \section{Empirical calibration}
 
@@ -604,15 +638,16 @@ $S^{\text{net}}$ (equivalently, $e=(Y-V-\text{CCF})/V$), with CCF drawn
 from AMECO's own consumption-of-fixed-capital series (item
 \texttt{UKCT}, current-price, deflated consistently with $V$ and $Y$ in
 each convention) rather than an assumed fraction of the capital stock;
-an earlier version of this calculation used a flat $10\%$ of the
-(constant-price) capital stock in place of CCF, which breaks the
-algebraic invariance of $S^{\text{gross}}/V$ under a common deflator
-applied to $Y$ and $V$ (since it mixes an unscaled term into the
-numerator) --- an inconsistency we found via external review and verify
-is now resolved in Section~5.2, where we report that $e$ (computed with
-$S^{\text{net}}$, CCF deflated consistently with $Y$ and $V$) is
-invariant across conventions exactly, confirming the fix addresses the
-right term. The sectoral cross-section of Section~5.1 also uses
+an earlier version of this calculation substituted a flat $10\%$ of the
+(constant-price) capital stock for CCF: a constant-price, unscaled term
+that does not move with the deflator applied to $Y$ and $V$, which
+breaks the algebraic invariance of $S^{\text{net}}/V$ specifically
+(there being no CCF-like term in $S^{\text{gross}}/V=(Y-V)/V$ for a
+mismeasured CCF to disturb) --- an inconsistency we found via external
+review and verify is now resolved in Section~5.2, where we report that
+$e^{\text{net}}$ (computed with $S^{\text{net}}$, CCF deflated
+consistently with $Y$ and $V$) is invariant across conventions exactly,
+confirming the fix addresses the right term. The sectoral cross-section of Section~5.1 also uses
 $S^{\text{net}}$ throughout (business income after consumption of fixed
 capital, Section~4.3).
 
@@ -777,7 +812,7 @@ value, and vice versa, the qualitative signature the transformation
 problem predicts, now shown on a real rather than a randomly generated
 technical structure. The comparison is qualitative only: labor values
 are expressed in labor-time units and production prices in the
-wage-numeraire monetary units of Equation~2, and we do not fix an
+wage-numeraire monetary units of Equation~\eqref{eq:sraffa}, and we do not fix an
 explicit monetary expression of labor time (MELT) to convert between
 them. Figure~\ref{fig:transformation} therefore reports each series normalized to sum to one
 and compares relative deviations, which is sufficient to display the
@@ -824,10 +859,10 @@ the parameter ranges of \texttt{criar\_matriz\_tecnica} and
 \texttt{criar\_departamentos}); we do not claim it generalizes beyond
 that tested class. The mean final dispersion is
 $0.063$ (mobility only), $0.189$ (adding realization pressure), and
-$0.440$ (adding rationing) --- rationing roughly triples dispersion
+$0.448$ (adding rationing) --- rationing roughly triples dispersion
 relative to realization pressure and roughly seven-folds it relative to
 mobility alone, on average, with substantial spread across seeds
-(rationing's dispersion ranges $0.108$--$0.736$ across the 50 economies).
+(rationing's dispersion ranges $0.168$--$0.687$ across the 50 economies).
 The economic reading is the same as before, now with numerical backing:
 exact per-sector rationing is a genuinely different, more disequalizing
 mechanism than either capital mobility or an aggregate realization
@@ -992,30 +1027,29 @@ for the relevant dataflow, but not the corresponding asset-specific
 depreciation profiles, which would be needed for a fully differentiated
 perpetual-inventory calculation.
 
-\emph{The dynamical model's output measure omits circulating constant
-capital, and no microfoundation for final demand exists.} Two related
-gaps in Section~3.3's coupling mechanisms, not yet closed. First, the
-supply side $O_i=\delta_iC_i+V_i+S_i$ used inside the simulated dynamics
-is a value-added-type flow, not gross output: the model has no separate
-state for circulating constant capital (materials, energy, purchased
-services consumed within the period), so $O_i$ systematically omits
-exactly the quantity $A$ prices the input requirements of. This is
-distinct from, and does not fix, the empirical technical matrix itself
-(Section~4.2), which is built from Eurostat's real gross-output figures
-and does not have this problem --- the gap is specific to the simulated
-$N$-department dynamics, where no per-period circulating-capital state
-exists to draw on. Second, and independently, the quantity-rationing
-mechanism of Section~3.3 constrains reinvestment demand through the
-technical matrix but does not model how aggregate consumption demand is
-allocated across sectors, since no data source in the current pipeline
-provides sector-of-origin consumption baskets. Both gaps point toward
-the same fix: introducing an explicit circulating-capital flow state
-(and, ideally, a final-demand allocation) into the dynamical model,
-rather than only into the static empirical calibration where the
-problem has already been addressed. Until that is done, the coupling
-mechanisms of Section~3.3 should be read as constraining a
-value-added-scale approximation of the investment-goods side of
-reproduction, not gross output or final demand in general.
+\emph{The dynamical model's output measure was resolved; final demand
+was not.} An earlier version of this paper used a value-added-type flow
+$W_i=\delta_iC_i+V_i+S_i$ as the supply side of Section~3.3's coupling
+mechanisms, omitting circulating constant capital (materials, energy,
+purchased services) entirely. We closed this gap rather than continuing
+to disclose it: Equation~\eqref{eq:output-bruto} reconstructs genuine
+gross output $x_i$ from $W_i$ and the model's own cost structure at
+every solver evaluation, without adding new state, and both coupling
+mechanisms now use $x_i$. The investment-demand side was fixed
+correspondingly (Equation~\eqref{eq:rationing}): $A_{ij}$ now multiplies
+a desired \emph{output} expansion $\Delta x_j$, converted from planned
+investment expenditure via the sector's own capital-output ratio, not
+raw expenditure directly. One gap remains, disclosed rather than
+resolved: the quantity-rationing mechanism still treats the \emph{full}
+reconstructed $x_i$ as available to meet investment demand, though
+output must also replace intermediate inputs and meet consumption and
+other final demand first. Closing this fully would require an explicit
+final-demand allocation across sectors, for which no data source in the
+current pipeline provides sector-of-origin consumption baskets; until
+then, $D_i\le x_i$ should be read as an upper bound on investable
+supply, not a fully netted reproduction balance. This limitation is
+narrower than before --- confined to the investable-residual question,
+not the output measure itself.
 
 \emph{Coarser sectoral aggregations inherit a data-quality caveat.} When
 the technical matrix is aggregated from 19 to 3 macro-sectors, the
@@ -1172,7 +1206,16 @@ radius and maximum profit rate that this paper had, in an earlier
 version, reported without knowing why they looked wrong. Rebuilt from
 the correct table, the matrix reconciles exactly against its own
 published output figures and gives economically plausible values
-throughout (Section~4.2, Section~6.2). We think this exercise is itself a
+throughout (Section~4.2, Section~6.2). A fifth defect, in the dynamical
+model itself, was resolved rather than only disclosed: the coupling
+mechanisms' supply side omitted circulating constant capital entirely,
+and their investment-demand side applied the technical matrix to
+expenditure rather than output. Both are fixed by reconstructing genuine
+gross output from the model's own state at every solver evaluation
+(Section~3.1, Equation~\eqref{eq:output-bruto}) and converting planned
+investment expenditure to an output-scale quantity via each sector's
+capital-output ratio before applying $A$ to it (Section~3.3) --- neither
+requires new state or a heavier solver. We think this exercise is itself a
 useful illustration of what a live, multi-source statistical pipeline
 buys a computational Marxian model: not just convenience, but the
 ability to catch exactly this kind of measurement and modeling error
