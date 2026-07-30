@@ -67,14 +67,13 @@ for N in Ns, densidade in densidades
 end
 
 fig6a = histogram(iterações_convergidas, bins = 20, xlabel = "Iterations to converge",
-                  ylabel = "Count", title = "Rationing fixed point: iterations to converge\n" *
-                  "($n_total trials, N∈{6,12,19}, density∈{0.2,0.4,0.6})",
+                  ylabel = "Count", title = "Convergence speed",
                   legend = false, color = :steelblue, size = (650, 420), margin = 5Plots.mm)
 savefig(fig6a, joinpath(FIG_DIR, "fig6a_convergence_iterations.pdf"))
 
 frações = [r.fração_racionada for r in resultados]
 fig6b = histogram(frações, bins = 20, xlabel = "Fraction of sectors rationed (κ<0.999)",
-                  ylabel = "Count", title = "Rationing incidence across $n_total trials",
+                  ylabel = "Count", title = "Rationing incidence",
                   legend = false, color = :firebrick, size = (650, 420), margin = 5Plots.mm)
 savefig(fig6b, joinpath(FIG_DIR, "fig6b_rationing_incidence.pdf"))
 

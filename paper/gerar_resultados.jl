@@ -116,21 +116,28 @@ println("  ✓ $(params.N) sectors, VAB-weighted mean e=$(round(sum(w.*params.e)
 # Figure 2 — real 19x19 technical matrix A (heatmap)
 # ----------------------------------------------------------------------------
 
-println("\n[3/5] Real technical matrix A (heatmap)...")
-fig2 = heatmap(params.códigos_cae, params.códigos_cae, params.A,
+# NAIO_10_CP1700 (the real symmetric IOT) is a benchmark table, not annual
+# (Portugal: 2010/2013/2015/2017/2020) — requesting 2022 silently falls back
+# to 2020, mixing a 2020-vintage matrix with 2022 labor coefficients. Rather
+# than accept that mismatch, Figures 2-3 use a fully coherent 2020
+# calibration (matrix AND labor coefficients both 2020); Table 1 and the
+# aggregate AMECO series stay 2022/1996-2022 (neither depends on A).
+println("\n[3/5] Real technical matrix A (heatmap, coherent 2020 calibration)...")
+params2020 = calibrar_modelo_portugal(ano = 2020, fonte_dados = :eurostat)
+fig2 = heatmap(params2020.códigos_cae, params2020.códigos_cae, params2020.A,
                xlabel = "buying sector j", ylabel = "supplying sector i",
-               title = "Real technical matrix A (Portugal, 2022)",
+               title = "Real technical matrix A (Portugal, 2020)",
                color = :viridis, size = (650, 550), margin = 5Plots.mm)
 savefig(fig2, joinpath(FIG_DIR, "fig2_matrix_A.pdf"))
-ρ_A = maximum(abs.(eigvals(params.A)))
-println("  ✓ ρ(A) = $(round(ρ_A, digits = 3))")
+ρ_A = maximum(abs.(eigvals(params2020.A)))
+println("  ✓ ρ(A) = $(round(ρ_A, digits = 3)) (2020 calibration, N=$(params2020.N))")
 
 # ----------------------------------------------------------------------------
 # Figure 3 — transformation problem on the real calibrated economy
 # ----------------------------------------------------------------------------
 
-println("\n[4/5] Transformation problem (real A, real l)...")
-A, l = params.A, params.l
+println("\n[4/5] Transformation problem (real A, real l, coherent 2020 calibration)...")
+A, l = params2020.A, params2020.l
 λ = calcular_valores_trabalho(A, l)
 λ_norm = λ ./ sum(λ)
 R_max = calcular_taxa_lucro_maxima(A, l)

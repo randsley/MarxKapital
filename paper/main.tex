@@ -28,50 +28,43 @@ production, and the sectoral dynamics of expanded reproduction. Beyond the
 classical two-department and generalized $N$-department reproduction
 schemes, the package implements three complementary mechanisms for coupling
 sectoral accumulation through the technical matrix~$A$ --- capital
-mobility, an aggregate realization-pressure heuristic, and an exact
-per-sector quantity-rationing scheme solved by fixed-point iteration ---
-without recourse to differential-algebraic equation (DAE) solvers; the
-rationing mechanism's convergence (270 random trials, $N\in\{6,12,19\}$)
-and its qualitative effect on cross-sector dispersion (50 random
-economies) are both checked systematically rather than on a single
-hand-picked example, though not yet against real per-sector accumulation
-data, for which no suitable time series currently exists. We
-further present a live, reproducible empirical pipeline that calibrates the
-model directly from official European statistical sources (Eurostat and
-AMECO, via their SDMX REST APIs), replacing the synthetic or ad hoc
-calibration common in the computational Marxian literature. Applying this
-pipeline to Portugal, we document a sectoral profile for 2022 and an
-aggregate profit-rate series for 1996--2022, and in doing so surface and
-correct two distinct measurement problems rather than one. External
-review of an earlier draft identified a genuine stock-flow conflation in
-the model itself: gross output was computed as $O_i=C_i+V_i+S_i$, adding
-a capital \emph{stock} directly to two annual \emph{flows}. We correct
-this --- output now uses the capital \emph{transferred} in a period,
-$O_i=\delta_iC_i+V_i+S_i$ --- and replace an aggregate depreciation term
-that used a flat 10\% of the capital stock with AMECO's own
-consumption-of-fixed-capital series. The correction has a clean,
-checkable consequence: the rate of exploitation, computed as $(Y-V)/V$,
-becomes exactly invariant under a common deflator applied to $Y$ and $V$,
-as the algebra requires, which it was not before the fix. With this in
-place, Portugal's profit rate for 1996--2022 ranges from about $8\%$ to
-$15\%$ across three deflation conventions we test, clustering lower under
-the unadjusted convention and higher under the investment-deflator
-convention, moving mildly rather than dramatically within each, in
-contrast to the dramatic swing an
-earlier, buggy version of this calibration reported. A separate audit of
-the sectoral technical matrix, prompted by review of an implausibly low
-spectral radius, found something more serious than a scaling issue: the
-pipeline had been pulling from the wrong Eurostat dataflow entirely (a
-trade-margins satellite table, not the symmetric input-output table),
-understating intermediate flows by more than an order of magnitude.
-Corrected, the matrix has zero negative cells, reconciles exactly
-against the source table's own published output figures, and gives an
-economically plausible spectral radius and maximum profit rate in place
-of implausible ones. We treat this progression --- three distinct
-defects found by auditing rather than assuming correctness, each
-disclosed alongside its fix and its quantified consequence --- as a
-contribution in its own right, alongside the specific empirical numbers,
-and report it in that spirit.
+mobility (conserving aggregate constant capital exactly by construction),
+an aggregate realization-pressure heuristic, and an exact per-sector
+quantity-rationing scheme solved by fixed-point iteration --- without
+recourse to differential-algebraic equation (DAE) solvers. The rationing
+mechanism's convergence (270 random trials, $N\in\{6,12,19\}$) and its
+effect on cross-sector dispersion (50 random economies) are checked
+systematically rather than on a single hand-picked example, though not
+yet against real per-sector accumulation data, for which no suitable
+time series currently exists. We further present a live, reproducible
+empirical pipeline that calibrates the model directly from official
+European statistical sources (Eurostat and AMECO, via their SDMX REST
+APIs), replacing the synthetic or ad hoc calibration common in the
+computational Marxian literature, and apply it to Portugal: a
+sectoral profile for 2022 (19 sectors, real value added, a technical
+matrix reconciled exactly against Eurostat's own published output
+figures) and an aggregate profit-rate series for 1996--2022, which
+ranges $7.9\%$--$15.1\%$ across three deflation conventions we test ---
+a real but modest sensitivity, not the dramatic artifact an earlier,
+internally inconsistent version of this calibration produced.
+
+That earlier inconsistency is itself part of what we report. Three
+defects, each found by auditing rather than assuming correctness and
+each disclosed alongside its fix and quantified consequence: a
+stock-flow conflation in the model's own output formula (a capital
+\emph{stock} was being added directly to annual \emph{flows}); a
+depreciation term that broke an algebraic invariance the corrected rate
+of exploitation now satisfies exactly, verified directly rather than
+asserted; and a technical-matrix construction that, on audit, turned out
+to be reading the wrong Eurostat dataflow entirely (a trade-margins
+satellite table, not the symmetric input-output table), understating
+intermediate flows by more than an order of magnitude and explaining an
+implausible spectral radius and maximum profit rate reported in earlier
+versions of this work. We treat this progression as a contribution in
+its own right, alongside the corrected empirical numbers, on the view
+that a live statistical pipeline's value lies as much in surfacing and
+fixing exactly this kind of error as in the numbers it ultimately
+reports.
 \end{abstract}
 
 \section{Introduction}
@@ -124,8 +117,9 @@ every output-facing formula with $\delta_iC_i$, the capital
 \emph{transferred} in a period; the depreciation fix replaces the flat
 10\% with AMECO's own consumption-of-fixed-capital series. Together they
 have a checkable algebraic consequence, which we verify directly: the
-rate of exploitation $e=(Y-V)/V$ is now exactly invariant under a common
-deflator applied to $Y$ and $V$, as it must be, which it demonstrably was
+rate of exploitation $e^{\text{net}}=(Y-V-\text{CCF})/V$ is now exactly
+invariant under a common deflator applied to $Y$, $V$, and CCF together,
+as it must be, which it demonstrably was
 not under the earlier, buggy formula. With the fix in place, we
 re-examine the same valuation question the earlier draft raised ---
 whether AMECO's mixed-valuation capital and flow series distort the
@@ -203,12 +197,29 @@ $C_d$ denotes constant capital \emph{advanced} --- a stock, the state
 variable accumulating in the equation above, on which organic composition
 and profit rate are conventionally computed. This is distinct from the
 constant capital \emph{transferred} to output during a single period,
-$\delta_dC_d$ under the model's single depreciation rate --- the quantity
-that belongs in a period's value-of-product identity, $W_d=\delta_dC_d+
-V_d+S_d$, not $C_d$ itself. An earlier version of this paper conflated
-the two (using $C_d+V_d+S_d$ as gross output throughout), which produces
-a value-of-product figure dominated by a stock rather than a period flow;
-Section~3.3 and Section~6.2 discuss the fix and its consequences.
+$\delta_dC_d$ under the model's single depreciation rate. An earlier
+version of this paper called $W_d=\delta_dC_d+V_d+S_d$ ``gross output'';
+that label is still not accurate, and we correct it here rather than
+merely renaming a symbol. The model tracks only \emph{fixed} constant
+capital $C_d$ (a depreciating stock) and its period-transferred portion
+$\delta_dC_d$; it has no separate state for \emph{circulating} constant
+capital (raw materials, energy, purchased services, and other
+intermediate inputs consumed within the period without being
+capitalized as a stock). True gross output is
+$x_d=z_d+\delta_dC_d+V_d+S_d$, where $z_d$ is circulating intermediate
+consumption --- a term this model does not represent. $W_d$ is therefore
+best understood as a \emph{value-added-type} flow (fixed-capital
+consumption plus the two income flows), structurally analogous to a
+sector's contribution to GDP, not as gross output in the input-output
+sense used in Section~4 to construct $A$ from real data. We use $W_d$
+(via $O_i$ in Section~3.3) purely as the supply-side quantity the
+model's own dynamics can compute period by period from its own state
+variables; where a genuine gross-output figure is available from data
+(Section~4's calibration, which uses Eurostat's published $x_i$ directly
+to build $A$), we use that instead and do not substitute $W_d$ for it.
+This is a real, stated limitation of the dynamical model, not a
+resolved one: Section~6.2 returns to what it means for the rationing
+mechanism of Section~3.3, whose supply side is $O_i=W_i$, not $x_i$.
 Intersectoral
 consistency (does Department~I's wage and unaccumulated-surplus income
 suffice to buy Department~II's output, and vice versa) is checked
@@ -306,20 +317,32 @@ fixed point is
   D_i &= \sum_j A_{ij}\,\kappa_j\,\sigma_{c,j}S_j, &
   \rho_i &= \min\!\left(1, \frac{O_i}{D_i}\right). \label{eq:rationing}
 \end{align}
-Two modeling simplifications in Equation~\eqref{eq:rationing} deserve
+Three modeling simplifications in Equation~\eqref{eq:rationing} deserve
 comment. First, $A_{ij}$ multiplies planned constant-capital
 \emph{expenditure} $\kappa_j\sigma_{c,j}S_j$ directly, as if a unit of
 investment expenditure by sector $j$ requires the same input mix as a
 unit of $j$'s physical output; we do not separately track a
 capital-output conversion, and this identification should be read as an
 explicit simplifying assumption, not a derived relationship. Second, the
-full supply $O_i$ is treated as available to meet investment demand,
-though in reality output must also replace intermediate inputs and meet
-consumption and other final demand first; the mechanism therefore
+supply side $O_i$ is the model's own value-added-type flow
+$W_i=\delta_iC_i+V_i+S_i$ (Section~3.1), not true gross output
+$x_i=z_i+W_i$ including circulating intermediate consumption $z_i$,
+which this dynamical model does not track as a separate state; $O_i$
+therefore \emph{omits} the very quantity ($z_i$, circulating constant
+capital) that $A$ is supposed to price the input requirements of,
+understating available supply relative to a genuine gross-output
+figure. Third, and independent of that omission, the full $O_i$ is
+treated as available to meet investment demand, though in reality output
+must also replace intermediate inputs and meet consumption and other
+final demand first; the mechanism therefore
 represents an upper bound on investable supply, and is best read as
 constraining the investment-goods side of reproduction specifically (we
 return to this in Section~6.2's discussion of final-demand
-microfoundations). We solve this by damped (under-relaxed) fixed-point iteration inside the
+microfoundations). The calibration in Section~4, by contrast, builds $A$
+from Eurostat's real product flows and uses the table's own published
+gross output $x_i$ directly (Section~4.2) --- the dynamical model's
+$O_i=W_i$ substitution applies only to the simulated coupling mechanisms
+of this section, not to the empirical technical matrix itself. We solve this by damped (under-relaxed) fixed-point iteration inside the
 right-hand side of the ODE at every solver evaluation, in exactly the same
 spirit as the Sraffa-price linear solve above, rather than exposing
 $(\rho,\kappa)$ as differential-algebraic state to the solver. This choice
@@ -525,24 +548,26 @@ dimension is involved in constructing $A$ itself; NACE enters only
 through the separately-sourced sectoral value-added weights
 (\texttt{NAMA\_10\_A64}), a different and already-documented join.
 
-One limitation the audit could not resolve, and reports rather than
-hides: \texttt{NAIO\_10\_CP1700} is a benchmark table, published for
-specific reference years (2010, 2013, 2015, 2017, 2020 for Portugal, not
-annually), not a series like the rest of the pipeline. Requesting a
-matrix for 2022 silently returns the nearest available reference year
---- 2020 for Portugal, which we now log explicitly as a warning at
-calibration time. Table~\ref{tab:sectors}'s sectoral $e$, $k$, $r$, and
-VAB figures do not themselves depend on $A$ and remain genuinely 2022
-(Section~5.1); it is specifically the matrix used in
-Figures~\ref{fig:matrixA} and~\ref{fig:transformation} (the heatmap and
-the transformation-problem comparison) that carries this 2020 vintage
-while being computed alongside 2022 labor coefficients, an explicit
-two-year mismatch rather than a single coherent one-year snapshot. This
-is a genuine remaining data-vintage issue, not a bug we can fix by
-writing more code; the only real fix is waiting for Eurostat's next
-benchmark table or restricting the affected figures to 2020 throughout,
-which we did not do here to keep them on the same most-recent year as
-the rest of the paper's empirical results.
+One limitation the audit surfaced and we chose to resolve by scoping,
+rather than by leaving a mismatch in place: \texttt{NAIO\_10\_CP1700} is
+a benchmark table, published for specific reference years (2010, 2013,
+2015, 2017, 2020 for Portugal, not annually), not a series like the rest
+of the pipeline. Requesting a matrix for 2022 silently falls back to the
+nearest available reference year --- 2020 for Portugal, logged
+explicitly as a warning at calibration time --- which would mix a
+2020-vintage matrix with 2022 labor coefficients if left uncorrected. We
+avoid that mismatch directly: Figures~\ref{fig:matrixA}
+and~\ref{fig:transformation} (the heatmap and the transformation-problem
+comparison) use a fully coherent 2020 calibration, matrix \emph{and}
+labor coefficients both from 2020, not a mixed vintage. Table~\ref{tab:sectors}'s
+sectoral $e$, $k$, $r$, and VAB figures do not depend on $A$ at all and
+remain genuinely 2022 (Section~5.1), as does the aggregate 1996--2022
+AMECO series (Section~5.2); neither needed to change. The paper's
+results therefore span two internally-coherent reference points --- a
+2020 production-structure snapshot (Figures~\ref{fig:matrixA}--\ref{fig:transformation})
+and a 2022 sectoral/aggregate snapshot (Table~\ref{tab:sectors},
+Figure~\ref{fig:timeseries}) --- rather than one section silently
+combining both.
 
 \subsection{Depreciation and capital stock}
 
@@ -727,9 +752,9 @@ vs.\ Spain, 1996--2022 (real AMECO data).}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.7\textwidth]{figures/fig2_matrix_A.pdf}
-\caption{Real technical matrix $A$, Portugal (19 NACE sections). Built
-from the nearest available benchmark input-output table (2020, not
-2022 --- Section~4.2).}
+\caption{Real technical matrix $A$, Portugal, 2020 (19 CPA product
+sections; the benchmark input-output table's most recent available
+year, used coherently with 2020 labor coefficients --- Section~4.2).}
 \label{fig:matrixA}
 \end{figure}
 
@@ -765,8 +790,8 @@ difficulty in empirical Marxian value theory
 \centering
 \includegraphics[width=0.75\textwidth]{figures/fig3_transformation.pdf}
 \caption{Labor values vs.\ Sraffian production prices, real technical
-matrix (Portugal, 2020 vintage --- Section~4.2), labor coefficients from
-2022, at three illustrative profit rates.}
+matrix and labor coefficients, Portugal 2020 (a coherent single-year
+calibration --- Section~4.2), at three illustrative profit rates.}
 \label{fig:transformation}
 \end{figure}
 
@@ -793,8 +818,11 @@ $50$ independent random seeds (each with its own random six-sector
 technical matrix, sectoral parameters, and initial conditions). Rationing
 produces \emph{higher} final dispersion than mobility alone in
 \textbf{50 of 50} seeds --- the pattern in Figure~\ref{fig:coupling} is
-not an artifact of one unlucky draw, but the systematic behavior of the
-mechanism in this class of random economy. The mean final dispersion is
+not an artifact of one unlucky draw, but a consistent finding across
+this specific class of random six-sector economies (moderate density,
+the parameter ranges of \texttt{criar\_matriz\_tecnica} and
+\texttt{criar\_departamentos}); we do not claim it generalizes beyond
+that tested class. The mean final dispersion is
 $0.063$ (mobility only), $0.189$ (adding realization pressure), and
 $0.440$ (adding rationing) --- rationing roughly triples dispersion
 relative to realization pressure and roughly seven-folds it relative to
@@ -851,7 +879,7 @@ sectors genuinely rationed per trial.}
 
 \section{Discussion}
 
-\subsection{Two bugs, not one: a stock-flow conflation and a valuation artifact}
+\subsection{A stock-flow conflation and a valuation artifact}
 
 A first pass at the raw AMECO series appears to show a profit rate rising
 sharply for Portugal over 1996--2022, driven by an organic composition
@@ -867,29 +895,38 @@ AMECO calculation used the same conflation implicitly, deducting a flat
 $10\%$ of the (constant-price) capital stock as ``depreciation'' from a
 current-price surplus. External review of an earlier draft caught this.
 It matters here specifically because the flat-depreciation term breaks
-an algebraic identity that should otherwise hold: if $Y$ (output) and $V$
-(wages) are both deflated by a common price index, $e=(Y-V)/V$ is
-invariant under that deflation --- the common factor cancels. Once a
-depreciation term denominated in a \emph{different}, unscaled basis
-(the constant-price capital stock) is subtracted from the numerator,
-that invariance breaks, and it breaks in a way that depends on how much
-the deflator itself has moved --- which changes over 26 years of
+an algebraic identity that should otherwise hold for the quantity
+actually reported. The rate of exploitation used throughout this paper
+is net of consumption of fixed capital, $e^{\text{net}}=(Y-V-\text{CCF})/V$
+(Section~4.3); if $Y$, $V$, and CCF are \emph{all} deflated by a common
+price index, $e^{\text{net}}$ is invariant under that deflation --- the
+common factor cancels from every term. The earlier, buggy version
+deducted a flat $10\%$ of the (constant-price) capital stock in place of
+CCF: an unscaled term that does \emph{not} move with the deflator
+applied to $Y$ and $V$, so it breaks precisely the invariance
+$e^{\text{net}}$ should have, and breaks it in a way that depends on how
+much the deflator itself has moved --- which changes over 26 years of
 cumulative inflation, producing not just a level shift between
 conventions but a diverging \emph{trend}. This, not a genuine valuation
-difference, is what generated the original $e:0.21\to0.61$ figure.
+difference, is what generated the original $e:0.21\to0.61$ figure. (The
+purely gross quantity $S^{\text{gross}}/V=(Y-V)/V$, which never involved
+CCF at all, was never the source of the problem; it is trivially
+invariant under any common deflator regardless of this bug, since no
+unscaled term ever entered it.)
 
 We fixed the underlying conflation directly (Section~3.1, Section~4.3):
 output-facing formulas now use $\delta_iC_i$ (capital \emph{transferred}
 in a period) rather than $C_i$ (capital \emph{advanced}, a stock), and
 the aggregate calculation now uses AMECO's own consumption-of-fixed-capital
-series rather than an assumed rate. The predicted consequence is
+series (properly deflated alongside $Y$ and $V$) rather than an assumed
+rate. The predicted consequence is
 checkable, and we checked it directly rather than asserting it: with the
-fix, $e=(Y-V)/V$ is now \emph{exactly} identical between the unadjusted
+fix, $e^{\text{net}}$ is now \emph{exactly} identical between the unadjusted
 and GDP-deflated conventions for every year in the 1996--2022 series,
 for both Portugal and Spain (Section~5.2). This is not a small
 improvement in agreement --- it is exact equality to floating-point
-precision, which is what the algebra predicts once the numerator and
-denominator share a common deflation factor, and is the strongest kind
+precision, which is what the algebra predicts once every term shares a
+common deflation factor, and is the strongest kind
 of internal-consistency check a reader could ask for: not ``the numbers
 look more reasonable now,'' but ``the two conventions are now provably
 required to agree, and they do.''
@@ -955,13 +992,30 @@ for the relevant dataflow, but not the corresponding asset-specific
 depreciation profiles, which would be needed for a fully differentiated
 perpetual-inventory calculation.
 
-\emph{No microfoundation for final demand.} The quantity-rationing
+\emph{The dynamical model's output measure omits circulating constant
+capital, and no microfoundation for final demand exists.} Two related
+gaps in Section~3.3's coupling mechanisms, not yet closed. First, the
+supply side $O_i=\delta_iC_i+V_i+S_i$ used inside the simulated dynamics
+is a value-added-type flow, not gross output: the model has no separate
+state for circulating constant capital (materials, energy, purchased
+services consumed within the period), so $O_i$ systematically omits
+exactly the quantity $A$ prices the input requirements of. This is
+distinct from, and does not fix, the empirical technical matrix itself
+(Section~4.2), which is built from Eurostat's real gross-output figures
+and does not have this problem --- the gap is specific to the simulated
+$N$-department dynamics, where no per-period circulating-capital state
+exists to draw on. Second, and independently, the quantity-rationing
 mechanism of Section~3.3 constrains reinvestment demand through the
 technical matrix but does not model how aggregate consumption demand is
 allocated across sectors, since no data source in the current pipeline
-provides sector-of-origin consumption baskets. The mechanism should
-therefore be read as constraining the investment-goods side of
-reproduction specifically, not final demand in general.
+provides sector-of-origin consumption baskets. Both gaps point toward
+the same fix: introducing an explicit circulating-capital flow state
+(and, ideally, a final-demand allocation) into the dynamical model,
+rather than only into the static empirical calibration where the
+problem has already been addressed. Until that is done, the coupling
+mechanisms of Section~3.3 should be read as constraining a
+value-added-scale approximation of the investment-goods side of
+reproduction, not gross output or final demand in general.
 
 \emph{Coarser sectoral aggregations inherit a data-quality caveat.} When
 the technical matrix is aggregated from 19 to 3 macro-sectors, the
@@ -1032,18 +1086,31 @@ plausible. The domestic-vs-total-use question is also resolved rather
 than left open: the correct table publishes a genuine domestic-use
 variant, which we use, directly addressing the concern that imported
 inputs were being modeled as domestic supply. The CPA-to-NACE
-concordance question dissolved rather than needing documentation: the
-symmetric table is genuinely product-by-product on both dimensions, so
-no product/industry classification join happens inside the matrix
-construction itself (Section~4.2). What remains unresolved, and cannot
-be fixed by writing more code: \texttt{NAIO\_10\_CP1700} is a benchmark
-table published for specific reference years (2010, 2013, 2015, 2017,
-2020 for Portugal), not annually, so the matrix used in
-Figures~\ref{fig:matrixA} and~\ref{fig:transformation} has an actual
-vintage of 2020 while being computed alongside 2022 labor coefficients
---- a real, disclosed data-vintage mismatch, logged as a warning at
-calibration time (Table~\ref{tab:sectors}'s own $e$, $k$, $r$, VAB
-figures do not depend on $A$ and remain genuinely 2022). An
+concordance question does not require a documented mapping \emph{inside}
+the matrix construction step itself: the symmetric table's two
+dimensions (\texttt{prd\_ava}, \texttt{prd\_use}) both use the same CPA
+product code, so $A$ is built entirely within one classification, with
+no product-to-industry join. A concordance assumption is still made one
+level up, where $A$'s CPA-labeled sections are combined with
+NACE-classified sectoral value-added weights and labor coefficients
+(\texttt{NAMA\_10\_A64}) to produce Table~\ref{tab:sectors} and
+Figures~\ref{fig:matrixA}--\ref{fig:transformation}; we rely on
+Eurostat's standard design correspondence between CPA and NACE section
+codes at this level of aggregation (both derive from the same top-level
+classification structure) rather than an independently verified
+concordance table, and label $A$'s axes as CPA product sections, not
+NACE industry sections, to keep this distinction visible. What remains
+unresolved, and cannot be fixed by writing more code:
+\texttt{NAIO\_10\_CP1700} is a benchmark table published for specific
+reference years (2010, 2013, 2015, 2017, 2020 for Portugal), not
+annually. We resolved the resulting vintage question by scoping rather
+than by leaving a silent mismatch: Figures~\ref{fig:matrixA}
+and~\ref{fig:transformation} now use a fully coherent 2020 calibration
+(matrix and labor coefficients both 2020), while Table~\ref{tab:sectors}
+and the aggregate AMECO series remain genuinely 2022, since neither
+depends on $A$. The paper's empirical results therefore span two
+internally-coherent reference points rather than one section silently
+mixing 2020 and 2022 data (Section~4.2). An
 explicit accounting-reconciliation assertion in the pipeline (failing
 loudly if a sector's computed output does not match the table's own
 \texttt{P1} row, in the spirit of the VAB check in Section~5.1) would be
