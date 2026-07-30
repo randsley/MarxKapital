@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: "Randsley"
     given-names: "Nigel"
-version: 0.6.0
+version: 0.6.1
 date-released: "2026-07-30"
 url: "https://github.com/randsley/MarxKapital"
 repository-code: "https://github.com/randsley/MarxKapital"

@@ -4,6 +4,14 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [0.6.1] — 2026-07-30
+
+### Adicionado
+- `CITATION.cff` e `.zenodo.json`: metadados de citação e arquivo,
+  preparando o repositório para a integração GitHub-Zenodo (release
+  sem alterações funcionais, só para acionar o primeiro arquivo
+  Zenodo depois de ativada a integração).
+
 ## [0.6.0] — 2026-07-30
 
 ### Corrigido
