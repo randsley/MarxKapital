@@ -57,6 +57,28 @@ println("  ✓ iterations to converge: mean=$(round(mean(iterações_convergidas
         "median=$(round(median(iterações_convergidas), digits=1)) ",
         "max=$(maximum(iterações_convergidas)) (cap=200)")
 
+# Admissibility of the output-bruto reconstruction (Equação 2 do artigo,
+# _garantir_admissibilidade_output): how often do the same class of random
+# synthetic matrices used throughout this sweep need column-sum rescaling,
+# and by how much?
+n_reescalada = 0
+fatores_reescala = Float64[]
+for N in Ns, densidade in densidades, trial in 1:trials_por_combinação
+    seed = 1000 * N + round(Int, 1000 * densidade) + trial
+    A = criar_matriz_tecnica(N, densidade = densidade, seed = seed)
+    colsum_antes = maximum(vec(sum(A, dims = 1)))
+    _, reescalada = _garantir_admissibilidade_output(A)
+    if reescalada
+        global n_reescalada += 1
+        push!(fatores_reescala, 0.95 / colsum_antes)
+    end
+end
+println("  ✓ output-bruto admissibility (Equation 2): $n_reescalada/$n_total matrices " *
+        "needed column-sum rescaling" *
+        (isempty(fatores_reescala) ? "" :
+         " (rescale factor mean=$(round(mean(fatores_reescala),digits=3)), " *
+         "min=$(round(minimum(fatores_reescala),digits=3)))"))
+
 # Convergence rate broken down by N and density
 println("  ✓ convergence rate by (N, densidade):")
 for N in Ns, densidade in densidades

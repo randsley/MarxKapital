@@ -180,6 +180,17 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         # a reescala é uniforme (mesmo fator em toda a matriz)
         fator = A_corrigida[1, 1] / A_má[1, 1]
         @test A_corrigida ≈ A_má .* fator
+
+        # Verificação de ponta a ponta: qualquer simulação acoplada com
+        # racionamento/realização montada por simular_Ndept_customizado deve
+        # ter, na prática, a condição de admissibilidade já garantida —
+        # não só a função auxiliar isolada, mas o pipeline real.
+        for seed in 1:10
+            Random.seed!(seed)
+            _, _, p = simular_Ndept(8, T = 1.0, seed = seed, acoplado = true,
+                                    racionamento = true)
+            @test maximum(vec(sum(p.A, dims = 1))) < 1.0
+        end
     end
 
     @testset "Agregação de matriz técnica (Leontief)" begin
