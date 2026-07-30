@@ -12,7 +12,8 @@ países da base).
 > desenvolvimento metodológico e um artigo académico em `paper/`, com
 > testes automáticos em CI
 > ([![Testes](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml))
-> ([![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705370.svg)](https://doi.org/10.5281/zenodo.21705370)).
+> ([![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705370.svg)](https://doi.org/10.5281/zenodo.21705370))
+> ([![Artigo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705609.svg)](https://doi.org/10.5281/zenodo.21705609)).
 > Dados setoriais e da AMECO **reais** estão disponíveis como opção (via
 > APIs SDMX oficiais), mas os valores por omissão continuam **sintéticos**.
 > Antes de qualquer uso empírico sério, leia
@@ -218,6 +219,9 @@ figuras/tabelas geradas de forma reproduzível a partir de dados reais
 (`paper/gerar_resultados.jl`, `paper/monte_carlo.jl`, `paper/matrix_audit.jl`
 — nenhum número inserido manualmente). Compilar com `latexmk -pdf
 paper/main.tex`.
+
+Publicado no Zenodo com DOI próprio, independente do DOI do software:
+[10.5281/zenodo.21705609](https://doi.org/10.5281/zenodo.21705609).
 
 ## Licença
 

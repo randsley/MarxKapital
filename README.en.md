@@ -12,7 +12,8 @@ INE) and European (**AMECO**, all countries in the database) data.
 > methodological development, and an academic paper in `paper/`, with
 > automated tests in CI
 > ([![Tests](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml))
-> ([![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705370.svg)](https://doi.org/10.5281/zenodo.21705370)).
+> ([![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705370.svg)](https://doi.org/10.5281/zenodo.21705370))
+> ([![Paper DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705609.svg)](https://doi.org/10.5281/zenodo.21705609)).
 > **Real** sectoral and AMECO data are available as an option (via
 > official SDMX APIs), but the defaults remain **synthetic**.
 > Before any serious empirical use, read
@@ -227,6 +228,9 @@ figure/table generated reproducibly from real data
 (`paper/gerar_resultados.jl`, `paper/monte_carlo.jl`,
 `paper/matrix_audit.jl` — no number entered by hand). Compile with
 `latexmk -pdf paper/main.tex`.
+
+Published on Zenodo with its own DOI, separate from the software DOI:
+[10.5281/zenodo.21705609](https://doi.org/10.5281/zenodo.21705609).
 
 ## License
 
