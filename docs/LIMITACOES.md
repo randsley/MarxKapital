@@ -28,33 +28,42 @@ procura de capital constante do setor i (ΔCᵢ) seja satisfeita pelo output dos
 setores fornecedores (colunas/linhas de A), e introduzir um mecanismo de
 mobilidade de capital que desloque investimento para setores com r > r̄.
 
-**Parcialmente corrigido:** `sistema_Ndept_io!` (`src/nucleo.jl`), selecionável
+**Corrigido:** `sistema_Ndept_io!` (`src/nucleo.jl`), selecionável
 com `acoplado=true` em `simular_Ndept`/`simular_Ndept_customizado`, acopla A à
 dinâmica através de um termo de mobilidade de capital `μ·(rᵢ − r̄)·Cᵢ`, com `rᵢ`
 calculado sobre capital valorizado a preços de produção de Sraffa (que dependem
 de A), em vez do `e/(k+1)` nu. `sistema_Ndept!` mantém-se como versão por
 omissão ("setores independentes"), inalterada, por compatibilidade.
+`r̄` é a média de `r` ponderada por `C` (não a razão agregada `ΣS/Σ(C+V)`,
+usada até uma correção posterior) — a única escolha para a qual
+`Σᵢ μ(rᵢ-r̄)Cᵢ = 0` exatamente, garantindo que o termo de mobilidade
+realoca capital constante agregado entre setores em vez de o criar ou
+destruir. Verificado por teste (`test/runtests.jl`, "Mobilidade de
+capital — conservação exata").
 
-**Parcialmente corrigido (segundo mecanismo, opcional):** `sistema_Ndept_io!`
+**Corrigido (segundo mecanismo, opcional):** `sistema_Ndept_io!`
 aceita agora `realização=true` (transportado via `p.realização`, kwarg de
 `simular_Ndept`/`simular_Ndept_customizado`), que acresce uma pressão de
-realização: define-se o output bruto por setor `Oᵢ=δᵢCᵢ+Vᵢ+Sᵢ` (capital
-constante *transferido*, δᵢCᵢ — não o stock Cᵢ, uma correção feita após
-revisão externa identificar que `Cᵢ+Vᵢ+Sᵢ` misturava um stock com dois
-fluxos anuais; ver `capital_transferido`/`valor_produto` em
-`estruturas.jl`) e a procura
-intermédia implícita em A, `(A·O)ᵢ`; a razão de realização agregada
-`ρ_real = Σ min(Oᵢ,(A·O)ᵢ) / Σ(A·O)ᵢ` (≤ 1) escala o reinvestimento planeado
-(`σ_c,ᵢ·Sᵢ`), travando a acumulação quando a estrutura técnica não consegue
-sustentar os níveis de output correntes. Verificado por teste
+realização escalando o reinvestimento planeado por
+`ρ_real = Σ min(xᵢ,(A·x)ᵢ) / Σ(A·x)ᵢ` (≤ 1), travando a acumulação quando
+a estrutura técnica não consegue sustentar os níveis de output correntes.
+`xᵢ` é o output bruto **genuíno**, não o fluxo tipo valor-acrescentado
+`Wᵢ=δᵢCᵢ+Vᵢ+Sᵢ` (capital constante *transferido*, não o stock `Cᵢ`) usado
+numa correção anterior: `Wᵢ` omite o consumo intermédio circulante que a
+matriz `A` efetivamente precifica. Reconstrói-se `xᵢ` a partir da própria
+identidade custo-output do modelo — ver mais abaixo, "Corrigido (output
+bruto genuíno...)". Verificado por teste
 (`test/runtests.jl`, "Simulação N-dept com pressão de realização") e por
 robustez em 20 combinações seed/μ sem falhas do solver.
 
 **Corrigido (terceiro mecanismo, exato por setor, opcional):**
 `sistema_Ndept_io!` aceita agora `racionamento=true` (tem precedência sobre
 `realização`), que resolve **racionamento de quantidades por setor** — não
-apenas uma pressão agregada. O reinvestimento planeado de cada setor `j`
-(`σ_c,ⱼ·Sⱼ`) exige inputs dos fornecedores na proporção `A[:,j]` (tecnologia
+apenas uma pressão agregada. A expansão de output *desejada* de cada setor
+`j`, `Δxⱼ=σ_c,ⱼ·Sⱼ·xⱼ/Cⱼ` (investimento planeado convertido para escala de
+output via o rácio capital-output corrente, não a despesa `σ_c,ⱼSⱼ`
+diretamente — uma correção posterior, ver abaixo), exige inputs dos
+fornecedores na proporção `A[:,j]` (tecnologia
 Leontief, sem substituição entre inputs), pelo que o reinvestimento
 realizado fica limitado pelo input mais escasso — e o racionamento sofrido
 por um setor reduz a sua procura efetiva de TODOS os seus inputs, afetando
@@ -63,8 +72,8 @@ ponto fixo (`_resolver_racionamento`, `src/nucleo.jl`):
 
 ```
 κⱼ = min_{i: A[i,j]>0} ρᵢ          (limitado pelo input mais escasso)
-Dᵢ = Σⱼ A[i,j]·κⱼ·σ_c,ⱼ·Sⱼ           (procura efetiva, já consistente com o racionamento)
-ρᵢ = min(1, Oᵢ / Dᵢ)               (regra do lado curto)
+Dᵢ = Σⱼ A[i,j]·κⱼ·Δxⱼ               (procura efetiva, já consistente com o racionamento)
+ρᵢ = min(1, xᵢ / Dᵢ)               (regra do lado curto)
 ```
 
 Mecanismo de racionamento de quantidades à Bénassy/Barro-Grossman
@@ -86,10 +95,52 @@ robustez em 20 combinações seed/μ (N=8) e em N=19, sem falhas de
 convergência nem do solver da EDO.
 
 `verificar_equilibrio_Ndept(sol, p)` (`src/analise.jl`) generaliza
-`verificar_equilibrio_2dept` a N setores: devolve o desvio `Oᵢ−(A·O)ᵢ` por
-setor e `ρ_real` (a versão agregada) num dado instante, a posteriori — não
-usa o racionamento por setor (esse já está embutido em `κ` dentro de
-`sistema_Ndept_io!` quando `racionamento=true`).
+`verificar_equilibrio_2dept` a N setores: devolve o *resíduo de uso
+intermédio* `xᵢ−(A·x)ᵢ` por setor e `ρ_real` (a versão agregada) num dado
+instante, a posteriori — não é uma medida de desequilíbrio ou de
+mercado (um resíduo positivo é o caso normal em contabilidade
+input-output: output disponível para consumo, exportações, etc., que
+este diagnóstico não modela), e não usa o racionamento por setor (esse
+já está embutido em `κ` dentro de `sistema_Ndept_io!` quando
+`racionamento=true`).
+
+**Corrigido (output bruto genuíno, não um fluxo tipo valor-acrescentado):**
+`Oᵢ`/`xᵢ` acima já não é `Wᵢ=δᵢCᵢ+Vᵢ+Sᵢ` (que omite consumo intermédio
+circulante — materiais, energia, serviços comprados — e não é gross
+output no sentido input-output usado para construir `A`). Reconstrói-se
+`xᵢ` a partir da própria identidade custo-output do modelo: como `A[i,j]`
+é definida como input `i` por unidade de output bruto do comprador `j`,
+o consumo circulante de `j` é `zⱼ=(Σᵢ A[i,j])·xⱼ`, donde
+`xⱼ = Wⱼ/(1-Σᵢ A[i,j])` — sem introduzir novo estado, recalculado a cada
+avaliação do lado direito da EDO tal como os preços de Sraffa. Válido só
+quando `A` representa o requisito de input circulante *completo* de cada
+setor (verdadeiro por construção para as matrizes sintéticas fechadas
+usadas nestas simulações; não para a matriz real de uso doméstico do
+Eurostat, que omite importações por definição — nunca usada nesta
+reconstrução). A condição de admissibilidade `Σᵢ A[i,j]<1` (necessária
+para o denominador ser positivo) não é garantida por `ρ(A)<1`
+(que limita o raio espectral, não qualquer soma de coluna individual);
+verificada e corrigida uma única vez quando a simulação é montada
+(`_garantir_admissibilidade_output`, `src/nucleo.jl`), reescalando `A`
+uniformemente se necessário, com aviso — não um clamp silencioso
+reaplicado a cada avaliação. Verificado por teste
+(`test/runtests.jl`, "Output bruto reconstruído..." e "Admissibilidade
+da reconstrução de output bruto").
+
+**Corrigido (procura de investimento em escala de output, não despesa):**
+o `Δxⱼ` na fórmula do racionamento acima substitui uma versão anterior
+que aplicava `A[i,j]` diretamente à despesa de investimento planeada
+`σ_c,ⱼSⱼ`, como se uma unidade de despesa exigisse a mesma composição de
+inputs que uma unidade de output físico — um problema dimensional
+identificado em revisão externa. `Δxⱼ=σ_c,ⱼSⱼ·xⱼ/Cⱼ` converte a despesa
+para uma expansão de output via o rácio capital-output corrente do
+setor, antes de `A` ser aplicada. Continua por resolver: todo o `xᵢ`
+reconstruído é tratado como disponível para a procura de investimento
+`Dᵢ`, sem descontar a reposição de inputs intermédios (já contada em
+`zᵢ`) nem outra procura final — não há fonte de dados no pipeline atual
+com a alocação de consumo por setor de origem, pelo que `Dᵢ≤xᵢ` deve
+ler-se como um limite superior à oferta investível, não um balanço de
+reprodução totalmente líquido.
 
 ## 2. R_max no choque salarial usa uma matriz auxiliar (corrigido)
 
@@ -177,7 +228,7 @@ Se todas as vias falharem, `obter_dados_ameco(..., método=:auto)` recorre
 silenciosamente a **dados sintéticos** (com aviso). Verifique sempre o campo
 `fonte` do resultado.
 
-## 4. Calibração AMECO é macro (3 setores), com pesos fixos por omissão (corrigido, com ressalva)
+## 4. Calibração AMECO é macro (3 setores), com pesos fixos por omissão (corrigido)
 
 `calibrar_com_dados_ameco` só implementa a agregação `:macro`
 (Primário/Secundário/Terciário). Por omissão (`dados_setoriais=:fixo`), a
@@ -194,43 +245,63 @@ países da UE/EEE; fora dessa cobertura, ou se o pedido (dados ou matriz A)
 falhar, cai silenciosamente (com aviso) para os pesos fixos e A aleatória —
 nunca lança erro.
 
-**Matriz A real — corrigido, com ressalva conhecida:** a via direta
-(agregar os fluxos brutos do IOT do Eurostat a apenas 3 grupos) foi tentada
-e rejeitada numa sessão anterior — a agregação a 3 grupos mistura de forma
-enganadora as margens de comércio/transporte (ver item 4-bis) com os
-restantes 11 setores de serviços, deixando a linha do Terciário
-implausivelmente pequena mesmo depois de tratar as margens negativas célula
-a célula. A correção que resultou: em vez de agregar os fluxos brutos,
-constrói-se primeiro a matriz real aos 19 setores finos (já limpa e
-não-negativa — item 4-bis) e agrega-se essa matriz de **coeficientes**
-(não fluxos brutos) aos 3 grupos pela fórmula padrão de agregação de
+**Matriz A real — corrigida, com boa reconciliação, não uma ressalva
+conhecida:** constrói-se primeiro a matriz real aos 19 setores finos (ver
+item 4-bis) e agrega-se essa matriz de **coeficientes** (não fluxos
+brutos) aos 3 grupos pela fórmula padrão de agregação de
 Leontief (`agregar_matriz_io`, `src/eurostat_sdmx.jl`):
 `A₃[gi,gj] = Σ A₁₉[i,j]·VAB[j] / Σ VAB[j]` (soma ponderada por VAB dentro do
-grupo `j`). Verificado com dados reais de Portugal 2022: matriz não-negativa,
-ρ(A)≈0.11. **Ressalva honesta:** isto evita reintroduzir o problema das
-margens (já não há valores negativos), mas não o resolve na origem — a
-linha do Terciário na matriz agregada continua a refletir o mesmo
-subdimensionamento herdado da matriz de 19 setores (ver item 4-bis), só que
-já não se manifesta como números inválidos. Uma melhoria real e mais
-trabalhosa exigiria combinar tabelas de oferta e utilização (que mantêm as
-margens como linha própria) em vez do IOT simétrico — não tentado.
+grupo `j`). A ressalva sobre a linha do Terciário que constava aqui numa
+versão anterior descrevia um sintoma da tabela errada usada nessa altura
+(ver item 4-bis) — resolvida, não contornada, com a correção do dataflow.
 
-## 4-bis. Matriz técnica A real (Eurostat IOT) — 19 setores (INE) e 3 setores macro (AMECO, agregada)
+## 4-bis. Matriz técnica A real — dataflow errado, encontrado e corrigido
 
-`construir_matriz_io_eurostat` (`src/eurostat_sdmx.jl`) constrói `A` a
-partir do IOT simétrico do Eurostat (`NAIO_10_CP1620`), usado por
-`calibrar_modelo_portugal(..., fonte_dados=:eurostat)` (19 setores CAE —
-ver item 5) e, agregada via `agregar_matriz_io`, por
-`calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` (3 setores macro —
-ver item 4). Verificado com dados reais de Portugal: matriz não-negativa,
-ρ(A)≈0.12-0.15 consoante o ano, estável em 2018/2020/2022. A tabela regista
-margens de comércio/transporte por vezes como fluxos negativos (convenção
-normal de contabilidade nacional, confirmada: 100% das ~300 células
-negativas de PT/2022 estão confinadas às secções de comércio/transporte
-como fornecedoras) — tratadas célula a célula (não na matriz agregada) antes
-de somar, para não apagar fluxos genuínos de outros setores. Ver item 4 para
-como a agregação a 3 setores macro reutiliza esta matriz (já limpa) em vez
-de agregar os fluxos brutos do IOT diretamente.
+**Histórico do bug (2026-07/08):** uma auditoria pedida em revisão externa
+(quantificar o efeito de um passo de "clipping" de margens, reconciliar
+totais publicados, documentar a correspondência CPA↔NACE, resolver a
+questão doméstico-vs-total-uso) revelou algo mais fundamental do que
+qualquer uma dessas perguntas: `construir_matriz_io_eurostat`
+(`src/eurostat_sdmx.jl`) usava `NAIO_10_CP1620`, que **não é** a tabela
+IOT simétrica — o título real no Eurostat é "Table of trade and
+transport margins", uma tabela satélite pequena, usada para decompor a
+tabela de usos a preços de comprador nas suas componentes (fluxos a
+preços base + margens + impostos-subsídios), não a tabela simétrica em
+si. Construir `A` a partir dela subavaliava os fluxos intersetoriais em
+mais de uma ordem de grandeza (consumo intermédio total implícito
+≈8.8 mil M€ para Portugal 2020, contra um verdadeiro ≈177.8 mil M€
+calculado como output publicado menos VAB publicado, somado por todas
+as secções NACE) — e todas as células negativas anteriormente atribuídas
+a uma convenção de realocação de margens eram simplesmente a mecânica
+dessa tabela satélite, não uma característica da estrutura input-output
+real. Isto explica diretamente o raio espectral implausivelmente baixo
+(ρ(A)≈0.11-0.15) e o `R_max` implausivelmente alto (≈600-700%) reportados
+em versões anteriores deste ficheiro e do artigo em `paper/`.
+
+**Corrigido:** `construir_matriz_io_eurostat` usa agora `NAIO_10_CP1700`
+("Symmetric input-output table at basic prices, product by product"), a
+tabela real, com `stk_flow=DOM` (fluxos só de uso doméstico — a tabela
+publica também `IMP` e `TOTAL`, confirmado por consulta real; `A` deve
+representar interdependência produtiva *doméstica*, e um input importado
+não é fornecido por nenhum setor doméstico). Verificado com dados reais
+de Portugal: zero células negativas, reconciliação exata contra a linha
+`P1` (output bruto) publicada pela própria tabela para as 19 secções,
+ρ(A)≈0.52-0.60 (consoante `stk_flow`), `R_max`≈68-91% — ambos
+economicamente plausíveis. `NAIO_10_CP1700` é uma tabela de referência
+(não anual — Portugal: 2010/2013/2015/2017/2020), diferente do resto do
+pipeline; um pedido para um ano sem tabela publicada cai automaticamente
+para o ano de referência mais próximo (`_ano_iot_mais_próximo`), com
+aviso — pelo que a matriz `A` de um pedido para 2022, por exemplo, tem
+na prática vintage 2020 (ver `paper/main.tex`, Secção 4.2, para como o
+artigo separa explicitamente os resultados de 2020 e 2022 em vez de os
+misturar).
+
+Usada por `calibrar_modelo_portugal(..., fonte_dados=:eurostat)` (19
+setores CAE — ver item 5) e, agregada via `agregar_matriz_io`, por
+`calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` (3 setores macro
+— ver item 4). Verificação completa (frequência de rescala de admissibilidade,
+reconciliação, questão doméstico/importado) em `paper/matrix_audit.jl`,
+corrido manualmente contra a API ao vivo.
 
 ## 5. `agregação` na calibração INE não está totalmente ligada (corrigido)
 
@@ -298,10 +369,42 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 48 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 111 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`fonte_dados=:eurostat`,
 `dados_setoriais=:eurostat`, `método=:sdmx`) exigem rede e não correm em CI —
-verifique-os manualmente com `verificar_sdmx_ameco()` e
-`verificar_eurostat_setorial()` antes de os usar numa análise real.
+verifique-os manualmente com `verificar_sdmx_ameco()`,
+`verificar_eurostat_setorial()` e `paper/matrix_audit.jl` antes de os usar
+numa análise real.
+
+## 8. Piso imposto em `e` (rate of exploitation) na calibração setorial
+
+`estimar_parametros_setoriais` (`src/calibracao_pt.jl`) impõe `e =
+max(0.1, taxa_mais_valia)`: setores cujo rendimento empresarial (após
+CCF) é próximo de zero ou negativo relativamente às remunerações
+produziriam `e` nulo ou negativo, que o modelo não aceita
+(`Departamento` exige `e>0`). Este é um valor imposto, não uma
+observação puramente empírica — a função agora reporta explicitamente
+quantos setores saturam no piso (ex.: 4/19 para Portugal 2022), em vez
+de o fazer silenciosamente. Não existe ainda uma tabela em anexo com os
+quatro valores brutos (não-piso) lado a lado com os valores impostos, o
+que fortaleceria a transparência — ver `paper/main.tex`, Secção 5.1, para
+a mesma ressalva no contexto do artigo.
+
+## 9. Formato da série de exploração/depreciação AMECO (corrigido)
+
+`analisar_série_temporal_com_dados` (`src/ameco.jl`) usava, numa versão
+anterior, uma dedução fixa de 10% do stock de capital (a preços
+constantes) como "depreciação" ao calcular o excedente, em vez de
+consumo de capital fixo (CCF) real — isto quebrava a invariância
+algébrica que `e=(Y-V-CCF)/V` deveria ter sob um deflator comum aplicado
+a `Y`, `V` e CCF em conjunto, já que o termo de 10% não escalava com o
+deflator. **Corrigido:** usa-se agora a série real de CCF da AMECO
+(item `UKCT`, capítulo 03-05), deflacionada de forma consistente com `V`
+e `Y` em cada convenção de valorização (`valorização=:corrente`,
+`:consistente` ou `:consistente_fbcf`, este último usando o deflator do
+investimento em vez do deflator do PIB, para testar sensibilidade à
+escolha do deflator). Verificado diretamente: `e` é agora idêntico entre
+convenções para todos os anos, para Portugal e Espanha — não apenas
+afirmado algebricamente.

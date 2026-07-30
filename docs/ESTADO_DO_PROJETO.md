@@ -1,12 +1,16 @@
 # MarxKapital — Estado do Projeto
 
 Documento de acompanhamento, iniciado na versão 0.3.0 e atualizado desde
-então; o trabalho descrito nas secções seguintes corresponde à versão
-**0.5.0**. Descreve o que está feito, o que falta resolver e recomendações
+então; o trabalho descrito nas secções seguintes corresponde a **0.5.0 e
+trabalho substancial ainda não etiquetado** (ver `CHANGELOG.md`, secção
+"Não lançado"), incluindo a correção do dataflow real do Eurostat para a
+matriz técnica, a reconstrução de output bruto genuíno no modelo dinâmico,
+a conservação exata do termo de mobilidade, e o artigo académico em
+`paper/`. Descreve o que está feito, o que falta resolver e recomendações
 concretas de implementação. Destina-se a ficar em
 `docs/ESTADO_DO_PROJETO.md`, ao lado de `docs/LIMITACOES.md`.
 
-Data: julho de 2026. Autor do projeto: Nigel Randsley.
+Data: última atualização, 2026-07-30. Autor do projeto: Nigel Randsley.
 
 ---
 
@@ -126,7 +130,7 @@ empacotamento, a verificação era só estática (delimitadores equilibrados,
 nenhuma função chamada sem definição, contagem de argumentos nos
 construtores posicionais). Desde então, a suite de testes corre por
 compilação real — localmente e em CI (GitHub Actions, Julia 1.10 e 1, em
-cada push a `main`, ver `.github/workflows/test.yml`) — 48 testes, todos a
+cada push a `main`, ver `.github/workflows/test.yml`) — 111 testes, todos a
 passar. Os caminhos de dados reais (rede) são verificados manualmente com
 `verificar_sdmx_ameco()`/`verificar_eurostat_setorial()`, fora da suite
 automática por design (ver `docs/LIMITACOES.md`).
@@ -147,21 +151,32 @@ da reprodução ampliada (o output de um setor é o capital constante de outro).
 **Corrigido, com três mecanismos opcionais em `sistema_Ndept_io!`
 (`acoplado=true`), independentes entre si:**
 1. Mobilidade de capital: `μ·(rᵢ − r̄)·Cᵢ`, com `rᵢ` valorizado a preços de
-   produção de Sraffa.
+   produção de Sraffa e `r̄` a média de `r` ponderada por `C` — a única
+   escolha para a qual o termo conserva capital constante agregado
+   exatamente (`Σμ(rᵢ-r̄)Cᵢ=0` por construção, verificado por teste).
 2. Pressão de realização agregada (`realização=true`):
-   `ρ_real = Σmin(Oᵢ,(A·O)ᵢ)/Σ(A·O)ᵢ` trava o reinvestimento quando a
+   `ρ_real = Σmin(xᵢ,(A·x)ᵢ)/Σ(A·x)ᵢ` trava o reinvestimento quando a
    estrutura técnica não sustenta os outputs correntes.
 3. Racionamento de quantidades exato por setor (`racionamento=true`, tem
    precedência sobre `realização`): resolve o racionamento à
    Bénassy/Barro-Grossman por iteração de ponto fixo — cada setor limitado
    pelo input mais escasso (tecnologia Leontief), sem precisar de expor o
    sistema como DAE nem de uma nova dependência de solver. Verificado com um
-   exemplo de solução fechada e por robustez em 20+ combinações seed/μ.
+   exemplo de solução fechada e por robustez num sweep sistemático de 270
+   combinações (N∈{6,12,19}, densidade∈{0.2,0.4,0.6}), 270/270 convergências.
+
+Em ambos os mecanismos com restrição de oferta, `xᵢ` é o output bruto
+**genuíno**, reconstruído a partir do próprio estado do modelo
+(`xⱼ=Wⱼ/(1-Σᵢ A[i,j])`, `Wⱼ=δⱼCⱼ+Vⱼ+Sⱼ`) — não o fluxo tipo
+valor-acrescentado `W` usado numa correção anterior, que omitia consumo
+intermédio circulante. A procura de investimento no racionamento usa
+`Δxⱼ=σ_c,ⱼSⱼ·xⱼ/Cⱼ` (expansão de output desejada, via o rácio
+capital-output corrente), não a despesa `σ_c,ⱼSⱼ` diretamente.
 
 `sistema_Ndept!` mantém-se como omissão (setores independentes).
 `verificar_equilibrio_Ndept` generaliza a verificação a posteriori do
-modelo de 2 departamentos — ver `docs/LIMITACOES.md` item 1 para os detalhes
-de cada mecanismo.
+modelo de 2 departamentos — ver `docs/LIMITACOES.md` item 1 para os
+detalhes de cada mecanismo e das correções mais recentes.
 
 ### 3.2 Resolvido: `R_max` no choque salarial era ilustrativo
 
@@ -179,9 +194,12 @@ REST SDMX oficial da AMECO (`webgate.ec.europa.eu/ecfin/redisstat`), agora o
 caminho automático por omissão (`obter_dados_ameco`, métodos `:auto`/`:sdmx`).
 Verificado com dados reais de Portugal (PIB, emprego, remunerações, FBCF,
 stock de capital). **Quase totalmente resolvido:** `MAPA_AMECO_SDMX` mapeia
-agora 22/25 variáveis mais 2 calculadas (deflator do PIB, balança comercial)
-— 24/25; só o stock de capital bruto ficou confirmado indisponível nesta
-API (não "pendente") — ver `docs/LIMITACOES.md` item 3 para a lista exata.
+agora 24 variáveis mais 2 calculadas (deflator do PIB, balança comercial) —
+26 séries no total, incluindo `deflator_FBCF` e `CCF` (consumo de capital
+fixo), acrescentadas para corrigir um problema de valorização na série
+temporal de exploração (ver `docs/LIMITACOES.md` item 9); só o stock de
+capital bruto ficou confirmado indisponível nesta API (não "pendente") —
+ver `docs/LIMITACOES.md` item 3 para a lista exata.
 
 ### 3.4 Resolvido: calibração AMECO só macro, com pesos fixos por omissão
 
@@ -191,10 +209,11 @@ capital por pesos fixos por país; países sem perfil específico caem num
 perfil médio da UE. **Corrigido (opcional):** `dados_setoriais=:eurostat`
 usa dados setoriais reais do Eurostat em vez dos pesos fixos, com fallback
 automático para países fora da cobertura UE/EEE, **incluindo agora a matriz
-`A`**: construída aos 19 setores finos (real, não-negativa) e agregada aos
+`A`**: construída aos 19 setores finos (real, não-negativa, dataflow
+`NAIO_10_CP1700` — ver `docs/LIMITACOES.md` item 4-bis para o bug do
+dataflow anterior, encontrado e corrigido) e agregada aos
 3 setores macro pela fórmula de Leontief (`agregar_matriz_io`), em vez de
-agregar os fluxos brutos do IOT diretamente — ver `docs/LIMITACOES.md`
-item 4 para a ressalva conhecida (linha do Terciário conservadora).
+agregar os fluxos brutos do IOT diretamente.
 
 ### 3.5 Resolvido: agregação INE incompleta
 
@@ -204,11 +223,18 @@ mesma agregação do caminho AMECO) e `:média` (10 setores, nível NACE Rev.2
 "A10") implementados via `agregar_setores`, funcionando tanto com dados
 sintéticos como reais.
 
-### 3.6 Médio: stock de capital e depreciação aproximados
+### 3.6 Resolvido (opcional): stock de capital por inventário perpétuo; depreciação AMECO corrigida
 
-O capital constante é aproximado pelo stock de capital e a depreciação é fixada
-perto de 10% em vários pontos. Falta uma abordagem de inventário perpétuo e
-taxas de depreciação diferenciadas.
+O capital constante é aproximado pelo stock de capital reportado por
+omissão; `inventário_perpétuo=true` substitui isso por uma série própria
+(PIM, `Kₜ=(1-δ)Kₜ₋₁+FBCFₜ`, δ estimado por setor a partir de CCF/stock,
+não fixo) — ver `docs/LIMITACOES.md` item 7. Separadamente, a série
+temporal AMECO (`analisar_série_temporal_com_dados`) usava uma dedução
+fixa de 10% do stock como "depreciação"; corrigida para usar CCF real da
+AMECO, deflacionada de forma consistente com os restantes termos — ver
+`docs/LIMITACOES.md` item 9. Ainda por diferenciar: taxas de depreciação
+por tipo de ativo (estruturas, máquinas, TIC), que o Eurostat não publica
+diretamente.
 
 ### 3.7 Transversal: dados sintéticos por omissão
 
@@ -217,16 +243,37 @@ demonstração e testes, não para análise empírica.
 
 ### 3.8 Resolvido: testes agora executados em CI
 
-A suite `test/runtests.jl` (48 testes) corre localmente e em CI (GitHub
+A suite `test/runtests.jl` (111 testes) corre localmente e em CI (GitHub
 Actions, Julia 1.10 e 1, `.github/workflows/test.yml`) em cada push a
 `main`. Cobre os caminhos sintéticos/opt-in por omissão; os caminhos de
 dados reais (rede) ficam de fora por design — ver §3.3/§4.3.
+
+### 3.9 Resolvido: matriz técnica A usava o dataflow errado do Eurostat
+
+Encontrado durante uma auditoria pedida em revisão externa do artigo em
+`paper/`: `NAIO_10_CP1620` não é a tabela IOT simétrica (é uma tabela
+satélite de margens de comércio/transporte), o que subavaliava fluxos
+intersetoriais por mais de uma ordem de grandeza e explicava um raio
+espectral e `R_max` implausíveis reportados até esta correção. Corrigido
+com `NAIO_10_CP1700` (a tabela real), `stk_flow=DOM` (só uso doméstico) —
+ver `docs/LIMITACOES.md` item 4-bis para o histórico completo.
+
+### 3.10 Resolvido: output bruto do modelo dinâmico e procura de investimento
+
+O output usado pelos mecanismos de acoplamento (`realização`,
+`racionamento`) era um fluxo tipo valor-acrescentado (`W=δC+V+S`), que
+omite consumo intermédio circulante — não gross output no sentido usado
+para construir `A`. Corrigido reconstruindo o output bruto genuíno a
+partir da própria identidade custo-output do modelo, sem novo estado; a
+procura de investimento no racionamento converte despesa planeada para
+escala de output via o rácio capital-output, em vez de aplicar `A`
+diretamente à despesa. Ver `docs/LIMITACOES.md` item 1.
 
 ---
 
 ## 4. Recomendações de implementação
 
-### 4.1 Acoplar A à acumulação (prioridade máxima) — passo 2 feito, passo 1 parcial
+### 4.1 Acoplar A à acumulação — feito (ambos os passos)
 
 Objetivo: tornar o modelo N-dept coerente com o de 2 departamentos, onde o
 equilíbrio intersetorial já é imposto.
@@ -285,10 +332,11 @@ viabilidade reportado passa a corresponder ao cenário simulado.
   indisponível nesta API. Alguns mnemónicos antigos (nunca verificados)
   revelaram-se incorretos — ver `docs/LIMITACOES.md` item 3.
 - ~~Mapear capítulo SDMX por variável~~ — feito (ver acima).
-- **Alternativa via Eurostat.** Para séries setoriais reais, a API SDMX do
-  Eurostat (`nama_10_a64` para contas por indústria, tabelas de recursos e
-  empregos para `A`, `nama_10_nfa` para stock de capital) continua relevante
-  e ainda por explorar — não coberta por este trabalho.
+- ~~Alternativa via Eurostat~~ — **feito**: `src/eurostat_sdmx.jl` usa
+  `NAMA_10_A64`/`_E`/`_P5` para VAB/remunerações/CCF/emprego/FBCF,
+  `NAMA_10_NFA_ST` para stock de capital, e `NAIO_10_CP1700` (a tabela IOT
+  simétrica real — ver item 3.9 e `docs/LIMITACOES.md` item 4-bis para a
+  correção do dataflow) para a matriz `A`.
 
 ### 4.4 Calibração setorial real (feito para 19, 10 e 3 setores; A real em ambos os caminhos)
 
@@ -299,15 +347,14 @@ viabilidade reportado passa a corresponder ao cenário simulado.
   INE, `dados_setoriais=:eurostat` no AMECO).
 - ~~Construir a matriz `A` a partir das tabelas do Eurostat~~ — feito para
   ambos os caminhos. INE: 19 setores, `construir_matriz_io_eurostat` via
-  `NAIO_10_CP1620`. AMECO (3 setores macro): a agregação direta dos fluxos
-  brutos do IOT falhou (margens de comércio/transporte, ver
-  `docs/LIMITACOES.md` item 4), mas agregar a matriz de 19 setores **já
-  limpa** (não os fluxos brutos) pela fórmula padrão de agregação de
-  Leontief (`agregar_matriz_io`) resultou numa matriz real, não-negativa —
-  com a ressalva de que a linha do Terciário fica conservadora (herda o
-  mesmo subdimensionamento da matriz de 19 setores, só que sem produzir
-  valores inválidos). Combinar tabelas de oferta e utilização em vez do IOT
-  simétrico continua por explorar como melhoria futura mais trabalhosa.
+  `NAIO_10_CP1700` (a tabela IOT simétrica real, `stk_flow=DOM` — uma
+  correção posterior substituiu `NAIO_10_CP1620`, que afinal era uma tabela
+  satélite de margens, não o IOT em si; ver `docs/LIMITACOES.md` item 4-bis).
+  AMECO (3 setores macro): agregar a matriz de 19 setores já limpa
+  (não os fluxos brutos) pela fórmula padrão de agregação de Leontief
+  (`agregar_matriz_io`) dá uma matriz real, não-negativa, sem a ressalva de
+  Terciário que constava aqui antes da correção do dataflow — verificado
+  com reconciliação exata contra o output publicado pela própria tabela.
 - ~~Estimar stock de capital por setor pelo método do inventário
   perpétuo~~ — feito (opcional, `inventário_perpétuo=true`;
   `calcular_stock_capital_pim`, `src/eurostat_sdmx.jl`). Usa uma taxa de
@@ -320,7 +367,7 @@ viabilidade reportado passa a corresponder ao cenário simulado.
 ### 4.5 Testes e integração contínua — feito
 
 - ~~Correr localmente~~ — feito, `julia install_deps.jl` seguido de
-  `julia --project=. test/runtests.jl`, 48 testes a passar.
+  `julia --project=. test/runtests.jl`, 111 testes a passar.
 - ~~Execução sem ecrã~~ — feito, via `GKSwstype=100` (variável de ambiente,
   não argumento por função) antes de carregar `Plots`; usado tanto localmente
   como em CI.
@@ -361,15 +408,26 @@ Sequência proposta, do mais estruturante ao mais exploratório:
    (`realização=true`) e racionamento de quantidades exato por setor
    (`racionamento=true`, ponto fixo, sem DAE); convergência de dispersão e
    amortecimento validados por teste.
-4. ~~Robustecer o acesso à AMECO~~ — feito (API SDMX oficial, 24/25
-   variáveis mapeadas ou calculadas; 1 confirmada indisponível).
+4. ~~Robustecer o acesso à AMECO~~ — feito (API SDMX oficial, 26 séries
+   obtidas — 24 mapeadas diretamente + 2 calculadas; 1 confirmada
+   indisponível).
 5. ~~Ligar dados setoriais reais (Eurostat)~~ — feito, opt-in, com matriz
    `A` real em ambos os caminhos (INE 19/10/3 setores; AMECO 3 setores,
-   ver §4.4 para a ressalva). Comportamento por omissão continua
+   ver §4.4). Comportamento por omissão continua
    sintético/pesos fixos.
 6. ~~Estimar stock de capital por inventário perpétuo~~ — feito, opcional
    (`inventário_perpétuo=true`).
-7. Extensões de médio prazo (financeirização, ecologia, troca desigual, agentes
+7. ~~Corrigir o dataflow errado da matriz técnica A~~ — feito
+   (`NAIO_10_CP1700`, `stk_flow=DOM` — ver §3.9).
+8. ~~Reconstruir output bruto genuíno no modelo dinâmico~~ — feito, sem
+   novo estado (ver §3.10).
+9. ~~Conservação exata do termo de mobilidade de capital~~ — feito (`r̄`
+   ponderado por `C` — ver §3.1).
+10. ~~Escrever artigo académico (metodologia + aplicação empírica)~~ —
+    feito, `paper/main.tex`, reproduzível a partir de dados reais
+    (`paper/gerar_resultados.jl`, `paper/monte_carlo.jl`,
+    `paper/matrix_audit.jl`).
+11. Extensões de médio prazo (financeirização, ecologia, troca desigual, agentes
    heterogéneos) — ainda por fazer.
 
 ---
@@ -384,8 +442,15 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 - [x] Racionamento de quantidades exato por setor (`racionamento=true`, ponto fixo, sem DAE nem `NonlinearSolve.jl`)
 - [x] Download AMECO via API SDMX oficial (substitui o ficheiro TXT descontinuado)
 - [x] API SDMX validada com valor conhecido (`verificar_sdmx_ameco()`)
-- [x] Mnemónicos AMECO confirmados (24/25 variáveis; 1 confirmada indisponível)
-- [x] Matriz A a partir de tabelas de recursos e empregos reais (INE 19/10/3 setores; AMECO 3 setores, agregada — ver LIMITACOES item 4)
+- [x] Mnemónicos AMECO confirmados (26 séries obtidas; 1 confirmada indisponível)
+- [x] Matriz A a partir de tabelas de recursos e empregos reais (INE 19/10/3 setores; AMECO 3 setores, agregada — ver LIMITACOES item 4-bis)
 - [x] Calibração setorial com contas nacionais por ramo (ambos os caminhos, opt-in)
 - [x] Stock de capital por inventário perpétuo (opcional, `inventário_perpétuo=true`; taxa de depreciação única por setor, não diferenciada por tipo de ativo)
 - [x] Agregações `:média` e `:macro` do INE implementadas
+- [x] Matriz técnica A corrigida para o dataflow real (`NAIO_10_CP1700`, `stk_flow=DOM`, zero células negativas, reconciliação exata contra P1)
+- [x] Output bruto genuíno reconstruído no modelo dinâmico (sem novo estado); procura de investimento em escala de output (`Δx`), não despesa
+- [x] Condição de admissibilidade da reconstrução verificada e corrigida uma única vez por simulação (`_garantir_admissibilidade_output`), não reclamada a cada avaliação
+- [x] Termo de mobilidade conserva capital constante agregado exatamente (`r̄` ponderado por `C`)
+- [x] Série temporal AMECO usa CCF real (não uma dedução fixa de 10%); `e` invariante sob deflator comum, verificado
+- [x] Piso `e=0.1` na calibração setorial reportado explicitamente (contagem de setores saturados)
+- [x] Artigo académico (`paper/main.tex`) — metodologia + aplicação empírica a Portugal, reproduzível

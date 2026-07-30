@@ -2,6 +2,80 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [Não lançado]
+
+### Corrigido
+- **Matriz técnica A usava o dataflow errado do Eurostat.** Uma auditoria
+  pedida em revisão externa do artigo em `paper/` (destinada a quantificar
+  o efeito de um passo de "clipping" de margens) revelou que
+  `NAIO_10_CP1620` — usado desde a primeira integração da matriz real —
+  não é a tabela IOT simétrica, mas sim "Table of trade and transport
+  margins", uma tabela satélite pequena. Construir `A` a partir dela
+  subavaliava os fluxos intersetoriais em mais de uma ordem de grandeza
+  (consumo intermédio total implícito ≈8.8 mil M€ para Portugal 2020,
+  contra um verdadeiro ≈177.8 mil M€) e explicava o raio espectral
+  implausivelmente baixo (ρ(A)≈0.11-0.15) e o `R_max` implausivelmente
+  alto (≈600-700%) reportados até agora. Corrigido com `NAIO_10_CP1700`
+  (a tabela real), `stk_flow=DOM` (só uso doméstico — a tabela publica
+  também `IMP`/`TOTAL`, ao contrário da anterior). Verificado: zero
+  células negativas, reconciliação exata contra o `P1` (output bruto)
+  publicado pela própria tabela, ρ(A)≈0.52-0.60, `R_max`≈68-91%. Ver
+  `docs/LIMITACOES.md` item 4-bis, `paper/matrix_audit.jl`.
+- **Output bruto do modelo dinâmico (`sistema_Ndept_io!`) omitia consumo
+  intermédio circulante.** Os mecanismos `realização`/`racionamento`
+  usavam `O=W=δC+V+S` (um fluxo tipo valor-acrescentado) como oferta,
+  não gross output no sentido usado para construir `A`. Corrigido
+  reconstruindo o output bruto genuíno `x=W/(1-Σᵢ A[i,j])` a partir da
+  própria identidade custo-output do modelo, sem novo estado — válido
+  só para as matrizes sintéticas fechadas usadas nestas simulações
+  (nunca aplicado à matriz real do Eurostat, de uso doméstico). A
+  condição de admissibilidade (`Σᵢ A[i,j]<1`) é agora verificada e
+  corrigida uma única vez quando a simulação é montada
+  (`_garantir_admissibilidade_output`), não reclamada a cada avaliação
+  do lado direito da EDO.
+- **Procura de investimento no racionamento aplicava A à despesa, não ao
+  output.** `_resolver_racionamento` recebia `σ_c,ⱼSⱼ` (despesa de
+  investimento planeada) diretamente; corrigido para `Δxⱼ=σ_c,ⱼSⱼ·xⱼ/Cⱼ`
+  (expansão de output desejada, via o rácio capital-output corrente),
+  para que `A` seja aplicada a uma grandeza em escala de output,
+  consistente com a sua própria definição.
+- **Termo de mobilidade de capital não conservava capital constante
+  agregado.** `r̄` era a razão agregada `ΣS/Σ(C+V)`, que não garante
+  `Σᵢμ(rᵢ-r̄)Cᵢ=0`. Corrigido usando a média de `r` ponderada por `C` — a
+  única escolha para a qual a soma é exatamente zero por construção.
+- **Série temporal AMECO (`analisar_série_temporal_com_dados`) deduzia
+  uma depreciação fixa de 10% do stock de capital**, em vez de consumo
+  de capital fixo (CCF) real — isto quebrava a invariância algébrica que
+  `e=(Y-V-CCF)/V` deve ter sob um deflator comum aplicado a `Y`, `V` e
+  CCF. Corrigido usando a série real de CCF da AMECO (item `UKCT`);
+  `deflator_FBCF` também acrescentado a `MAPA_AMECO_SDMX`, para testar
+  sensibilidade à escolha do deflator (`valorização=:consistente_fbcf`).
+  Verificado: `e` agora idêntico entre convenções de valorização para
+  todos os anos, Portugal e Espanha.
+- Tabela de calibração setorial (usada em `paper/gerar_resultados.jl`)
+  reconstruía VAB como `C+V+e·V` (uma stock somada a fluxos), em vez de
+  reportar o VAB real já calculado pelo pipeline — somava duas ordens de
+  grandeza a menos que o total nacional. `ParâmetrosCalibrados` ganhou um
+  campo `VAB` real.
+
+### Adicionado
+- `capital_transferido(d)`/correção de `valor_produto(d)` em
+  `estruturas.jl`: distingue capital constante *avançado* (stock, `d.c`)
+  de capital constante *transferido* num período (`δ·c`) — a magnitude
+  correta a somar com fluxos anuais.
+- `paper/` (novo): artigo académico completo em LaTeX combinando
+  metodologia (o modelo, os três mecanismos de acoplamento, o
+  racionamento como ponto fixo com prova de existência e antitonicidade)
+  e aplicação empírica a Portugal, com todas as figuras/tabelas
+  reproduzíveis a partir de dados reais (`gerar_resultados.jl`,
+  `monte_carlo.jl` — sweeps sistemáticos de convergência e dispersão,
+  `matrix_audit.jl` — auditoria da matriz técnica).
+- 63 novos testes em `test/runtests.jl` (48→111): invariância de `e`
+  sob deflator, conservação exata da mobilidade, sensibilidade do
+  racionamento a condições iniciais/ordem/tolerância, reconstrução de
+  output bruto, admissibilidade da reconstrução (caso normal e caso de
+  rescala), entre outros.
+
 ## [0.5.0] — 2026-07-28
 
 ### Adicionado
