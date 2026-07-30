@@ -1,5 +1,7 @@
 # MarxKapital
 
+*[🇬🇧 Read this in English](README.en.md)*
+
 Modelação matemática da teoria económica marxista em Julia: acumulação,
 exploração, composição orgânica, lei tendencial da queda da taxa de lucro,
 problema da transformação valores→preços, fronteira distributiva salário-lucro,
@@ -143,7 +145,7 @@ marxkapital/
 │   └── exemplos.jl         # exemplos prontos + ajuda + testar_modelo
 ├── test/runtests.jl
 ├── examples/demo.jl
-├── docs/LIMITACOES.md      # leitura obrigatória
+├── docs/LIMITACOES.md      # leitura obrigatória (+ .en.md em inglês)
 ├── paper/                  # artigo académico (LaTeX), reproduzível a partir de dados reais
 │   ├── main.tex            # metodologia + aplicação empírica (Portugal)
 │   ├── gerar_resultados.jl # gera todas as figuras/tabelas do artigo

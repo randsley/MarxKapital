@@ -1,5 +1,7 @@
 # Registo de alterações
 
+*[🇬🇧 Read this in English](CHANGELOG.en.md)*
+
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
 ## [0.6.0] — 2026-07-30

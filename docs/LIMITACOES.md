@@ -1,5 +1,7 @@
 # Limitações conhecidas e trabalho pendente
 
+*[🇬🇧 Read this in English](LIMITACOES.en.md)*
+
 Este ficheiro documenta, sem rodeios, o que ainda não está correto ou
 completo. Nenhum destes pontos impede a execução, mas todos afetam a
 interpretação dos resultados.
@@ -329,8 +331,7 @@ metodológico — **não para análise empírica publicável** nesse modo.
 - INE: `calibrar_modelo_portugal(fonte_dados=:eurostat, agregação=:detalhada|:macro|:média)`
   — 19, 3 ou 10 setores, dados e matriz técnica `A` reais (ver item 4-bis e item 5).
 - AMECO: `calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` — 3 setores
-  macro, dados e matriz `A` reais (ver item 4 para a ressalva sobre a linha
-  do Terciário na matriz agregada).
+  macro, dados e matriz `A` reais (ver item 4).
 
 Continua a ser necessário pedir explicitamente estes modos — o comportamento
 por omissão em ambos os caminhos mantém-se sintético/pesos fixos, por

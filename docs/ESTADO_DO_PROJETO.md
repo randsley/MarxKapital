@@ -1,5 +1,7 @@
 # MarxKapital — Estado do Projeto
 
+*[🇬🇧 Read this in English](ESTADO_DO_PROJETO.en.md)*
+
 Documento de acompanhamento, iniciado na versão 0.3.0 e atualizado desde
 então; o trabalho descrito nas secções seguintes corresponde à versão
 **0.6.0**, incluindo a correção do dataflow real do Eurostat para a
