@@ -147,9 +147,11 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         Random.seed!(5)
         sol_com, _, p_com = simular_Ndept(6, T = 20.0, seed = 5, acoplado = true, μ = 0.5,
                                           racionamento = true)
+        @test all(isfinite.(sol_com.u[end]))
         eq = verificar_equilibrio_Ndept(sol_com, p_com)
         N = 6
-        C = sol_com[end][1:N]; V = sol_com[end][N+1:2N]
+        estado_final = sol_com.u[end]
+        C = estado_final[1:N]; V = estado_final[N+1:2N]
         S = p_com.e .* V
         W = p_com.δ .* C .+ V .+ S
         x = eq.output
