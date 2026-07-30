@@ -34,3 +34,13 @@ abstract: >-
   directly from official European statistical sources (Eurostat and
   AMECO, via their SDMX REST APIs). An accompanying academic paper
   (paper/main.tex) applies the pipeline to Portugal.
+preferred-citation:
+  type: article
+  title: "MarxKapital: A Computational Framework for Marxian Value Theory with Real Empirical Calibration"
+  authors:
+    - family-names: "Randsley"
+      given-names: "Nigel"
+  year: 2026
+  month: 7
+  doi: 10.5281/zenodo.21705609
+  url: "https://doi.org/10.5281/zenodo.21705609"
