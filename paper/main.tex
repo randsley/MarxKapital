@@ -255,14 +255,24 @@ but not any individual column sum. We do not clamp this silently inside
 the per-evaluation calculation; a synthetic matrix's column sums are
 checked once, when the simulation is assembled, and any matrix that
 violates the condition is rescaled uniformly (the same rule already used
-to enforce $\rho(A)<1$) until its largest column sum is safely below
-one, with a warning logged --- an explicit admissibility rule applied
+to enforce $\rho(A)<1$) until its largest column sum equals exactly
+$0.95$ (the same margin used throughout the codebase for this purpose),
+with a warning logged --- an explicit admissibility rule applied
 once to the matrix, not a numerical safeguard reapplied at every solver
 step. Across the 270 random synthetic matrices used in the convergence
 sweep of Section~5.4 ($N\in\{6,12,19\}$, density $\in\{0.2,0.4,0.6\}$),
 50 ($18.5\%$) required rescaling, by a factor averaging $0.81$ (worst
 case $0.63$) --- a non-negligible fraction, reported here rather than
-left as an abstract possibility. Section~3.3's coupling mechanisms use
+left as an abstract possibility. We also checked whether rescaling
+itself measurably changes downstream behavior, rather than assuming it
+is neutral: the rescaled and non-rescaled subsets both converge in every
+trial ($50/50$ and $220/220$), with the rescaled subset taking modestly
+more iterations on average ($28.4$ vs.\ $25.3$) and showing a higher
+mean fraction of sectors rationed ($1.00$ vs.\ $0.90$) --- consistent
+with rescaled matrices being the denser, more interconnected ones in
+the sample (larger column sums are exactly what triggers rescaling),
+not evidence that rescaling itself distorts the fixed point's behavior.
+Section~3.3's coupling mechanisms use
 $x_d$, not $W_d$, as the supply-side quantity --- resolving, rather than
 merely disclosing, the gap between a value-added-type flow and genuine
 gross output that an earlier version of this paper left as an open
