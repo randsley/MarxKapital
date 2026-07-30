@@ -1,0 +1,29 @@
+{
+  "title": "MarxKapital: A Computational Framework for Marxian Value Theory with Real Empirical Calibration",
+  "description": "MarxKapital is an open-source Julia package for the mathematical modeling of Marxian value theory: capital accumulation, the tendency of the rate of profit, the transformation of labor values into prices of production, and the sectoral dynamics of expanded reproduction. Beyond the classical two-department and generalized N-department reproduction schemes, it implements three coupling mechanisms for sectoral accumulation through the technical matrix A -- capital mobility, an aggregate realization-pressure heuristic, and an exact per-sector quantity-rationing scheme solved by fixed-point iteration -- and a live, reproducible empirical calibration pipeline drawing directly from official European statistical sources (Eurostat and AMECO, via their SDMX REST APIs). An accompanying academic paper (paper/main.tex) applies the pipeline to Portugal.",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Randsley, Nigel"
+    }
+  ],
+  "keywords": [
+    "julia",
+    "economics",
+    "marxist-economics",
+    "political-economy",
+    "input-output-model",
+    "differential-equations",
+    "eurostat",
+    "computational-economics"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/randsley/MarxKapital",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}
