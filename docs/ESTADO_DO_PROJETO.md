@@ -1,9 +1,8 @@
 # MarxKapital — Estado do Projeto
 
 Documento de acompanhamento, iniciado na versão 0.3.0 e atualizado desde
-então; o trabalho descrito nas secções seguintes corresponde a **0.5.0 e
-trabalho substancial ainda não etiquetado** (ver `CHANGELOG.md`, secção
-"Não lançado"), incluindo a correção do dataflow real do Eurostat para a
+então; o trabalho descrito nas secções seguintes corresponde à versão
+**0.6.0**, incluindo a correção do dataflow real do Eurostat para a
 matriz técnica, a reconstrução de output bruto genuíno no modelo dinâmico,
 a conservação exata do termo de mobilidade, e o artigo académico em
 `paper/`. Descreve o que está feito, o que falta resolver e recomendações

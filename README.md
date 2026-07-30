@@ -6,8 +6,7 @@ problema da transformação valores→preços, fronteira distributiva salário-l
 e calibração empírica com dados nacionais (INE) e europeus (**AMECO**, todos os
 países da base).
 
-> Estado: **v0.5.0+** (trabalho substancial desde a última etiqueta —
-> ver `CHANGELOG.md`, secção "Não lançado") — funcional para demonstração,
+> Estado: **v0.6.0** — funcional para demonstração,
 > desenvolvimento metodológico e um artigo académico em `paper/`, com
 > testes automáticos em CI
 > ([![Testes](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml)).

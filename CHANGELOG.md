@@ -2,7 +2,7 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
-## [Não lançado]
+## [0.6.0] — 2026-07-30
 
 ### Corrigido
 - **Matriz técnica A usava o dataflow errado do Eurostat.** Uma auditoria
