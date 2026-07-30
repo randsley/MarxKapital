@@ -268,10 +268,13 @@ itself measurably changes downstream behavior, rather than assuming it
 is neutral: the rescaled and non-rescaled subsets both converge in every
 trial ($50/50$ and $220/220$), with the rescaled subset taking modestly
 more iterations on average ($28.4$ vs.\ $25.3$) and showing a higher
-mean fraction of sectors rationed ($1.00$ vs.\ $0.90$) --- consistent
-with rescaled matrices being the denser, more interconnected ones in
-the sample (larger column sums are exactly what triggers rescaling),
-not evidence that rescaling itself distorts the fixed point's behavior.
+mean fraction of sectors rationed ($1.00$ vs.\ $0.90$). Because
+rescaling is triggered by a matrix's pre-existing column sums, the two
+subsets already differ structurally by construction, and this
+descriptive comparison does not identify a causal effect of rescaling
+itself --- we did not separately measure matrix density (as distinct
+from coefficient magnitude) between the subsets, so we do not assert
+which of the two drives the larger column sums that trigger rescaling.
 Section~3.3's coupling mechanisms use
 $x_d$, not $W_d$, as the supply-side quantity --- resolving, rather than
 merely disclosing, the gap between a value-added-type flow and genuine
@@ -1094,15 +1097,6 @@ supply, not a fully netted reproduction balance. This limitation is
 narrower than before --- confined to the investable-residual question,
 not the output measure itself.
 
-\emph{Coarser sectoral aggregations inherit a data-quality caveat.} When
-the technical matrix is aggregated from 19 to 3 macro-sectors, the
-tertiary (services) row is conservative because it inherits reduced
-intermediate-flow estimates for the trade and transport sub-sectors,
-whose margin-accounting convention we clip at the finer resolution before
-aggregating (Section~4.2); the coarser matrix is non-negative and usable,
-but likely understates services' true role as an input supplier to other
-sectors.
-
 \emph{Limited robustness and sensitivity analysis, partially addressed.}
 We report the aggregate trend under three valuation conventions
 (unadjusted, GDP-deflated, investment-deflated; Section~5.2 and
@@ -1169,9 +1163,11 @@ dimensions (\texttt{prd\_ava}, \texttt{prd\_use}) both use the same CPA
 product code, so $A$ is built entirely within one classification, with
 no product-to-industry join. A concordance assumption is still made one
 level up, where $A$'s CPA-labeled sections are combined with
-NACE-classified sectoral value-added weights and labor coefficients
-(\texttt{NAMA\_10\_A64}) to produce Table~\ref{tab:sectors} and
-Figures~\ref{fig:matrixA}--\ref{fig:transformation}; we rely on
+NACE-classified labor coefficients (\texttt{NAMA\_10\_A64}) for the
+production-structure analysis of Figures~\ref{fig:matrixA}--\ref{fig:transformation}.
+Table~\ref{tab:sectors} is constructed independently, directly from
+NACE-classified sectoral accounts, and does not depend on $A$ at all
+(Section~5.1). We rely on
 Eurostat's standard design correspondence between CPA and NACE section
 codes at this level of aggregation (both derive from the same top-level
 classification structure) rather than an independently verified
