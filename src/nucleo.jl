@@ -67,6 +67,44 @@ function criar_matriz_tecnica(N::Int; densidade = 0.3, max_coef = 0.15,
     return A
 end
 
+"""
+    _garantir_admissibilidade_output(A; margem=0.95)
+
+Reconstruir o output bruto a partir do fluxo tipo valor-acrescentado
+(`xⱼ = Wⱼ/(1-Σᵢ A[i,j])`, Equação 2 do artigo) exige `Σᵢ A[i,j] < 1` para
+todo `j` — condição de admissibilidade do modelo, não um pormenor
+numérico. `ρ(A)<1` (garantido por `criar_matriz_tecnica`) \\emph{não}
+implica isto: ρ(A) é um limite superior à maior soma de coluna, não um
+limite inferior, pelo que uma matriz produtiva no sentido de Leontief
+pode ainda assim ter uma coluna com soma ≥1.
+
+Esta condição só é válida quando `A` representa o requisito de input
+circulante \\emph{completo} de cada setor — verdadeiro por construção
+para as matrizes sintéticas fechadas usadas nas simulações dinâmicas
+(`criar_matriz_tecnica`), mas não necessariamente para uma matriz
+empírica de uso doméstico (que, por definição, omite inputs importados);
+por isso a reconstrução de `x` desta função nunca é aplicada à matriz
+real do Eurostat (`construir_matriz_io_eurostat`), só às matrizes
+sintéticas usadas pelas dinâmicas de `sistema_Ndept_io!`.
+
+Verifica a condição explicitamente em vez de a impor silenciosamente a
+cada avaliação do lado direito da EDO: se alguma soma de coluna exceder
+`margem`, reescala `A` inteira (mesma lógica de `criar_matriz_tecnica`
+para ρ(A)<1) até que a maior soma de coluna fique abaixo de `margem`,
+uma única vez, no início da simulação — não a cada passo do solver.
+Devolve `(A_admissível, foi_reescalada::Bool)`.
+"""
+function _garantir_admissibilidade_output(A; margem = 0.95)
+    colsum = vec(sum(A, dims = 1))
+    maxcol = maximum(colsum)
+    maxcol < margem && return A, false
+    fator = margem / maxcol
+    @warn "Soma de coluna máxima de A ($(round(maxcol,digits=3))) excede $margem; " *
+          "reescalada por um fator $(round(fator,digits=3)) para garantir a condição " *
+          "de admissibilidade da reconstrução de output bruto (Equação 2)."
+    return A .* fator, true
+end
+
 # ----------------------------------------------------------------------------
 # Criação de departamentos
 # ----------------------------------------------------------------------------
@@ -229,11 +267,17 @@ function sistema_Ndept_io!(dX, X, p, t)
         # circulante zᵢ. Recupera-se x (output bruto) a partir da própria
         # identidade custo-output do modelo, xⱼ = zⱼ+Wⱼ com zⱼ=Σᵢ A[i,j]·xⱼ
         # (A é definida por unidade de output bruto do comprador), donde
-        # xⱼ = Wⱼ/(1-Σᵢ A[i,j]) — sem introduzir novo estado. `colsum` é
-        # limitado a 0.95 por segurança numérica (ρ(A)<1 não garante
-        # nenhuma soma de coluna individual <1).
+        # xⱼ = Wⱼ/(1-Σᵢ A[i,j]) — sem introduzir novo estado. Válido apenas
+        # quando A representa o requisito de input circulante COMPLETO de
+        # cada setor (verdadeiro por construção para as matrizes sintéticas
+        # fechadas aqui usadas; não se aplica à matriz real de uso
+        # doméstico do Eurostat, que omite inputs importados por definição
+        # — ver `construir_matriz_io_eurostat`, nunca usada nesta EDO). A
+        # condição de admissibilidade Σᵢ A[i,j]<1 é verificada e garantida
+        # uma única vez, no início da simulação
+        # (`_garantir_admissibilidade_output`), não a cada avaliação.
         W = p.δ .* C .+ V .+ S
-        colsum = min.(vec(sum(p.A, dims = 1)), 0.95)
+        colsum = vec(sum(p.A, dims = 1))
         x = W ./ (1 .- colsum)
         O = x  # output bruto genuíno, não W — corrige a crítica de revisão
                 # externa de que O omitia consumo intermédio circulante.
@@ -366,6 +410,7 @@ function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
     N = length(depts)
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
     A = criar_matriz_tecnica(N, seed = seed)
+    (acoplado && (realização || racionamento)) && (A, _ = _garantir_admissibilidade_output(A))
 
     if acoplado
         l = [d.v for d in depts]

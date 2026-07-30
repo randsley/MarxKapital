@@ -136,7 +136,10 @@ function verificar_equilibrio_Ndept(sol, p; t_idx = length(sol.t))
     V = X[N+1:2N]
     S = p.e .* V
     W = p.δ .* C .+ V .+ S
-    colsum = min.(vec(sum(p.A, dims = 1)), 0.95)
+    # A admissibilidade (Σᵢ A[i,j]<1 para todo j) é garantida uma única vez
+    # quando a simulação é montada (`_garantir_admissibilidade_output`,
+    # `src/nucleo.jl`), não reclamada aqui — ver `sistema_Ndept_io!`.
+    colsum = vec(sum(p.A, dims = 1))
     O = W ./ (1 .- colsum)
     procura_intermédia = p.A * O
     desvio = O .- procura_intermédia

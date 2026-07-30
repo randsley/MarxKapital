@@ -231,19 +231,38 @@ solved without introducing new state: $x_d$ is reconstructed at every
 solver evaluation from $W_d$ (itself a function of the state
 $C_d,V_d$) and the fixed matrix $A$, the same way Sraffa prices are
 recomputed at every evaluation rather than tracked as state
-(Section~3.2). The column sum $\sum_iA_{id}$ is clamped below $0.95$ for
-numerical safety, since $\rho(A)<1$ bounds the matrix's spectral radius
-but not any individual column sum. Section~3.3's coupling mechanisms use
+(Section~3.2). Equation~\eqref{eq:output-bruto} is valid only if $A$
+represents each sector's \emph{complete} circulating-input requirement
+--- true by construction for the closed synthetic economies
+(\texttt{criar\_matriz\_tecnica}) used in the simulations of
+Section~3.3 and Section~5.4, where every input a sector uses is, by
+definition, supplied by some sector inside the same $N\times N$ matrix.
+It is \emph{not} generally true of the empirical technical matrix
+(Section~4.2), which we deliberately build from domestic-use flows only
+and which therefore, by definition, omits imported intermediate inputs;
+applying Equation~\eqref{eq:output-bruto} to that matrix would
+understate reconstructed output by exactly the imported share of
+intermediate consumption. We do not do this: Section~4's empirical
+calibration uses Eurostat's own published $x_i$ directly and never
+invokes Equation~\eqref{eq:output-bruto}, which is used exclusively for
+the closed synthetic economies of Section~3.3 and Section~5.4, where the
+completeness condition holds by construction.
+
+The admissibility condition $\sum_iA_{id}<1$ for every $d$ (required for
+the denominator in Equation~\eqref{eq:output-bruto} to be positive) is
+not guaranteed by $\rho(A)<1$, which bounds the matrix's spectral radius
+but not any individual column sum. We do not clamp this silently inside
+the per-evaluation calculation; a synthetic matrix's column sums are
+checked once, when the simulation is assembled, and any matrix that
+violates the condition is rescaled uniformly (the same rule already used
+to enforce $\rho(A)<1$) until its largest column sum is safely below
+one, with a warning logged --- an explicit admissibility rule applied
+once to the matrix, not a numerical safeguard reapplied at every solver
+step. Section~3.3's coupling mechanisms use
 $x_d$, not $W_d$, as the supply-side quantity --- resolving, rather than
 merely disclosing, the gap between a value-added-type flow and genuine
 gross output that an earlier version of this paper left as an open
-limitation. Where a genuine gross-output figure is available from real
-data instead of reconstructed from the model's own dynamics
-(Section~4's calibration, which uses Eurostat's published $x_i$ directly
-to build $A$), we use that measured figure, not the reconstruction ---
-Equation~\eqref{eq:output-bruto} is specifically for the simulated
-$N$-department dynamics, where no measured $x_d$ exists period by
-period. Intersectoral
+limitation. Intersectoral
 consistency (does Department~I's wage and unaccumulated-surplus income
 suffice to buy Department~II's output, and vice versa) is checked
 \emph{a posteriori} by a dedicated consistency function, not imposed
@@ -488,13 +507,23 @@ rather than a single global theorem.
 None of the three mechanisms imposes exact market clearing at every
 instant for every sector as a hard constraint solved simultaneously with
 the differential state --- that would require the DAE formulation we
-deliberately avoid. A dedicated consistency-check function generalizes the
+deliberately avoid. A dedicated diagnostic function generalizes the
 two-department \emph{a posteriori} check to $N$ sectors, reconstructing
 $x_i$ from the state via Equation~\eqref{eq:output-bruto} and reporting
-the per-sector gap $x_i - (Ax)_i$ and the aggregate realization ratio at
-a given point in the trajectory, for diagnostic use outside the dynamics
-themselves --- now a genuine gross-output gap, not a comparison built on
-the value-added-type $W_i$ an earlier version of this diagnostic used.
+the per-sector \emph{intermediate-use residual} $x_i - (Ax)_i$ and its
+aggregate ratio at a given point in the trajectory. We do not call this
+a market-clearing gap or a disequilibrium measure: in standard
+input-output accounting, gross output minus modeled intermediate demand
+is ordinarily positive and expected --- it is output available for
+final use, exports, inventories, and every other demand category this
+diagnostic does not model (Section~6.2) --- so a positive residual is
+the normal case, not evidence of anything approaching balance. The
+residual is informative as a relative, within-model comparison (larger
+under one parameterization than another, changing over the trajectory)
+and now uses a genuine gross-output $x_i$ rather than the
+value-added-type $W_i$ an earlier version of this diagnostic used, but
+it should not be read as a sectoral equilibrium or reproduction-balance
+measure on its own.
 
 \section{Empirical calibration}
 
@@ -1154,14 +1183,22 @@ exact in the cases we checked.
 \emph{The mobility term's conservation was fixed} (Section~3.3): an
 earlier draft's $\bar r$ did not guarantee $\sum_i\mu(r_i-\bar r)C_i=0$;
 redefining $\bar r$ as the $C_i$-weighted mean of $r_i$ makes this hold
-by construction, verified directly rather than assumed. \emph{The rationing mechanism's
-demand term treats planned investment expenditure as if it required the
-same input mix as a unit of physical output}, an explicit simplifying
-assumption (Section~3.3) rather than a derived capital-output
-relationship, and treats the full sectoral supply $O_i$ as available for
-investment before intermediate replacement and consumption demand are
-met --- overstating investable supply, in the same direction as, and
-compounding, the final-demand microfoundation gap noted above.
+by construction, verified directly rather than assumed. \emph{The
+rationing mechanism's demand term was also fixed}: an earlier draft
+applied $A_{ij}$ directly to planned investment \emph{expenditure}
+$\sigma_{c,j}S_j$, as if a unit of investment spending required the same
+input mix as a unit of physical output. Section~3.3's
+$\Delta x_j=\sigma_{c,j}S_j\cdot x_j/C_j$ resolves this by converting
+expenditure to an output-scale quantity via the sector's own
+capital-output ratio before $A_{ij}$ is applied to it. One simplification
+remains, disclosed rather than resolved: the full reconstructed $x_i$ is
+still treated as available for investment demand $D_i$ before
+intermediate replacement (already counted in $z_i$) and consumption and
+other final demand are met --- overstating investable supply, since no
+data source in the current pipeline provides sector-of-origin
+consumption baskets to net out. $D_i\le x_i$ should therefore be read as
+an upper bound on investable supply, not a fully netted reproduction
+balance (Section~3.3).
 
 \emph{Reproducibility is live-query reproducibility, not archival
 reproducibility.} Every result in this paper is produced by re-running

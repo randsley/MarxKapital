@@ -164,6 +164,24 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         end
     end
 
+    @testset "Admissibilidade da reconstrução de output bruto" begin
+        # Já admissível (todas as somas de coluna < 0.95): devolvida inalterada.
+        A_ok = [0.0 0.3; 0.2 0.0]
+        A_devolvida, reescalada = _garantir_admissibilidade_output(A_ok)
+        @test A_devolvida == A_ok
+        @test !reescalada
+
+        # Inadmissível (soma de coluna 2 = 1.3 > 0.95): reescalada até
+        # a maior soma de coluna ficar exatamente em 0.95.
+        A_má = [0.6 0.9; 0.3 0.4]  # colsums = [0.9, 1.3]
+        A_corrigida, reescalada2 = _garantir_admissibilidade_output(A_má)
+        @test reescalada2
+        @test maximum(vec(sum(A_corrigida, dims = 1))) ≈ 0.95 atol = 1e-9
+        # a reescala é uniforme (mesmo fator em toda a matriz)
+        fator = A_corrigida[1, 1] / A_má[1, 1]
+        @test A_corrigida ≈ A_má .* fator
+    end
+
     @testset "Agregação de matriz técnica (Leontief)" begin
         A = [0.1 0.2 0.3 0.4; 0.5 0.6 0.7 0.8; 0.1 0.1 0.1 0.1; 0.2 0.2 0.2 0.2]
         secções = ["a", "b", "c", "d"]
