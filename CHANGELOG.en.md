@@ -2,6 +2,8 @@
 
 *[🇵🇹 Ler em português](CHANGELOG.md)*
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705370.svg)](https://doi.org/10.5281/zenodo.21705370)
+
 Format based on Keep a Changelog. Semantic versioning.
 
 ## [0.6.1] — 2026-07-30
