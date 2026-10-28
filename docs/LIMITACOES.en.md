@@ -240,9 +240,26 @@ result's `fonte` (source) field.
 (Primary/Secondary/Tertiary). By default (`dados_setoriais=:fixo`), the
 sectoral split of GDP, employment, and capital stock uses **fixed
 per-country weights** hard-coded in `_dist_setorial_vab`,
-`_dist_setorial_emprego`, and `[0.10, 0.35, 0.55]`. These are
+`_dist_setorial_emprego`, and `_dist_setorial_stock`. These are
 approximations; countries without a specific profile fall back to the EU
-average profile.
+average profile. Since value added, compensation and CCF are split by the
+same weights, `e` comes out equal in all three sectors; only `k` differs.
+
+**Fixed (fixed weights):** this path deducted 10% of each sector's capital
+stock as depreciation, instead of AMECO's real CCF (the same error as item
+9), and split the stock by `[0.10, 0.35, 0.55]`, which gave the Primary
+sector 12–17 times its value added in capital. Together these made net
+income negative in the Primary sector (and, with synthetic data, in the
+Secondary too): `e` sat at the 0.1 floor while `r` was negative,
+inconsistent with `r = e/(k+1)`. The path now uses AMECO's CCF series
+(`UKCT`), split like value added (real sectoral CCF shares track value-added
+shares closely), and Eurostat capital-stock shares for Portugal,
+`[0.02, 0.16, 0.82]` (`NAMA_10_NFA_ST`, 2019/2022: 0.016 / 0.16 / 0.82; the
+Tertiary sector includes dwellings). `r` is computed as `e/(k+1)` from the
+floored `e`, and sectors hitting the floor are reported, as in the INE path
+(item 8). In `comparar_países_ameco`, the `PIB` and `Quota_Salarial` columns
+actually measured capital advanced `Σ(C+V)` and `ΣV/Σ(C+V)`; they now
+measure value added and `ΣV/ΣVAB`.
 
 **Fixed (optional):** `dados_setoriais=:eurostat` uses **real** VAB,
 compensation, consumption of fixed capital, employment, GFCF, and

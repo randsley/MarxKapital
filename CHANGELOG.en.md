@@ -22,6 +22,20 @@ Format based on Keep a Changelog. Semantic versioning.
   `notebooks/limpar_saidas.jl` keeps only the PNG of each plot in the
   committed outputs.
 
+### Fixed
+- **AMECO calibration with fixed weights** (`calibrar_com_dados_ameco`,
+  `dados_setoriais=:fixo`, the default path): it deducted 10% of the capital
+  stock as depreciation instead of AMECO's real CCF, and split the stock by
+  `[0.10, 0.35, 0.55]`, which gave negative profit rates in the Primary
+  sector (and in the Secondary with synthetic data), with `e` at the 0.1
+  floor. It now uses the `UKCT` series, split like value added, and
+  Eurostat capital-stock shares (`[0.02, 0.16, 0.82]`); `r = e/(k+1)` from
+  the floored `e`, and sectors at the floor are reported. See
+  `docs/LIMITACOES.en.md` item 4.
+- `comparar_países_ameco`: the `PIB` and `Quota_Salarial` columns measured
+  capital advanced `Σ(C+V)` and `ΣV/Σ(C+V)`; they now measure value added
+  and `ΣV/ΣVAB`.
+
 ## [0.8.0] — 2026-10-28
 
 DOI of this version (Zenodo): [10.5281/zenodo.23735182](https://doi.org/10.5281/zenodo.23735182). To cite all versions, use the concept DOI above.

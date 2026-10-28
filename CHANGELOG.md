@@ -22,6 +22,18 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   `notebooks/limpar_saidas.jl` deixa só o PNG de cada gráfico nas saídas
   gravadas.
 
+### Corrigido
+- **Calibração AMECO com pesos fixos** (`calibrar_com_dados_ameco`,
+  `dados_setoriais=:fixo`, o caminho por omissão): deduzia como depreciação
+  10% do stock de capital em vez do CCF real da AMECO, e repartia o stock
+  por `[0.10, 0.35, 0.55]`, o que dava taxas de lucro negativas no Primário
+  (e no Secundário com dados sintéticos), com `e` no piso 0.1. Usa agora a
+  série `UKCT`, repartida como o VAB, e quotas de stock do Eurostat
+  (`[0.02, 0.16, 0.82]`); `r = e/(k+1)` com o `e` já com piso, e os setores
+  no piso são reportados. Ver `docs/LIMITACOES.md` item 4.
+- `comparar_países_ameco`: as colunas `PIB` e `Quota_Salarial` mediam o
+  capital adiantado `Σ(C+V)` e `ΣV/Σ(C+V)`; medem agora o VAB e `ΣV/ΣVAB`.
+
 ## [0.8.0] — 2026-10-28
 
 DOI desta versão (Zenodo): [10.5281/zenodo.23735182](https://doi.org/10.5281/zenodo.23735182). Para citar todas as versões, use o DOI conceptual acima.

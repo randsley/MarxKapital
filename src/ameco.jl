@@ -152,6 +152,11 @@ function _dist_setorial_emprego(código_país)
     código_país == "PT" ? [0.04, 0.24, 0.72] : [0.03, 0.26, 0.71]
 end
 
+"""Distribuição setorial (macro: 3 setores) do stock de capital líquido.
+Quotas do Eurostat para Portugal (`NAMA_10_NFA_ST`, 2019/2022: ≈ 0.016 /
+0.16 / 0.82), usadas para todos os países: o Terciário inclui a habitação."""
+_dist_setorial_stock(código_país) = [0.02, 0.16, 0.82]
+
 """Soma valores setoriais (secção NACE → valor) por grupo de secções."""
 function _somar_por_grupo(valores::Dict{String, Float64}, grupos::Vector{Vector{String}})
     [sum(get(valores, s, 0.0) for s in secções) for secções in grupos]
@@ -275,9 +280,18 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
         VAB           = PIB_total * dist_VAB
         emprego       = emprego_tot * dist_emp
         remunerações  = remun_tot * dist_VAB
-        stock_capital = stock_tot * [0.10, 0.35, 0.55]
+        stock_capital = stock_tot * _dist_setorial_stock(dados.código_país)
         FBCF_setorial = FBCF_total * dist_VAB
-        CCF           = stock_capital * 0.10
+        # CCF real da AMECO (UKCT), repartido como o VAB (as quotas setoriais
+        # reais do CCF seguem de perto as do VAB); só sem série se recorre a
+        # uma taxa de depreciação típica sobre o stock.
+        CCF_total = dados.CCF[idx]
+        if isfinite(CCF_total) && CCF_total > 0
+            CCF = CCF_total * dist_VAB
+        else
+            @warn "CCF AMECO indisponível em $ano; a usar 6% do stock de capital."
+            CCF = stock_capital * 0.06
+        end
     end
 
     V = remunerações
@@ -285,9 +299,15 @@ function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symb
     EBE = VAB .- remunerações
     rendimento = EBE .- CCF
 
-    e = max.(rendimento ./ remunerações, 0.1)
+    # Piso em e, como em estimar_parametros_setoriais (docs/LIMITACOES.md item 8),
+    # e r = e/(k+1) a partir do e já com piso, para os parâmetros ficarem coerentes.
+    e_bruto = rendimento ./ remunerações
+    e = max.(e_bruto, 0.1)
+    n_saturados = count(e_bruto .< 0.1)
+    n_saturados > 0 && println("  ⚠ e saturado no piso 0.1 em $n_saturados/$N setores " *
+                               "(taxa de mais-valia < 0.1 antes do piso)")
     k = C ./ V
-    r = rendimento ./ (C .+ V)
+    r = e ./ (k .+ 1)
 
     println("\n📐 Parâmetros marxianos:")
     for i in 1:N
@@ -351,11 +371,11 @@ function comparar_países_ameco(países::Vector{String}; ano = 2022, método = :
 
     df = DataFrame(
         País = [r.país for r in resultados],
-        PIB = [round(sum(r.params.C .+ r.params.V) / 1000, digits = 1) for r in resultados],
+        PIB = [round(sum(r.params.VAB) / 1000, digits = 1) for r in resultados],   # mil M
         Taxa_Exploração = [round(mean(r.params.e), digits = 2) for r in resultados],
         Comp_Orgânica = [round(mean(r.params.k), digits = 2) for r in resultados],
         Taxa_Lucro = [round(mean(r.params.r) * 100, digits = 2) for r in resultados],
-        Quota_Salarial = [round(sum(r.params.V) / sum(r.params.C .+ r.params.V) * 100, digits = 1) for r in resultados],
+        Quota_Salarial = [round(sum(r.params.V) / sum(r.params.VAB) * 100, digits = 1) for r in resultados],
     )
     println("\n", df)
 

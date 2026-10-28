@@ -236,8 +236,25 @@ silenciosamente a **dados sintéticos** (com aviso). Verifique sempre o campo
 (Primário/Secundário/Terciário). Por omissão (`dados_setoriais=:fixo`), a
 repartição do PIB, do emprego e do stock de capital por setor usa **pesos
 fixos por país** codificados em `_dist_setorial_vab`,
-`_dist_setorial_emprego` e `[0.10, 0.35, 0.55]`. São aproximações; países
-sem perfil específico caem no perfil médio da UE.
+`_dist_setorial_emprego` e `_dist_setorial_stock`. São aproximações; países
+sem perfil específico caem no perfil médio da UE. Como VAB, remunerações e
+CCF se repartem pelos mesmos pesos, `e` sai igual nos três setores; só `k`
+difere.
+
+**Corrigido (pesos fixos):** este caminho deduzia como depreciação 10% do
+stock de capital de cada setor, em vez do CCF real da AMECO (o mesmo erro do
+item 9), e repartia o stock por `[0.10, 0.35, 0.55]`, que dava ao Primário
+12–17 vezes o seu VAB em capital. Com os dois, o rendimento líquido saía
+negativo no Primário (e, com dados sintéticos, também no Secundário): `e`
+ficava no piso 0.1 e `r` negativo, incoerente com `r = e/(k+1)`. Agora usa-se
+a série de CCF da AMECO (`UKCT`), repartida como o VAB (as quotas setoriais
+reais do CCF seguem de perto as do VAB), e quotas de stock do Eurostat para
+Portugal, `[0.02, 0.16, 0.82]` (`NAMA_10_NFA_ST`, 2019/2022: 0.016 / 0.16 /
+0.82; o Terciário inclui a habitação). `r` calcula-se com `e/(k+1)` a partir
+do `e` com piso, e os setores que saturam no piso são reportados, como no
+caminho INE (item 8). Em `comparar_países_ameco`, as colunas `PIB` e
+`Quota_Salarial` mediam afinal o capital adiantado `Σ(C+V)` e `ΣV/Σ(C+V)`;
+medem agora o VAB e `ΣV/ΣVAB`.
 
 **Corrigido (opcional):** `dados_setoriais=:eurostat` usa VAB, remunerações,
 consumo de capital fixo, emprego, FBCF e stock de capital **reais** do

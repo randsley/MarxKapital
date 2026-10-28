@@ -265,6 +265,15 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test all(dados.PIB .> 0)
         params, _ = calibrar_com_ameco_v2("Portugal", ano = 2022, método = :sintético)
         @test params.N == 3
+        # pesos fixos: CCF da série AMECO (não 10% do stock) e quotas de stock
+        # plausíveis dão excedente líquido positivo em todos os setores
+        @test all(params.e .> 0.1)
+        @test all(params.r .> 0)
+        @test params.r ≈ params.e ./ (params.k .+ 1)
+        @test sum(params.δ .* params.C) ≈ dados.CCF[end]
+        comp = comparar_países_ameco(["Portugal", "Grécia"], ano = 2022)
+        @test all(0 .< comp.tabela.Quota_Salarial .< 100)
+        @test comp.tabela.PIB[1] ≈ round(dados.PIB[end] / 1000, digits = 1)
     end
 
     @testset "Série temporal AMECO — valorização consistente vs. corrente" begin
