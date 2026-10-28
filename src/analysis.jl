@@ -1,13 +1,13 @@
 # ============================================================================
-# ANÁLISE: TAXAS DE LUCRO, VALORES-TRABALHO E PREÇOS DE PRODUÇÃO
+# ANALYSIS: PROFIT RATES, LABOR VALUES AND PRODUCTION PRICES
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-# Métricas ao longo do tempo
+# Metrics over time
 # ----------------------------------------------------------------------------
 
-"""Taxas de lucro por setor ao longo do tempo (matriz N × T)."""
-function calcular_taxas_lucro(sol, e)
+"""Sectoral profit rates over time (N × T matrix)."""
+function compute_profit_rates(sol, e)
     N = length(e)
     T = length(sol.t)
     r = zeros(N, T)
@@ -21,13 +21,13 @@ function calcular_taxas_lucro(sol, e)
 end
 
 """
-Taxas de lucro por setor ao longo do tempo, com capital constante valorizado
-a preços de produção de Sraffa (matriz N × T). Usa a mesma lógica de
-`sistema_Ndept_io!` (ver `src/nucleo.jl`) para reproduzir, fora da EDO, a taxa
-de lucro `rᵢ` que a dinâmica acoplada usa internamente. Requer `p` com os
-campos `e, A, l, R_max, w` (ver `simular_Ndept_customizado(..., acoplado=true)`).
+Sectoral profit rates over time, with constant capital valued at Sraffian
+production prices (N × T matrix). Uses the same logic as `system_Ndept_io!`
+(see `src/core.jl`) to reproduce, outside the ODE, the profit rate `rᵢ` that
+the coupled dynamics uses internally. Needs `p` with the fields
+`e, A, l, R_max, w` (see `simulate_Ndept_custom(..., coupled=true)`).
 """
-function calcular_taxas_lucro_precos(sol, p)
+function compute_price_profit_rates(sol, p)
     N = length(p.e)
     T = length(sol.t)
     r = zeros(N, T)
@@ -36,13 +36,13 @@ function calcular_taxas_lucro_precos(sol, p)
         V = sol[N+1:2N, idx]
         S = p.e .* V
 
-        r[:, idx] = _taxas_lucro_io(C, V, S, p)
+        r[:, idx] = _io_profit_rates(C, V, S, p)
     end
     return r
 end
 
-"""Composições orgânicas por setor ao longo do tempo (matriz N × T)."""
-function calcular_composicoes_organicas(sol)
+"""Sectoral organic compositions over time (N × T matrix)."""
+function compute_organic_compositions(sol)
     N = Int(length(sol.u[1]) / 2)
     T = length(sol.t)
     k = zeros(N, T)
@@ -54,218 +54,218 @@ function calcular_composicoes_organicas(sol)
     return k
 end
 
-"""Taxa média (agregada) de lucro ao longo do tempo (vetor de comprimento T)."""
-function calcular_taxa_media_lucro(sol, e)
+"""Average (aggregate) profit rate over time (vector of length T)."""
+function compute_average_profit_rate(sol, e)
     N = length(e)
     T = length(sol.t)
-    r_media = zeros(T)
+    r_mean = zeros(T)
     for idx in 1:T
         C = sol[1:N, idx]
         V = sol[N+1:2N, idx]
         S = e .* V
-        r_media[idx] = sum(S) / (sum(C) + sum(V))
+        r_mean[idx] = sum(S) / (sum(C) + sum(V))
     end
-    return r_media
+    return r_mean
 end
 
-"""Gráfico da dispersão (desvio-padrão) das taxas de lucro ao longo do tempo."""
-function analisar_convergencia(sol, depts, p)
-    r = calcular_taxas_lucro(sol, p.e)
+"""Plot of the dispersion (standard deviation) of profit rates over time."""
+function analyze_convergence(sol, depts, p)
+    r = compute_profit_rates(sol, p.e)
     σ_r = [std(r[:, i]) for i in 1:size(r, 2)]
     plot(sol.t, σ_r,
-         xlabel = "Tempo", ylabel = "Desvio-padrão das taxas de lucro",
-         title = "Convergência das taxas de lucro", lw = 2, legend = false)
+         xlabel = "Time", ylabel = "Standard deviation of profit rates",
+         title = "Convergence of profit rates", lw = 2, legend = false)
 end
 
 """
-Verifica a condição de equilíbrio intersetorial do esquema clássico de 2
-departamentos: V1+(1-σc1)S1 = C2+σc2·S2. `C1`,`C2` denotam aqui, tal como no
-esquema clássico de Marx, o capital constante \\emph{consumido/transferido}
-no período (não o stock avançado) — a magnitude que precisa de ser
-substituída por compras ao Departamento I."""
-function verificar_equilibrio_2dept(C1, V1, C2, V2, e1, e2, σ_c1, σ_c2)
+Checks the intersectoral equilibrium condition of the classic 2-department
+scheme: V1+(1-σc1)S1 = C2+σc2·S2. `C1`,`C2` stand here, as in Marx's classic
+scheme, for the constant capital \\emph{used up/transferred} in the period
+(not the advanced stock), the magnitude that has to be replaced by purchases
+from Department I."""
+function check_equilibrium_2dept(C1, V1, C2, V2, e1, e2, σ_c1, σ_c2)
     S1 = e1 * V1
     S2 = e2 * V2
-    lado_esq = V1 + (1 - σ_c1) * S1
-    lado_dir = C2 + σ_c2 * S2
-    deseq = lado_esq - lado_dir
-    return (equilibrio = abs(deseq) < 0.01, desequilibrio = deseq,
-            lado_esquerdo = lado_esq, lado_direito = lado_dir)
+    lhs = V1 + (1 - σ_c1) * S1
+    rhs = C2 + σ_c2 * S2
+    diseq = lhs - rhs
+    return (equilibrium = abs(diseq) < 0.01, disequilibrium = diseq,
+            lhs = lhs, rhs = rhs)
 end
 
 """
-    verificar_equilibrio_Ndept(sol, p; t_idx=length(sol.t))
+    check_equilibrium_Ndept(sol, p; t_idx=length(sol.t))
 
-Generalização a N setores de `verificar_equilibrio_2dept`: verifica a
-posteriori (não realimenta a dinâmica — tal como a versão de 2 departamentos
-não realimenta `sistema_2dept!`) se os níveis de output correntes conseguem
-sustentar a procura intermédia implícita na matriz técnica `p.A`.
+Generalization of `check_equilibrium_2dept` to N sectors. It checks after
+the fact (it does not feed back into the dynamics, just as the 2-department
+version does not feed back into `system_2dept!`) whether current output
+levels can sustain the intermediate demand implied by the technical matrix
+`p.A`.
 
-Para o instante `t_idx` (por omissão, o último), reconstrói primeiro o
-fluxo tipo valor-acrescentado `Wᵢ = δᵢCᵢ+Vᵢ+Sᵢ` (capital constante
-\emph{transferido}, δᵢCᵢ — não o stock Cᵢ; ver `capital_transferido`/
-`valor_produto` em `estruturas.jl`) e depois o output bruto genuíno
-`xᵢ = Wᵢ/(1-Σⱼ A[j,i])` a partir da identidade custo-output do modelo
-(mesma reconstrução usada em `sistema_Ndept_io!`, `src/nucleo.jl`) —
-`Wᵢ` sozinho omite o consumo intermédio circulante e não é diretamente
-comparável a `(A··)ᵢ`, que é procura de input por unidade de output
-bruto. Com `xᵢ`, calcula-se a procura intermédia `(A·x)ᵢ`; devolve o
-desvio por setor (`xᵢ − (A·x)ᵢ`, positivo quando o setor produz mais do
-que a economia precisa dele como input, negativo quando produz menos) e
-a razão de realização agregada `ρ_real = Σ min(xᵢ,(A·x)ᵢ) / Σ(A·x)ᵢ`
-(≤ 1; = 1 sem estrangulamento). Usada por `sistema_Ndept_io!`
-(`realização=true`, `src/nucleo.jl`) como base do fator de amortecimento
-do reinvestimento — aqui exposta para inspecionar o resultado fora da
-EDO, à semelhança de `calcular_taxas_lucro_precos`.
+At time `t_idx` (the last one by default), it first rebuilds the
+value-added-type flow `Wᵢ = δᵢCᵢ+Vᵢ+Sᵢ` (constant capital
+\emph{transferred}, δᵢCᵢ, not the stock Cᵢ; see `transferred_capital`/
+`product_value` in `types.jl`) and then the genuine gross output
+`xᵢ = Wᵢ/(1-Σⱼ A[j,i])` from the model's cost-output identity (the same
+reconstruction used in `system_Ndept_io!`, `src/core.jl`). `Wᵢ` alone leaves
+out circulating intermediate consumption and is not directly comparable with
+`(A··)ᵢ`, which is input demand per unit of gross output. With `xᵢ` it
+computes intermediate demand `(A·x)ᵢ` and returns the deviation per sector
+(`xᵢ − (A·x)ᵢ`, positive when the sector produces more than the economy needs
+from it as an input, negative when it produces less) and the aggregate
+realization ratio `ρ_real = Σ min(xᵢ,(A·x)ᵢ) / Σ(A·x)ᵢ` (≤ 1; = 1 with no
+bottleneck). `system_Ndept_io!` (`realization=true`, `src/core.jl`) uses it as
+the basis of the reinvestment damping factor; it is exposed here so the
+result can be inspected outside the ODE, like `compute_price_profit_rates`.
 """
-function verificar_equilibrio_Ndept(sol, p; t_idx = length(sol.t))
+function check_equilibrium_Ndept(sol, p; t_idx = length(sol.t))
     N = length(p.e)
     X = sol.u[t_idx]
     C = X[1:N]
     V = X[N+1:2N]
     S = p.e .* V
     W = p.δ .* C .+ V .+ S
-    # A admissibilidade (Σᵢ A[i,j]<1 para todo j) é garantida uma única vez
-    # quando a simulação é montada (`_garantir_admissibilidade_output`,
-    # `src/nucleo.jl`), não reclamada aqui — ver `sistema_Ndept_io!`.
+    # Admissibility (Σᵢ A[i,j]<1 for every j) is ensured once, when the
+    # simulation is set up (`_ensure_output_admissibility`, `src/core.jl`),
+    # and is not re-checked here; see `system_Ndept_io!`.
     colsum = vec(sum(p.A, dims = 1))
     O = W ./ (1 .- colsum)
-    procura_intermédia = p.A * O
-    desvio = O .- procura_intermédia
-    soma_procura = sum(procura_intermédia)
-    ρ_real = soma_procura > 0 ? sum(min.(O, procura_intermédia)) / soma_procura : 1.0
-    return (equilibrio = ρ_real > 0.95, ρ_real = ρ_real, desvio = desvio,
-            output = O, procura_intermédia = procura_intermédia)
+    intermediate_demand = p.A * O
+    deviation = O .- intermediate_demand
+    demand_sum = sum(intermediate_demand)
+    ρ_real = demand_sum > 0 ? sum(min.(O, intermediate_demand)) / demand_sum : 1.0
+    return (equilibrium = ρ_real > 0.95, ρ_real = ρ_real, deviation = deviation,
+            output = O, intermediate_demand = intermediate_demand)
 end
 
 # ----------------------------------------------------------------------------
-# Valores-trabalho e preços de produção
+# Labor values and production prices
 # ----------------------------------------------------------------------------
 
 """
-    calcular_valores_trabalho(A, l)
+    compute_labor_values(A, l)
 
-Valores-trabalho λ = (I − A)⁻¹ · l. Requer economia produtiva (ρ(A) < 1).
+Labor values λ = (I − A)⁻¹ · l. Requires a productive economy (ρ(A) < 1).
 """
-function calcular_valores_trabalho(A, l)
+function compute_labor_values(A, l)
     N = size(A, 1)
-    Id = matriz_identidade(N)
+    Id = identity_matrix(N)
     ρ_A = maximum(abs.(eigvals(A)))
-    ρ_A >= 1.0 && error("Matriz não produtiva! ρ(A) = $ρ_A ≥ 1")
+    ρ_A >= 1.0 && error("Matrix is not productive! ρ(A) = $ρ_A ≥ 1")
     λ = (Id - A) \ l
-    any(λ .< 0) && @warn "Valores-trabalho negativos detetados"
+    any(λ .< 0) && @warn "Negative labor values detected"
     return λ
 end
 
 """
-    calcular_taxa_lucro_maxima(A, l)
+    compute_max_profit_rate(A, l)
 
-Taxa máxima de lucro (salários = 0): R_max = 1/λ_max(Aᵀ) − 1.
+Maximum profit rate (wages = 0): R_max = 1/λ_max(Aᵀ) − 1.
 """
-function calcular_taxa_lucro_maxima(A, l)
+function compute_max_profit_rate(A, l)
     λ_max = maximum(real.(eigvals(A')))
     return (1 / λ_max) - 1
 end
 
 """
-    calcular_precos_producao(A, l, w, r_barra)
+    compute_production_prices(A, l, w, r_bar)
 
-Preços de produção de Sraffa: p = w(1+r̄)[I − (1+r̄)Aᵀ]⁻¹ · l.
-Rejeita r̄ que torne o sistema singular (r̄ ≥ R_max).
+Sraffian production prices: p = w(1+r̄)[I − (1+r̄)Aᵀ]⁻¹ · l.
+Rejects any r̄ that makes the system singular (r̄ ≥ R_max).
 """
-function calcular_precos_producao(A, l, w, r_barra)
+function compute_production_prices(A, l, w, r_bar)
     N = size(A, 1)
-    Id = matriz_identidade(N)
-    fator = 1 + r_barra
-    matriz = Id - fator * A'
-    R_max = calcular_taxa_lucro_maxima(A, l)
-    if r_barra >= R_max || abs(det(matriz)) < 1e-10
-        error("Sistema singular para r̄=$r_barra. Taxa máxima R_max=$(round(R_max, digits=3))")
+    Id = identity_matrix(N)
+    factor = 1 + r_bar
+    matrix = Id - factor * A'
+    R_max = compute_max_profit_rate(A, l)
+    if r_bar >= R_max || abs(det(matrix)) < 1e-10
+        error("Singular system for r̄=$r_bar. Maximum rate R_max=$(round(R_max, digits=3))")
     end
-    p = w * fator * (matriz \ l)
-    any(p .< 0) && @warn "Preços negativos para r̄=$r_barra"
+    p = w * factor * (matrix \ l)
+    any(p .< 0) && @warn "Negative prices for r̄=$r_bar"
     return p
 end
 
 """
-    problema_transformacao(N=3)
+    transformation_problem(N=3)
 
-Analisa o problema da transformação de valores em preços, para várias taxas
-de lucro, e produz a visualização comparativa.
+Analyzes the transformation of values into prices for several profit rates
+and draws the comparison plots.
 """
-function problema_transformacao(N = 3)
+function transformation_problem(N = 3)
     println("\n" * "="^70)
-    println("PROBLEMA DA TRANSFORMAÇÃO DE VALORES EM PREÇOS")
+    println("TRANSFORMATION OF VALUES INTO PRICES")
     println("="^70)
 
-    A = criar_matriz_tecnica(N, densidade = 0.5)
+    A = create_technical_matrix(N, density = 0.5)
     l = 0.3 .+ rand(N) * 0.3
 
-    λ = calcular_valores_trabalho(A, l)
+    λ = compute_labor_values(A, l)
     λ_norm = λ / sum(λ)
     w = 1.0
-    R_max = calcular_taxa_lucro_maxima(A, l)
-    println("\nTaxa máxima de lucro: $(round(R_max*100, digits=1))%")
+    R_max = compute_max_profit_rate(A, l)
+    println("\nMaximum profit rate: $(round(R_max*100, digits=1))%")
 
-    taxas_lucro = [0.0, 0.1, 0.2, 0.3, min(0.4, R_max * 0.9)]
-    resultados = []
-    for r_barra in taxas_lucro
-        p = calcular_precos_producao(A, l, w, r_barra)
+    profit_rates = [0.0, 0.1, 0.2, 0.3, min(0.4, R_max * 0.9)]
+    results = []
+    for r_bar in profit_rates
+        p = compute_production_prices(A, l, w, r_bar)
         p_norm = p / sum(p)
-        desvios = (p_norm - λ_norm) ./ λ_norm * 100
-        push!(resultados, (r = r_barra, p = p_norm, desvios = desvios))
+        deviations = (p_norm - λ_norm) ./ λ_norm * 100
+        push!(results, (r = r_bar, p = p_norm, deviations = deviations))
     end
 
-    println("\nMatriz Técnica A:")
+    println("\nTechnical Matrix A:")
     display(round.(A, digits = 3))
-    println("\n\nValores-Trabalho λ (normalizados):")
+    println("\n\nLabor Values λ (normalized):")
     display(round.(λ_norm, digits = 4))
-    println("\n\nAnálise por Taxa de Lucro:")
+    println("\n\nAnalysis by Profit Rate:")
     println("-"^70)
-    for res in resultados
+    for res in results
         println("\nr̄ = $(round(res.r*100, digits=1))%")
-        println("Desvios (%): ", round.(res.desvios, digits = 2))
+        println("Deviations (%): ", round.(res.deviations, digits = 2))
     end
 
-    r_medio_idx = findfirst(x -> x.r ≈ 0.3, resultados)
-    if !isnothing(r_medio_idx)
-        res_medio = resultados[r_medio_idx]
+    r_mean_idx = findfirst(x -> x.r ≈ 0.3, results)
+    if !isnothing(r_mean_idx)
+        res_mean = results[r_mean_idx]
         x = 1:N
-        largura = 0.35
+        col_width = 0.35
 
-        p1 = bar(x .- largura/2, λ_norm, bar_width = largura,
-                 label = "Valores-Trabalho", ylabel = "Proporção",
-                 title = "Comparação Normalizada", color = :blue, alpha = 0.7)
-        bar!(x .+ largura/2, res_medio.p, bar_width = largura,
-             label = "Preços de Produção", color = :red, alpha = 0.7)
+        p1 = bar(x .- col_width/2, λ_norm, bar_width = col_width,
+                 label = "Labor Values", ylabel = "Share",
+                 title = "Normalized Comparison", color = :blue, alpha = 0.7)
+        bar!(x .+ col_width/2, res_mean.p, bar_width = col_width,
+             label = "Production Prices", color = :red, alpha = 0.7)
 
-        p2 = bar(x, res_medio.desvios, xlabel = "Departamento",
-                 ylabel = "Desvio (%)", title = "Desvios Percentuais",
+        p2 = bar(x, res_mean.deviations, xlabel = "Department",
+                 ylabel = "Deviation (%)", title = "Percentage Deviations",
                  legend = false,
-                 color = ifelse.(res_medio.desvios .> 0, :red, :blue), alpha = 0.7)
+                 color = ifelse.(res_mean.deviations .> 0, :red, :blue), alpha = 0.7)
         hline!([0], color = :black, linestyle = :dash, label = "")
 
-        p3 = plot(xlabel = "Taxa de Lucro r̄", ylabel = "Desvio Médio Absoluto (%)",
-                  title = "Divergência Valores-Preços", legend = false)
-        r_values = [res.r for res in resultados]
-        desvios_médios = [mean(abs.(res.desvios)) for res in resultados]
-        plot!(r_values, desvios_médios, marker = :circle, markersize = 6,
+        p3 = plot(xlabel = "Profit Rate r̄", ylabel = "Mean Absolute Deviation (%)",
+                  title = "Value-Price Divergence", legend = false)
+        r_values = [res.r for res in results]
+        mean_deviations = [mean(abs.(res.deviations)) for res in results]
+        plot!(r_values, mean_deviations, marker = :circle, markersize = 6,
               lw = 2, color = :purple)
 
-        p4 = scatter(λ_norm, res_medio.p, xlabel = "Valores-Trabalho (norm.)",
-                     ylabel = "Preços de Produção (norm.)",
-                     title = "Correlação Valores-Preços", label = "",
+        p4 = scatter(λ_norm, res_mean.p, xlabel = "Labor Values (norm.)",
+                     ylabel = "Production Prices (norm.)",
+                     title = "Value-Price Correlation", label = "",
                      markersize = 8, alpha = 0.7)
-        max_val = maximum([λ_norm; res_medio.p])
+        max_val = maximum([λ_norm; res_mean.p])
         plot!([0, max_val], [0, max_val], linestyle = :dash, color = :black,
-              label = "Igualdade", lw = 2)
-        ρ = cor(λ_norm, res_medio.p)
+              label = "Equality", lw = 2)
+        ρ = cor(λ_norm, res_mean.p)
         annotate!(max_val * 0.7, max_val * 0.2, text("ρ = $(round(ρ, digits=3))", 12))
 
         combined = plot(p1, p2, p3, p4, layout = (2, 2), size = (1200, 900))
         display(combined)
 
-        return (A = A, l = l, λ = λ_norm, resultados = resultados,
-                plot = combined, R_max = R_max, correlação = ρ)
+        return (A = A, l = l, λ = λ_norm, results = results,
+                plot = combined, R_max = R_max, correlation = ρ)
     end
 end

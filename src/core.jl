@@ -1,66 +1,66 @@
 # ============================================================================
-# NÚCLEO: MATRIZES, DEPARTAMENTOS, SISTEMAS DINÂMICOS E SIMULAÇÃO
+# CORE: MATRICES, DEPARTMENTS, DYNAMICAL SYSTEMS AND SIMULATION
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-# Auxiliares matemáticos
+# Math helpers
 # ----------------------------------------------------------------------------
 
-"""Cria matriz identidade N×N (evita a constante `I` do LinearAlgebra)."""
-matriz_identidade(N::Int) = diagm(ones(N))
+"""Creates an N×N identity matrix (avoids LinearAlgebra's `I` constant)."""
+identity_matrix(N::Int) = diagm(ones(N))
 
 """
-    criar_matriz_tecnica(N; densidade=0.3, max_coef=0.15,
-                         estrutura=:aleatoria, seed=nothing)
+    create_technical_matrix(N; density=0.3, max_coef=0.15,
+                         structure=:random, seed=nothing)
 
-Cria uma matriz técnica input-output A (N×N) com raio espectral < 1.
+Creates an input-output technical matrix A (N×N) with spectral radius < 1.
 
 # Estruturas
-- `:aleatoria`  — ligações aleatórias
-- `:triangular` — hierárquica (setores iniciais → finais)
-- `:blocos`     — clusters com ligações inter-bloco fracas
+- `:random`  — random links
+- `:triangular` — hierarchical (upstream → downstream sectors)
+- `:blocks`     — clusters with weak inter-block links
 
-Passar `seed` fixa a semente e torna a matriz reprodutível (recomendado
-sempre que se comparam cenários).
+Passing `seed` fixes the random seed and makes the matrix reproducible
+(recommended whenever scenarios are compared).
 """
-function criar_matriz_tecnica(N::Int; densidade = 0.3, max_coef = 0.15,
-                              estrutura = :aleatoria, seed = nothing)
+function create_technical_matrix(N::Int; density = 0.3, max_coef = 0.15,
+                              structure = :random, seed = nothing)
     isnothing(seed) || Random.seed!(seed)
 
     A = zeros(N, N)
 
-    if estrutura == :aleatoria
+    if structure == :random
         for i in 1:N, j in 1:N
-            rand() < densidade && (A[i, j] = rand() * max_coef)
+            rand() < density && (A[i, j] = rand() * max_coef)
         end
 
-    elseif estrutura == :triangular
+    elseif structure == :triangular
         for i in 1:N, j in i:N
-            rand() < densidade && (A[i, j] = rand() * max_coef)
+            rand() < density && (A[i, j] = rand() * max_coef)
         end
 
-    elseif estrutura == :blocos
-        n_blocos = max(2, N ÷ 3)
-        tamanho_bloco = N ÷ n_blocos
-        for bloco in 1:n_blocos
-            inicio = (bloco - 1) * tamanho_bloco + 1
-            fim = min(bloco * tamanho_bloco, N)
-            for i in inicio:fim, j in inicio:fim
-                rand() < densidade * 2 && (A[i, j] = rand() * max_coef)
+    elseif structure == :blocks
+        n_blocks = max(2, N ÷ 3)
+        block_size = N ÷ n_blocks
+        for block in 1:n_blocks
+            start = (block - 1) * block_size + 1
+            stop = min(block * block_size, N)
+            for i in start:stop, j in start:stop
+                rand() < density * 2 && (A[i, j] = rand() * max_coef)
             end
-            if bloco < n_blocos
-                prox_i = fim + 1
-                prox_f = min((bloco + 1) * tamanho_bloco, N)
-                for i in inicio:fim, j in prox_i:prox_f
-                    rand() < densidade * 0.5 && (A[i, j] = rand() * max_coef * 0.5)
+            if block < n_blocks
+                next_i = stop + 1
+                next_f = min((block + 1) * block_size, N)
+                for i in start:stop, j in next_i:next_f
+                    rand() < density * 0.5 && (A[i, j] = rand() * max_coef * 0.5)
                 end
             end
         end
     else
-        error("Estrutura '$estrutura' desconhecida (:aleatoria, :triangular, :blocos)")
+        error("Unknown structure '$structure' (:random, :triangular, :blocks)")
     end
 
-    # Garantir produtividade: ρ(A) < 1
+    # Ensure productivity: ρ(A) < 1
     ρ_A = maximum(abs.(eigvals(A)))
     ρ_A >= 1.0 && (A = A / ρ_A * 0.8)
 
@@ -68,67 +68,67 @@ function criar_matriz_tecnica(N::Int; densidade = 0.3, max_coef = 0.15,
 end
 
 """
-    _garantir_admissibilidade_output(A; margem=0.95)
+    _ensure_output_admissibility(A; margin=0.95)
 
-Reconstruir o output bruto a partir do fluxo tipo valor-acrescentado
-(`xⱼ = Wⱼ/(1-Σᵢ A[i,j])`, Equação 2 do artigo) exige `Σᵢ A[i,j] < 1` para
-todo `j` — condição de admissibilidade do modelo, não um pormenor
-numérico. `ρ(A)<1` (garantido por `criar_matriz_tecnica`) \\emph{não}
-implica isto: ρ(A) é um limite superior à maior soma de coluna, não um
-limite inferior, pelo que uma matriz produtiva no sentido de Leontief
-pode ainda assim ter uma coluna com soma ≥1.
+Reconstructing gross output from the value-added-type flow
+(`xⱼ = Wⱼ/(1-Σᵢ A[i,j])`, Equation 2 of the paper) requires `Σᵢ A[i,j] < 1`
+for every `j`. This is an admissibility condition of the model, not a
+numerical detail. `ρ(A)<1` (guaranteed by `create_technical_matrix`) does
+\\emph{not} imply it: ρ(A) is an upper bound on the largest column sum, not a
+lower bound, so a matrix that is productive in Leontief's sense can still
+have a column summing to ≥1.
 
-Esta condição só é válida quando `A` representa o requisito de input
-circulante \\emph{completo} de cada setor — verdadeiro por construção
-para as matrizes sintéticas fechadas usadas nas simulações dinâmicas
-(`criar_matriz_tecnica`), mas não necessariamente para uma matriz
-empírica de uso doméstico (que, por definição, omite inputs importados);
-por isso a reconstrução de `x` desta função nunca é aplicada à matriz
-real do Eurostat (`construir_matriz_io_eurostat`), só às matrizes
-sintéticas usadas pelas dinâmicas de `sistema_Ndept_io!`.
+The condition only holds when `A` is the \\emph{complete} circulating-input
+requirement of each sector. That is true by construction for the closed
+synthetic matrices used in the dynamic simulations
+(`create_technical_matrix`), but not necessarily for an empirical
+domestic-use matrix (which by definition leaves out imported inputs). This
+is why the reconstruction of `x` in this function is never applied to the
+real Eurostat matrix (`build_eurostat_io_matrix`), only to the synthetic
+matrices used by the `system_Ndept_io!` dynamics.
 
-Verifica a condição explicitamente em vez de a impor silenciosamente a
-cada avaliação do lado direito da EDO: se alguma soma de coluna exceder
-`margem`, reescala `A` inteira (mesma lógica de `criar_matriz_tecnica`
-para ρ(A)<1) até que a maior soma de coluna fique abaixo de `margem`,
-uma única vez, no início da simulação — não a cada passo do solver.
-Devolve `(A_admissível, foi_reescalada::Bool)`.
+The condition is checked explicitly rather than enforced silently at every
+evaluation of the ODE right-hand side: if some column sum exceeds `margin`,
+the whole of `A` is rescaled (same logic as `create_technical_matrix` uses
+for ρ(A)<1) until the largest column sum is below `margin`. This happens
+once, at the start of the simulation, not at every solver step.
+Returns `(A_admissible, was_rescaled::Bool)`.
 """
-function _garantir_admissibilidade_output(A; margem = 0.95)
+function _ensure_output_admissibility(A; margin = 0.95)
     colsum = vec(sum(A, dims = 1))
     maxcol = maximum(colsum)
-    maxcol < margem && return A, false
-    fator = margem / maxcol
-    @warn "Soma de coluna máxima de A ($(round(maxcol,digits=3))) excede $margem; " *
-          "reescalada por um fator $(round(fator,digits=3)) para garantir a condição " *
-          "de admissibilidade da reconstrução de output bruto (Equação 2)."
-    return A .* fator, true
+    maxcol < margin && return A, false
+    factor = margin / maxcol
+    @warn "Largest column sum of A ($(round(maxcol,digits=3))) exceeds $margin; " *
+          "rescaled by a factor of $(round(factor,digits=3)) to satisfy the " *
+          "admissibility condition of the gross-output reconstruction (Equation 2)."
+    return A .* factor, true
 end
 
 # ----------------------------------------------------------------------------
-# Criação de departamentos
+# Creating departments
 # ----------------------------------------------------------------------------
 
-"""Modelo clássico de Marx com 2 departamentos (meios de produção / consumo)."""
-function modelo_dois_departamentos()
-    dept1 = Departamento("Meios de Produção",
+"""Marx's classic 2-department model (means of production / means of consumption)."""
+function two_department_model()
+    dept1 = Department("Means of Production",
                          c = 4000.0, v = 1000.0, e = 1.0,
                          σ_c = 0.5, σ_v = 0.1, δ = 0.05)
-    dept2 = Departamento("Bens de Consumo",
+    dept2 = Department("Consumer Goods",
                          c = 2000.0, v = 500.0, e = 1.0,
                          σ_c = 0.3, σ_v = 0.15, δ = 0.05)
     return [dept1, dept2]
 end
 
 """
-    criar_departamentos(N, nomes=String[])
+    create_departments(N, name_list=String[])
 
-Cria N departamentos com parâmetros aleatórios mas plausíveis. A composição
-orgânica cresce com o índice do setor.
+Creates N departments with random but plausible parameters. The organic
+composition rises with the sector index.
 """
-function criar_departamentos(N::Int, nomes::Vector{String} = String[])
-    isempty(nomes) && (nomes = ["Dept_$i" for i in 1:N])
-    depts = Departamento[]
+function create_departments(N::Int, name_list::Vector{String} = String[])
+    isempty(name_list) && (name_list = ["Dept_$i" for i in 1:N])
+    depts = Department[]
     for i in 1:N
         k_base = 1.5 + (i / N) * 2.0
         c = 100.0 * k_base
@@ -137,18 +137,18 @@ function criar_departamentos(N::Int, nomes::Vector{String} = String[])
         σ_c = 0.4 + rand() * 0.3
         σ_v = 0.1 + rand() * 0.15
         δ = 0.03 + rand() * 0.05
-        push!(depts, Departamento(nomes[i], c = c, v = v, e = e,
+        push!(depts, Department(name_list[i], c = c, v = v, e = e,
                                   σ_c = σ_c, σ_v = σ_v, δ = δ))
     end
     return depts
 end
 
 # ----------------------------------------------------------------------------
-# Sistemas de equações diferenciais
+# Systems of differential equations
 # ----------------------------------------------------------------------------
 
-"""Sistema de EDOs para o modelo de 2 departamentos. Estado: [C1,V1,C2,V2]."""
-function sistema_2dept!(dX, X, p, t)
+"""ODE system for the 2-department model. State: [C1,V1,C2,V2]."""
+function system_2dept!(dX, X, p, t)
     C1, V1, C2, V2 = X
     e1, e2, σ_c1, σ_v1, σ_c2, σ_v2, δ1, δ2 = p
     S1 = e1 * V1
@@ -160,16 +160,16 @@ function sistema_2dept!(dX, X, p, t)
 end
 
 """
-    sistema_Ndept!(dX, X, p, t)
+    system_Ndept!(dX, X, p, t)
 
-Sistema de EDOs para N departamentos. Estado: [C1..CN, V1..VN].
+ODE system for N departments. State: [C1..CN, V1..VN].
 
-LIMITAÇÃO CONHECIDA: a acumulação de cada departamento depende apenas da
-sua própria mais-valia; a matriz técnica `p.A` é transportada nos parâmetros
-mas **não realimenta** a dinâmica. Ver `docs/LIMITACOES.md` (item 1) para a
-correção pendente que acopla os setores via A.
+KNOWN LIMITATION: each department's accumulation depends only on its own
+surplus value; the technical matrix `p.A` is carried in the parameters but
+**does not feed back** into the dynamics. See `docs/LIMITATIONS.md` (item 1)
+and the coupled version `system_Ndept_io!`, which links the sectors via A.
 """
-function sistema_Ndept!(dX, X, p, t)
+function system_Ndept!(dX, X, p, t)
     N = length(p.e)
     C = @view X[1:N]
     V = @view X[N+1:2N]
@@ -179,128 +179,127 @@ function sistema_Ndept!(dX, X, p, t)
 end
 
 """
-    sistema_Ndept_io!(dX, X, p, t)
+    system_Ndept_io!(dX, X, p, t)
 
-Sistema de EDOs para N departamentos, com a matriz técnica `p.A` a realimentar
-a dinâmica através de um termo de mobilidade de capital:
+ODE system for N departments, with the technical matrix `p.A` feeding back
+into the dynamics through a capital-mobility term:
 
     dCᵢ/dt = σ_c,ᵢ·Sᵢ − δᵢ·Cᵢ + μ·(rᵢ − r̄)·Cᵢ
 
-onde `rᵢ` é a taxa de lucro do setor i com o capital constante valorizado a
-preços de produção de Sraffa (que dependem de A), não pelo valor contabilístico
-nu. Para evitar a circularidade de usar r̄ para calcular preços que por sua vez
-definem r̄, a taxa de lucro que entra em `calcular_precos_producao` é a média
-não ponderada por preços (`r̄_naive`), fixada a um máximo de 95% de `p.R_max`
-para não colidir com a singularidade de Sraffa. Se mesmo assim o sistema de
-preços falhar (matriz mal condicionada), cai-se para preços = valores-trabalho
-(sem ajuste, π = 1).
+where `rᵢ` is the profit rate of sector i with constant capital valued at
+Sraffian production prices (which depend on A), not at bare book value. To
+avoid the circularity of using r̄ to compute prices that in turn define r̄,
+the profit rate passed to `compute_production_prices` is the
+non-price-weighted average (`r̄_naive`), capped at 95% of `p.R_max` so it
+stays clear of the Sraffian singularity. If the price system still fails
+(ill-conditioned matrix), prices fall back to labor values (no adjustment,
+π = 1).
 
-`r̄` (a taxa usada no termo de mobilidade, distinta de `r̄_naive` acima) é a
-média de `r` ponderada por `C` — não a razão agregada `ΣS/Σ(C+V)` — porque é
-a única escolha para a qual `Σᵢ μ(rᵢ-r̄)Cᵢ = 0` exatamente, garantindo que o
-termo de mobilidade realoca capital constante agregado entre setores em vez
-de o criar ou destruir (verificado por teste, `test/runtests.jl`,
-"Mobilidade de capital — conservação exata").
+`r̄` (the rate used in the mobility term, distinct from `r̄_naive` above) is
+the `C`-weighted mean of `r`, not the aggregate ratio `ΣS/Σ(C+V)`, because
+it is the only choice for which `Σᵢ μ(rᵢ-r̄)Cᵢ = 0` exactly. This guarantees
+that the mobility term reallocates aggregate constant capital between
+sectors instead of creating or destroying it (checked by a test,
+`test/runtests.jl`, "Capital mobility — exact conservation").
 
-Ver `docs/LIMITACOES.md` (item 1): esta é a versão opcional acoplada,
-selecionável com `acoplado=true` em `simular_Ndept`/`simular_Ndept_customizado`.
-`sistema_Ndept!` mantém-se como a versão "setores independentes".
+See `docs/LIMITATIONS.md` (item 1): this is the optional coupled version,
+selected with `coupled=true` in `simulate_Ndept`/`simulate_Ndept_custom`.
+`system_Ndept!` remains the "independent sectors" version.
 
-Se `p.realização == true`, acresce um segundo mecanismo, independente da
-mobilidade de capital: uma pressão de realização que trava o reinvestimento
-quando a estrutura técnica (`A`) não consegue suportar os níveis de output
-correntes. Define-se o output bruto por setor `Oᵢ = Cᵢ+Vᵢ+Sᵢ` e a procura
-intermédia implícita em A, `(A·O)ᵢ`; a razão de realização agregada
+If `p.realization == true`, a second mechanism is added, independent of
+capital mobility: a realization pressure that brakes reinvestment when the
+technical structure (`A`) cannot support current output levels. Gross
+output per sector is `Oᵢ = Cᵢ+Vᵢ+Sᵢ` and the intermediate demand implied by
+A is `(A·O)ᵢ`; the aggregate realization ratio
 
     ρ_real = Σᵢ min(Oᵢ, (A·O)ᵢ) / Σᵢ (A·O)ᵢ
 
-mede que fração da procura intermédia agregada os outputs correntes
-conseguem cobrir (≤ 1; = 1 quando não há estrangulamento). O reinvestimento
-planeado (`σ_c,ᵢ·Sᵢ`) é escalado por `min(ρ_real, 1)` — uma aproximação
-agregada, a mesma escala para todos os setores.
+measures what fraction of aggregate intermediate demand current outputs can
+cover (≤ 1; = 1 when there is no bottleneck). Planned reinvestment
+(`σ_c,ᵢ·Sᵢ`) is scaled by `min(ρ_real, 1)`. This is an aggregate
+approximation: the same scale applies to every sector.
 
-Se `p.racionamento == true` (tem precedência sobre `p.realização`), usa-se
-em vez disso um racionamento **por setor**, via `_resolver_racionamento`:
-ver a sua docstring para o mecanismo (racionamento de quantidades à
-Bénassy/Barro-Grossman, com tecnologia Leontief). Ambos os mecanismos ficam
-uma EDO comum — não introduzem variáveis de estado novas nem exigem um
-solver de equações algébrico-diferenciais (DAE): o racionamento é resolvido
-por iteração de ponto fixo dentro do próprio cálculo do lado direito, tal
-como os preços de Sraffa já o são. Nenhum dos dois impõe realização exata
-por via de restrições algébricas geridas pelo solver; ver
-`verificar_equilibrio_Ndept` (`src/analise.jl`) para uma verificação a
-posteriori mais detalhada, e `docs/LIMITACOES.md` item 1 para a fronteira de
-alcance explícita desta aproximação.
+If `p.rationing == true` (takes precedence over `p.realization`), exact
+**per-sector** rationing is used instead, via `_solve_rationing`; see its
+docstring for the mechanism (Bénassy/Barro-Grossman quantity rationing with
+Leontief technology). Both mechanisms remain an ordinary ODE: they add no
+new state variables and need no differential-algebraic (DAE) solver. The
+rationing is solved by fixed-point iteration inside the right-hand side
+itself, just as the Sraffian prices already are. Neither imposes exact
+realization through algebraic constraints handled by the solver; see
+`check_equilibrium_Ndept` (`src/analysis.jl`) for a more detailed check
+after the fact, and `docs/LIMITATIONS.md` item 1 for the explicit scope of
+this approximation.
 
-Se `p.μ_v ≠ 0` (campo opcional), o capital variável também se move entre
-setores: `dVᵢ/dt = σ_v,ᵢ·Sᵢ + μ_v·(rᵢ − r̄_V)·Vᵢ`, com `r̄_V` a média de `r`
-ponderada por `V`. Sem este termo, cada `Vᵢ` cresce à sua própria taxa
-`σ_v,ᵢ·eᵢ` e não há crescimento equilibrado interior (o setor com a maior
-taxa acaba com todo o capital variável) — ver `src/crescimento.jl`.
+If `p.μ_v ≠ 0` (optional field), variable capital also moves between
+sectors: `dVᵢ/dt = σ_v,ᵢ·Sᵢ + μ_v·(rᵢ − r̄_V)·Vᵢ`, with `r̄_V` the
+`V`-weighted mean of `r`. Without this term each `Vᵢ` grows at its own rate
+`σ_v,ᵢ·eᵢ` and there is no interior balanced growth (the sector with the
+highest rate ends up with all the variable capital); see `src/growth.jl`.
 
-O lado direito é homogéneo de grau 1 no estado (`f(λX) = λf(X)`): só as
-proporções importam, e os estados estacionários relevantes são raios de
-crescimento equilibrado, `f(X★) = g★·X★`.
+The right-hand side is homogeneous of degree 1 in the state
+(`f(λX) = λf(X)`): only proportions matter, and the relevant steady states
+are balanced-growth rays, `f(X★) = g★·X★`.
 """
-function sistema_Ndept_io!(dX, X, p, t)
+function system_Ndept_io!(dX, X, p, t)
     N = length(p.e)
     C = @view X[1:N]
     V = @view X[N+1:2N]
     S = p.e .* V
 
-    r = _taxas_lucro_io(C, V, S, p)
-    # r̄ é a média de r ponderada por C (o stock em livro, o mesmo peso que
-    # multiplica o termo de mobilidade abaixo) — não Σ S/Σ(C+V), a razão
-    # agregada usada antes. É a única escolha para a qual Σμ(rᵢ-r̄)Cᵢ = 0
-    # exatamente, de modo que o termo de mobilidade realoca capital
-    # constante agregado em vez de o criar ou destruir (ver paper/main.tex,
-    # discussão da conservação do termo de mobilidade).
+    r = _io_profit_rates(C, V, S, p)
+    # r̄ is the C-weighted mean of r (the book stock, the same weight that
+    # multiplies the mobility term below), not ΣS/Σ(C+V), the aggregate
+    # ratio used before. It is the only choice for which Σμ(rᵢ-r̄)Cᵢ = 0
+    # exactly, so the mobility term reallocates aggregate constant capital
+    # instead of creating or destroying it (see paper/main.tex, discussion
+    # of the conservation of the mobility term).
     r̄ = sum(r .* C) / sum(C)
 
-    # `κ` herda o tipo de `S` (não `ones(N)`, Float64): sob diferenciação
-    # automática (ForwardDiff, `src/diferenciacao.jl`) o estado é `Dual`.
+    # `κ` inherits the type of `S` (not `ones(N)`, Float64): under automatic
+    # differentiation (ForwardDiff, `src/differentiation.jl`) the state is `Dual`.
     κ = fill(one(eltype(S)), N)
-    if p.racionamento || p.realização
-        # W = fluxo tipo valor-acrescentado do período (capital constante
-        # TRANSFERIDO, δ.*C, não o stock C — ver `capital_transferido` em
-        # `estruturas.jl`). Não é output bruto: falta o consumo intermédio
-        # circulante zᵢ. Recupera-se x (output bruto) a partir da própria
-        # identidade custo-output do modelo, xⱼ = zⱼ+Wⱼ com zⱼ=Σᵢ A[i,j]·xⱼ
-        # (A é definida por unidade de output bruto do comprador), donde
-        # xⱼ = Wⱼ/(1-Σᵢ A[i,j]) — sem introduzir novo estado. Válido apenas
-        # quando A representa o requisito de input circulante COMPLETO de
-        # cada setor (verdadeiro por construção para as matrizes sintéticas
-        # fechadas aqui usadas; não se aplica à matriz real de uso
-        # doméstico do Eurostat, que omite inputs importados por definição
-        # — ver `construir_matriz_io_eurostat`, nunca usada nesta EDO). A
-        # condição de admissibilidade Σᵢ A[i,j]<1 é verificada e garantida
-        # uma única vez, no início da simulação
-        # (`_garantir_admissibilidade_output`), não a cada avaliação.
+    if p.rationing || p.realization
+        # W = value-added-type flow of the period (constant capital
+        # TRANSFERRED, δ.*C, not the stock C; see `transferred_capital` in
+        # `types.jl`). It is not gross output: circulating intermediate
+        # consumption zᵢ is missing. x (gross output) is recovered from the
+        # model's own cost-output identity, xⱼ = zⱼ+Wⱼ with zⱼ=Σᵢ A[i,j]·xⱼ
+        # (A is defined per unit of the buyer's gross output), so that
+        # xⱼ = Wⱼ/(1-Σᵢ A[i,j]), with no new state. Valid only when A is the
+        # COMPLETE circulating-input requirement of each sector (true by
+        # construction for the closed synthetic matrices used here; it does
+        # not apply to Eurostat's real domestic-use matrix, which leaves out
+        # imported inputs by definition; see `build_eurostat_io_matrix`,
+        # never used in this ODE). The admissibility condition
+        # Σᵢ A[i,j]<1 is checked and enforced once, at the start of the
+        # simulation (`_ensure_output_admissibility`), not at every
+        # evaluation.
         W = p.δ .* C .+ V .+ S
         colsum = vec(sum(p.A, dims = 1))
         x = W ./ (1 .- colsum)
-        O = x  # output bruto genuíno, não W — corrige a crítica de revisão
-                # externa de que O omitia consumo intermédio circulante.
-        if p.racionamento
-            # Expansão de output desejada implícita no reinvestimento
-            # planeado σ_c,ⱼSⱼ, via o rácio capital/output corrente Cⱼ/xⱼ
-            # (Δxⱼ = investimento planeado ÷ rácio capital-output) — Aᵢⱼ
-            # aplica-se a esta expansão de OUTPUT, não a despesa de
-            # investimento diretamente (a simplificação anterior, já
-            # documentada como tal no artigo).
+        O = x  # genuine gross output, not W: fixes the external review's
+                # criticism that O left out circulating intermediate consumption.
+        if p.rationing
+            # Desired output expansion implied by planned reinvestment
+            # σ_c,ⱼSⱼ, via the current capital/output ratio Cⱼ/xⱼ
+            # (Δxⱼ = planned investment ÷ capital-output ratio). Aᵢⱼ
+            # applies to this OUTPUT expansion, not to investment spending
+            # directly (the earlier simplification, already
+            # documented as such in the paper).
             Δx = p.σ_c .* S .* x ./ C
-            κ = _resolver_racionamento(p.A, ones(N), Δx, O)
+            κ = _solve_rationing(p.A, ones(N), Δx, O)
         else
-            procura_intermédia = p.A * O
-            soma_procura = sum(procura_intermédia)
-            soma_procura > 0 && (κ = fill(min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0), N))
+            intermediate_demand = p.A * O
+            demand_sum = sum(intermediate_demand)
+            demand_sum > 0 && (κ = fill(min(sum(min.(O, intermediate_demand)) / demand_sum, 1.0), N))
         end
     end
 
     dX[1:N]    = κ .* p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C
-    # Mobilidade do capital variável (opcional, `p.μ_v`; ausente ou 0 = desligada,
-    # dinâmica idêntica à anterior). Com r̄_V ponderado por V, Σᵢ μ_v(rᵢ-r̄_V)Vᵢ = 0
-    # exatamente: o termo realoca capital variável entre setores sem o criar.
+    # Mobility of variable capital (optional, `p.μ_v`; absent or 0 = off,
+    # dynamics identical to before). With r̄_V weighted by V, Σᵢ μ_v(rᵢ-r̄_V)Vᵢ = 0
+    # exactly: the term reallocates variable capital between sectors without creating it.
     μ_v = get(p, :μ_v, 0.0)
     if iszero(μ_v)
         dX[N+1:2N] = p.σ_v .* S
@@ -311,248 +310,250 @@ function sistema_Ndept_io!(dX, X, p, t)
 end
 
 """
-Relaxação por omissão da iteração de racionamento, `ρ ↦ (1−α)ρ + αF(ρ)`.
-Com os setores ordenados por ρ*, a jacobiana de `F` é triangular com
-valores próprios `−θₖ ∈ [−1, 0]`, e 0 e −1 ocorrem sempre que há
-racionamento (`paper/main.tex`, Proposição 1); `α = 2/3` minimiza
-`max(|1−α|, |1−2α|)`, contraindo o erro local por 1/3 a cada passo (0.5,
-o valor anterior, contrai por 1/2). Verificado em 6870 casos (sweep de
-`paper/monte_carlo.jl`, pontos iniciais aleatórios, oferta muito escassa):
-convergência em todos, ≈30% menos iterações do que com 0.5.
+Default relaxation of the rationing iteration, `ρ ↦ (1−α)ρ + αF(ρ)`. With
+the sectors ordered by ρ*, the Jacobian of `F` is triangular with
+eigenvalues `−θₖ ∈ [−1, 0]`, and 0 and −1 always occur when there is
+rationing (`paper/main.tex`, Proposition 1). `α = 2/3` minimizes
+`max(|1−α|, |1−2α|)`, shrinking the local error by 1/3 at each step (0.5,
+the previous value, shrinks it by 1/2). Checked on 6870 cases (the
+`paper/monte_carlo.jl` sweep, random starting points, very scarce supply):
+convergence in all of them, with ≈30% fewer iterations than with 0.5.
 """
-const RELAXAÇÃO_PADRÃO = 2 / 3
+const DEFAULT_RELAXATION = 2 / 3
 
 """
-    _taxas_lucro_io(C, V, S, p)
+    _io_profit_rates(C, V, S, p)
 
-Taxas de lucro por setor com o capital constante valorizado a preços de
-produção de Sraffa, `rᵢ = Sᵢ/(πᵢCᵢ + Vᵢ)`, tal como `sistema_Ndept_io!` as
-usa. Para evitar a circularidade de usar r̄ para calcular preços que por sua
-vez definem r̄, a taxa que entra nos preços é a razão agregada
-`ΣS/Σ(C+V)`, limitada a 95% de `p.R_max`.
+Sectoral profit rates with constant capital valued at Sraffian production
+prices, `rᵢ = Sᵢ/(πᵢCᵢ + Vᵢ)`, as `system_Ndept_io!` uses them. To avoid the
+circularity of using r̄ to compute prices that in turn define r̄, the rate
+passed to the prices is the aggregate ratio `ΣS/Σ(C+V)`, capped at 95% of
+`p.R_max`.
 """
-function _taxas_lucro_io(C, V, S, p)
-    r_efetivo = clamp(sum(S) / sum(C .+ V), 0.0, 0.95 * p.R_max)
-    π = _razão_preço_valor(p, r_efetivo, length(S))
+function _io_profit_rates(C, V, S, p)
+    r_effective = clamp(sum(S) / sum(C .+ V), 0.0, 0.95 * p.R_max)
+    π = _price_value_ratio(p, r_effective, length(S))
     return S ./ (π .* C .+ V)
 end
 
 """
-    _razão_preço_valor(p, r_efetivo, N)
+    _price_value_ratio(p, r_effective, N)
 
-Razão preço de produção / valor-trabalho, `πᵢ = pᵢ/λᵢ`, usada para valorizar
-o capital constante em `sistema_Ndept_io!` e `calcular_taxas_lucro_precos`.
-Se o sistema de preços for singular (`calcular_precos_producao` lança
-`ErrorException`), cai para `π = 1` (preços = valores). Outros erros — por
-exemplo um `MethodError` sob diferenciação automática — são relançados, para
-não serem mascarados silenciosamente pelo fallback.
+Ratio of production price to labor value, `πᵢ = pᵢ/λᵢ`, used to value
+constant capital in `system_Ndept_io!` and `compute_price_profit_rates`. If
+the price system is singular (`compute_production_prices` throws
+`ErrorException`), it falls back to `π = 1` (prices = values). Other errors,
+for example a `MethodError` under automatic differentiation, are rethrown
+so the fallback does not silently hide them.
 """
-function _razão_preço_valor(p, r_efetivo, N)
+function _price_value_ratio(p, r_effective, N)
     try
-        precos = calcular_precos_producao(p.A, p.l, p.w, r_efetivo)
-        λ = calcular_valores_trabalho(p.A, p.l)
-        return precos ./ λ
+        prices = compute_production_prices(p.A, p.l, p.w, r_effective)
+        λ = compute_labor_values(p.A, p.l)
+        return prices ./ λ
     catch err
         err isa ErrorException || rethrow()
-        return fill(one(r_efetivo), N)
+        return fill(one(r_effective), N)
     end
 end
 
 """
-    _resolver_racionamento(A, σ_c, S, O; max_iter=200, tol=1e-8, relaxação=RELAXAÇÃO_PADRÃO)
+    _solve_rationing(A, σ_c, S, O; max_iter=200, tol=1e-8, relaxation=DEFAULT_RELAXATION)
 
-Resolve o racionamento de mercado (regra do lado curto, tecnologia Leontief)
-para os bens de investimento, dado o estado corrente. Para cada setor
-comprador `j`, o reinvestimento planeado `σ_c,ⱼ·Sⱼ` exige inputs de
-fornecedores na proporção `A[:,j]` — não há substituição entre inputs, logo
-o reinvestimento realizado fica limitado pelo input mais escasso (lei do
-mínimo). Isto torna o problema simultâneo: o racionamento sofrido por um
-setor reduz a sua procura efetiva de TODOS os seus inputs, o que por sua vez
-afeta o racionamento sofrido pelos seus fornecedores. Resolve-se por
-iteração de ponto fixo (`ρ`= fator de racionamento por setor fornecedor,
-`κ` = fração realizada do reinvestimento planeado por setor comprador):
+Solves market rationing (short-side rule, Leontief technology) for
+investment goods, given the current state. For each buying sector `j`,
+planned reinvestment `σ_c,ⱼ·Sⱼ` needs inputs from suppliers in the
+proportions `A[:,j]`. There is no substitution between inputs, so realized
+reinvestment is limited by the scarcest input (law of the minimum). This
+makes the problem simultaneous: the rationing a sector suffers lowers its
+effective demand for ALL its inputs, which in turn affects the rationing
+its suppliers suffer. It is solved by fixed-point iteration (`ρ` = rationing
+factor per supplying sector, `κ` = realized fraction of planned
+reinvestment per buying sector):
 
-    κⱼ = min_{i: A[i,j]>0} ρᵢ                    (limitado pelo input mais escasso)
-    Dᵢ = Σⱼ A[i,j]·κⱼ·σ_c,ⱼ·Sⱼ                     (procura efetiva, já consistente com o racionamento)
-    ρᵢ = min(1, Oᵢ / Dᵢ)                          (regra do lado curto)
+    κⱼ = min_{i: A[i,j]>0} ρᵢ                    (limited by the scarcest input)
+    Dᵢ = Σⱼ A[i,j]·κⱼ·σ_c,ⱼ·Sⱼ                     (effective demand, already consistent with the rationing)
+    ρᵢ = min(1, Oᵢ / Dᵢ)                          (short-side rule)
 
-A iteração é amortecida, `ρ ← (1−α)ρ + α·F(ρ)` com `α = relaxação`
-(por omissão `RELAXAÇÃO_PADRÃO = 2/3`; ver a sua docstring).
+The iteration is damped, `ρ ← (1−α)ρ + α·F(ρ)` with `α = relaxation`
+(`DEFAULT_RELAXATION = 2/3` by default; see its docstring).
 
-Se não convergir em `max_iter` iterações, cai-se para `κ = ones(N)` (sem
-racionamento, equivalente a desligar este mecanismo) com um aviso — a
-mesma filosofia de degradação graciosa usada no resto do código (fallback
-de preços de Sraffa na mesma função, fallbacks de rede AMECO/Eurostat).
+If it does not converge within `max_iter` iterations, it falls back to
+`κ = ones(N)` (no rationing, equivalent to switching this mechanism off)
+with a warning. This is the same graceful-degradation approach used in the
+rest of the code (the Sraffian price fallback in the same function, the
+AMECO/Eurostat network fallbacks).
 """
-function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8,
-                                relaxação = RELAXAÇÃO_PADRÃO,
-                                ρ_inicial = nothing, devolver_diagnóstico::Bool = false)
+function _solve_rationing(A, σ_c, S, O; max_iter = 200, tol = 1e-8,
+                                relaxation = DEFAULT_RELAXATION,
+                                ρ_initial = nothing, return_diagnostics::Bool = false)
     N = length(S)
-    D_planeado = σ_c .* S
-    # Sob diferenciação automática, o ponto fixo resolve-se em valores
-    # (Float64) e a derivada propaga-se pelo teorema da função implícita
-    # (`_racionamento_dual`), em vez de diferenciar cada iteração.
-    if eltype(D_planeado) <: ForwardDiff.Dual || eltype(O) <: ForwardDiff.Dual ||
+    D_planned = σ_c .* S
+    # Under automatic differentiation the fixed point is solved in values
+    # (Float64) and the derivative propagates through the implicit function
+    # theorem (`_rationing_dual`), instead of differentiating each iteration.
+    if eltype(D_planned) <: ForwardDiff.Dual || eltype(O) <: ForwardDiff.Dual ||
        eltype(A) <: ForwardDiff.Dual
-        devolver_diagnóstico && error("devolver_diagnóstico não suportado com números Dual")
-        return _racionamento_dual(A, D_planeado, O; max_iter = max_iter, tol = tol,
-                                  relaxação = relaxação, ρ_inicial = ρ_inicial)
+        return_diagnostics && error("return_diagnostics is not supported with Dual numbers")
+        return _rationing_dual(A, D_planned, O; max_iter = max_iter, tol = tol,
+                                  relaxation = relaxation, ρ_initial = ρ_initial)
     end
-    ρ = isnothing(ρ_inicial) ? ones(N) : copy(ρ_inicial)
-    convergiu = false
-    iterações = max_iter
+    ρ = isnothing(ρ_initial) ? ones(N) : copy(ρ_initial)
+    converged = false
+    iterations = max_iter
     for it in 1:max_iter
-        ρ_alvo = _mapa_racionamento(ρ, A, D_planeado, O)
-        # sub-relaxação: sem isto, a iteração pode oscilar entre dois estados em vez de
-        # convergir (o mapa min(1,O/D) não é uma contração pura) — verificado num exemplo
-        # de 2 setores em que a versão sem relaxação oscilava indefinidamente entre
-        # ρ=[0.8,1] e ρ=[1,1]. Ver `jacobiana_racionamento` (`src/diferenciacao.jl`)
-        # para o intervalo de `relaxação` que garante convergência local.
-        ρ_novo = (1 - relaxação) .* ρ .+ relaxação .* ρ_alvo
-        if maximum(abs.(ρ_novo .- ρ)) < tol
-            ρ = ρ_novo
-            convergiu = true
-            iterações = it
+        ρ_target = _rationing_map(ρ, A, D_planned, O)
+        # under-relaxation: without it the iteration can oscillate between two states
+        # instead of converging (the map min(1,O/D) is not a pure contraction), as seen
+        # in a 2-sector example where the undamped version oscillated forever between
+        # ρ=[0.8,1] and ρ=[1,1]. See `rationing_jacobian` (`src/differentiation.jl`)
+        # for the range of `relaxation` that guarantees local convergence.
+        ρ_new = (1 - relaxation) .* ρ .+ relaxation .* ρ_target
+        if maximum(abs.(ρ_new .- ρ)) < tol
+            ρ = ρ_new
+            converged = true
+            iterations = it
             break
         end
-        ρ = ρ_novo
+        ρ = ρ_new
     end
-    convergiu || @warn "Racionamento não convergiu em $max_iter iterações; a usar κ=1 (sem racionamento)."
-    κ_final = convergiu ? _κ_racionamento(ρ, A) : ones(N)
-    if devolver_diagnóstico
-        return (κ = κ_final, ρ = ρ, convergiu = convergiu, iterações = iterações,
-                fração_racionada = count(κ_final .< 0.999) / N)
+    converged || @warn "Rationing did not converge in $max_iter iterations; using κ=1 (no rationing)."
+    κ_final = converged ? _κ_rationing(ρ, A) : ones(N)
+    if return_diagnostics
+        return (κ = κ_final, ρ = ρ, converged = converged, iterations = iterations,
+                rationed_fraction = count(κ_final .< 0.999) / N)
     end
     return κ_final
 end
 
 """
-    _κ_racionamento(ρ, A)
+    _κ_rationing(ρ, A)
 
-`κⱼ = min_{i: A[i,j]>0} ρᵢ` (1 se a coluna j de A não tiver fornecedores).
+`κⱼ = min_{i: A[i,j]>0} ρᵢ` (1 if column j of A has no suppliers).
 """
-_κ_racionamento(ρ, A) = [minimum((ρ[i] for i in axes(A, 1) if A[i, j] > 0); init = one(eltype(ρ)))
+_κ_rationing(ρ, A) = [minimum((ρ[i] for i in axes(A, 1) if A[i, j] > 0); init = one(eltype(ρ)))
                          for j in axes(A, 2)]
 
 """
-    _mapa_racionamento(ρ, A, D_planeado, O)
+    _rationing_map(ρ, A, D_planned, O)
 
-O mapa `F(ρ)` cujo ponto fixo `_resolver_racionamento` procura (Equação
-`eq:rationing` de `paper/main.tex`): `F(ρ)ᵢ = min(1, Oᵢ/Dᵢ(κ(ρ)))`, com
-`Dᵢ = Σⱼ A[i,j]·κⱼ·D_planeadoⱼ`. Genérico no tipo de número, para que
-ForwardDiff possa calcular `∂F/∂ρ` (ver `jacobiana_racionamento`).
+The map `F(ρ)` whose fixed point `_solve_rationing` looks for (equation
+`eq:rationing` in `paper/main.tex`): `F(ρ)ᵢ = min(1, Oᵢ/Dᵢ(κ(ρ)))`, with
+`Dᵢ = Σⱼ A[i,j]·κⱼ·D_plannedⱼ`. Generic in the number type, so that
+ForwardDiff can compute `∂F/∂ρ` (see `rationing_jacobian`).
 """
-function _mapa_racionamento(ρ, A, D_planeado, O)
-    κ = _κ_racionamento(ρ, A)
-    D_real = A * (κ .* D_planeado)
+function _rationing_map(ρ, A, D_planned, O)
+    κ = _κ_rationing(ρ, A)
+    D_real = A * (κ .* D_planned)
     return min.(one(eltype(D_real)), O ./ max.(D_real, 1e-12))
 end
 
 """
-    _racionamento_dual(A, D_planeado, O; kwargs...)
+    _rationing_dual(A, D_planned, O; kwargs...)
 
-Versão de `_resolver_racionamento` para entradas `ForwardDiff.Dual`. Resolve
-o ponto fixo `ρ* = F(ρ*; θ)` em valores e propaga as derivadas pelo teorema
-da função implícita, `dρ* = (I − ∂F/∂ρ)⁻¹ · ∂F/∂θ·dθ`, que é exato no ponto
-fixo (mesma técnica que `SpatialEconometrics.StructuralMacroCalibration`
-usa para o balanceamento GRAS). Devolve `κ(ρ*)` como vetor de `Dual`.
+Version of `_solve_rationing` for `ForwardDiff.Dual` inputs. Solves the
+fixed point `ρ* = F(ρ*; θ)` in values and propagates the derivatives through
+the implicit function theorem, `dρ* = (I − ∂F/∂ρ)⁻¹ · ∂F/∂θ·dθ`, which is
+exact at the fixed point (the same technique
+`SpatialEconometrics.StructuralMacroCalibration` uses for GRAS balancing).
+Returns `κ(ρ*)` as a vector of `Dual`.
 """
-function _racionamento_dual(A, D_planeado, O; kwargs...)
+function _rationing_dual(A, D_planned, O; kwargs...)
     val(x) = ForwardDiff.value.(x)
-    Av, Dv, Ov = val(A), val(D_planeado), val(O)
-    diag = _resolver_racionamento(Av, ones(length(Dv)), Dv, Ov; devolver_diagnóstico = true, kwargs...)
-    diag.convergiu || return fill(one(eltype(promote_type(eltype(A), eltype(D_planeado), eltype(O)))), length(Dv))
+    Av, Dv, Ov = val(A), val(D_planned), val(O)
+    diag = _solve_rationing(Av, ones(length(Dv)), Dv, Ov; return_diagnostics = true, kwargs...)
+    diag.converged || return fill(one(eltype(promote_type(eltype(A), eltype(D_planned), eltype(O)))), length(Dv))
     ρ★ = diag.ρ
-    Fθ = _mapa_racionamento(ρ★, A, D_planeado, O)            # ∂F/∂θ·dθ nas partials
-    Jρ = ForwardDiff.jacobian(r -> _mapa_racionamento(r, Av, Dv, Ov), ρ★)
+    Fθ = _rationing_map(ρ★, A, D_planned, O)            # ∂F/∂θ·dθ in the partials
+    Jρ = ForwardDiff.jacobian(r -> _rationing_map(r, Av, Dv, Ov), ρ★)
     TD = eltype(Fθ)
     P = reduce(vcat, (collect(ForwardDiff.partials(f))' for f in Fθ))
-    dρ = (matriz_identidade(length(ρ★)) .- Jρ) \ P
+    dρ = (identity_matrix(length(ρ★)) .- Jρ) \ P
     ρ_dual = [TD(ρ★[i], ForwardDiff.Partials(Tuple(dρ[i, :]))) for i in eachindex(ρ★)]
-    return _κ_racionamento(ρ_dual, A)
+    return _κ_rationing(ρ_dual, A)
 end
 
 # ----------------------------------------------------------------------------
-# Simulação
+# Simulation
 # ----------------------------------------------------------------------------
 
-"""Simula o modelo de 2 departamentos."""
-function simular_2dept(; T = 100.0)
-    depts = modelo_dois_departamentos()
+"""Simulates the 2-department model."""
+function simulate_2dept(; T = 100.0)
+    depts = two_department_model()
     X0 = [depts[1].c, depts[1].v, depts[2].c, depts[2].v]
     p = (depts[1].e, depts[2].e,
          depts[1].σ_c, depts[1].σ_v,
          depts[2].σ_c, depts[2].σ_v,
          depts[1].δ, depts[2].δ)
-    prob = ODEProblem(sistema_2dept!, X0, (0.0, T), p)
+    prob = ODEProblem(system_2dept!, X0, (0.0, T), p)
     sol = solve(prob, Tsit5(), saveat = 0.5)
     return sol, depts, p
 end
 
 """
-    simular_Ndept(N; T=100.0, nomes=String[], seed=nothing, acoplado=false, μ=0.3, μ_v=0.0,
-                  realização=false, racionamento=false, preços_mercado=false, β=0.5, cesto=nothing)
+    simulate_Ndept(N; T=100.0, name_list=String[], seed=nothing, coupled=false, μ=0.3, μ_v=0.0,
+                  realization=false, rationing=false, market_prices=false, β=0.5, basket=nothing)
 
-Simula o modelo de N departamentos com departamentos gerados aleatoriamente.
-Com `acoplado=true`, usa `sistema_Ndept_io!` (mobilidade de capital via A e
-preços de produção); `μ` é o coeficiente de mobilidade nesse caso, e `μ_v`
-o da mobilidade do capital variável (0 = desligada, por omissão).
-`realização=true` (só tem efeito com `acoplado=true`) acresce a pressão de
-realização agregada; `racionamento=true` (tem precedência sobre
-`realização`) usa racionamento por setor — ver docstring de
-`sistema_Ndept_io!`. `preços_mercado=true` (exige `acoplado=true`) usa a
-dinâmica cruzada de `sistema_cruzado!`: preços de mercado com velocidade de
-ajustamento `β` e cabaz de consumo `cesto` (por omissão `cesto_inicial`).
+Simulates the N-department model with randomly generated departments. With
+`coupled=true` it uses `system_Ndept_io!` (capital mobility via A and
+production prices); `μ` is then the mobility coefficient, and `μ_v` that of
+variable capital (0 = off, the default). `realization=true` (only has an
+effect with `coupled=true`) adds the aggregate realization pressure;
+`rationing=true` (takes precedence over `realization`) uses per-sector
+rationing; see the `system_Ndept_io!` docstring. `market_prices=true`
+(requires `coupled=true`) uses the cross-dual dynamics of
+`cross_dual_system!`: market prices with adjustment speed `β` and consumption
+basket `basket` (`basket_initial` by default).
 """
-function simular_Ndept(N::Int; T = 100.0, nomes::Vector{String} = String[],
-                       seed = nothing, acoplado = false, μ = 0.3, μ_v = 0.0,
-                       realização = false, racionamento = false,
-                       preços_mercado = false, β = 0.5, cesto = nothing)
-    depts = criar_departamentos(N, nomes)
-    return simular_Ndept_customizado(depts, T = T, seed = seed, acoplado = acoplado, μ = μ,
-                                     μ_v = μ_v, realização = realização,
-                                     racionamento = racionamento,
-                                     preços_mercado = preços_mercado, β = β, cesto = cesto)
+function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
+                       seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
+                       realization = false, rationing = false,
+                       market_prices = false, β = 0.5, basket = nothing)
+    depts = create_departments(N, name_list)
+    return simulate_Ndept_custom(depts, T = T, seed = seed, coupled = coupled, μ = μ,
+                                     μ_v = μ_v, realization = realization,
+                                     rationing = rationing,
+                                     market_prices = market_prices, β = β, basket = basket)
 end
 
 """
-    simular_Ndept_customizado(depts; T=100.0, seed=nothing, acoplado=false, μ=0.3, μ_v=0.0,
-                              realização=false, racionamento=false,
-                              preços_mercado=false, β=0.5, cesto=nothing)
+    simulate_Ndept_custom(depts; T=100.0, seed=nothing, coupled=false, μ=0.3, μ_v=0.0,
+                              realization=false, rationing=false,
+                              market_prices=false, β=0.5, basket=nothing)
 
-Simula o modelo de N departamentos a partir de departamentos pré-configurados.
-Com `acoplado=true`, usa `sistema_Ndept_io!` em vez de `sistema_Ndept!`
-(`μ_v`, mobilidade do capital variável, só tem efeito nesse caso).
-`preços_mercado=true` usa `sistema_cruzado!` (ver `simular_Ndept`); não se
-combina com `realização`/`racionamento`.
-`realização=true` (só tem efeito com `acoplado=true`) acresce a pressão de
-realização agregada; `racionamento=true` (tem precedência sobre
-`realização`) usa racionamento por setor — ver docstring de
-`sistema_Ndept_io!`.
+Simulates the N-department model from pre-configured departments. With
+`coupled=true` it uses `system_Ndept_io!` instead of `system_Ndept!` (`μ_v`,
+the mobility of variable capital, only has an effect in that case).
+`market_prices=true` uses `cross_dual_system!` (see `simulate_Ndept`); it
+cannot be combined with `realization`/`rationing`.
+`realization=true` (only has an effect with `coupled=true`) adds the
+aggregate realization pressure; `rationing=true` (takes precedence over
+`realization`) uses per-sector rationing; see the docstring of
+`system_Ndept_io!`.
 """
-function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
-                                   seed = nothing, acoplado = false, μ = 0.3, μ_v = 0.0,
-                                   realização = false, racionamento = false,
-                                   preços_mercado = false, β = 0.5, cesto = nothing)
+function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
+                                   seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
+                                   realization = false, rationing = false,
+                                   market_prices = false, β = 0.5, basket = nothing)
     N = length(depts)
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
-    A = criar_matriz_tecnica(N, seed = seed)
-    (acoplado && (realização || racionamento || preços_mercado)) &&
-        (A, _ = _garantir_admissibilidade_output(A))
+    A = create_technical_matrix(N, seed = seed)
+    (coupled && (realization || rationing || market_prices)) &&
+        (A, _ = _ensure_output_admissibility(A))
 
-    if preços_mercado
-        acoplado || error("preços_mercado=true exige acoplado=true")
-        (realização || racionamento) &&
-            error("preços_mercado=true não se combina com realização/racionamento")
+    if market_prices
+        coupled || error("market_prices=true requires coupled=true")
+        (realization || rationing) &&
+            error("market_prices=true cannot be combined with realization/rationing")
         p = (e = [d.e for d in depts], σ_c = [d.σ_c for d in depts],
              σ_v = [d.σ_v for d in depts], δ = [d.δ for d in depts],
              A = A, μ = μ, μ_v = μ_v, β = β)
-        p = merge(p, (cesto = isnothing(cesto) ? cesto_inicial(A, X0, p) : cesto,))
-        prob = ODEProblem(sistema_cruzado!, [X0; zeros(N)], (0.0, T), p)
+        p = merge(p, (basket = isnothing(basket) ? basket_initial(A, X0, p) : basket,))
+        prob = ODEProblem(cross_dual_system!, [X0; zeros(N)], (0.0, T), p)
         return solve(prob, Tsit5(), saveat = 0.5), depts, p
     end
 
-    if acoplado
+    if coupled
         l = [d.v for d in depts]
         p = (
             e           = [d.e for d in depts],
@@ -561,14 +562,14 @@ function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
             δ           = [d.δ for d in depts],
             A           = A,
             l           = l,
-            R_max       = calcular_taxa_lucro_maxima(A, l),
+            R_max       = compute_max_profit_rate(A, l),
             μ           = μ,
             μ_v         = μ_v,
             w           = 1.0,
-            realização  = realização,
-            racionamento = racionamento,
+            realization  = realization,
+            rationing = rationing,
         )
-        prob = ODEProblem(sistema_Ndept_io!, X0, (0.0, T), p)
+        prob = ODEProblem(system_Ndept_io!, X0, (0.0, T), p)
     else
         p = (
             e   = [d.e for d in depts],
@@ -577,7 +578,7 @@ function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
             δ   = [d.δ for d in depts],
             A   = A,
         )
-        prob = ODEProblem(sistema_Ndept!, X0, (0.0, T), p)
+        prob = ODEProblem(system_Ndept!, X0, (0.0, T), p)
     end
 
     sol = solve(prob, Tsit5(), saveat = 0.5)

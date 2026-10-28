@@ -25,78 +25,78 @@ println("="^70)
 println("\n[1/2] Rationing fixed-point convergence sweep...")
 
 Ns = [6, 12, 19]
-densidades = [0.2, 0.4, 0.6]
-trials_por_combinação = 30
+densities = [0.2, 0.4, 0.6]
+trials_per_combination = 30
 
-resultados = NamedTuple[]
-for N in Ns, densidade in densidades, trial in 1:trials_por_combinação
-    seed = 1000 * N + round(Int, 1000 * densidade) + trial
+results = NamedTuple[]
+for N in Ns, density in densities, trial in 1:trials_per_combination
+    seed = 1000 * N + round(Int, 1000 * density) + trial
     Random.seed!(seed)
-    A = criar_matriz_tecnica(N, densidade = densidade, seed = seed)
-    _, reescalada = _garantir_admissibilidade_output(A)
+    A = create_technical_matrix(N, density = density, seed = seed)
+    _, rescaled = _ensure_output_admissibility(A)
     σ_c = 0.3 .+ rand(N) * 0.4
     S = 5.0 .+ 15 * rand(N)
     # O deliberately scarce relative to planned demand, to force genuine
     # rationing in most trials rather than trivial κ=1 everywhere.
-    escala_O = 0.1 + rand() * 0.8
-    O = escala_O .* (0.5 .+ rand(N))
-    diag = _resolver_racionamento(A, σ_c, S, O; devolver_diagnóstico = true)
-    push!(resultados, (N = N, densidade = densidade, seed = seed,
-                       convergiu = diag.convergiu, iterações = diag.iterações,
-                       fração_racionada = diag.fração_racionada, ρA = maximum(abs.(eigvals(A))),
-                       reescalada = reescalada))
+    scale_O = 0.1 + rand() * 0.8
+    O = scale_O .* (0.5 .+ rand(N))
+    diag = _solve_rationing(A, σ_c, S, O; return_diagnostics = true)
+    push!(results, (N = N, density = density, seed = seed,
+                       converged = diag.converged, iterations = diag.iterations,
+                       rationed_fraction = diag.rationed_fraction, ρA = maximum(abs.(eigvals(A))),
+                       rescaled = rescaled))
 end
 
-n_total = length(resultados)
-n_convergiu = count(r -> r.convergiu, resultados)
-n_racionado = count(r -> r.fração_racionada > 0, resultados)
-iterações_convergidas = [r.iterações for r in resultados if r.convergiu]
+n_total = length(results)
+n_converged = count(r -> r.converged, results)
+n_rationed = count(r -> r.rationed_fraction > 0, results)
+converged_iterations = [r.iterations for r in results if r.converged]
 
-println("  ✓ $n_total trials ($(length(Ns))×$(length(densidades))×$trials_por_combinação): ",
-        "$n_convergiu/$n_total converged ($(round(100n_convergiu/n_total, digits=1))%), ",
-        "$n_racionado/$n_total had genuine rationing (fração_racionada>0)")
-println("  ✓ iterations to converge: mean=$(round(mean(iterações_convergidas), digits=1)) ",
-        "median=$(round(median(iterações_convergidas), digits=1)) ",
-        "max=$(maximum(iterações_convergidas)) (cap=200)")
+println("  ✓ $n_total trials ($(length(Ns))×$(length(densities))×$trials_per_combination): ",
+        "$n_converged/$n_total converged ($(round(100n_converged/n_total, digits=1))%), ",
+        "$n_rationed/$n_total had genuine rationing (rationed_fraction>0)")
+println("  ✓ iterations to converge: mean=$(round(mean(converged_iterations), digits=1)) ",
+        "median=$(round(median(converged_iterations), digits=1)) ",
+        "max=$(maximum(converged_iterations)) (cap=200)")
 
-# Admissibility of the output-bruto reconstruction (Equação 2 do artigo,
-# _garantir_admissibilidade_output): how often do the same class of random
+# Admissibility of the gross-output reconstruction (Equation 2 of the paper,
+# _ensure_output_admissibility): how often do the same class of random
 # synthetic matrices used throughout this sweep need column-sum rescaling,
 # and does rescaling itself measurably change convergence/rationing behavior?
-reescaladas = filter(r -> r.reescalada, resultados)
-não_reescaladas = filter(r -> !r.reescalada, resultados)
-n_reescalada = length(reescaladas)
-println("  ✓ output-bruto admissibility (Equation 2): $n_reescalada/$n_total matrices " *
-        "needed column-sum rescaling ($(round(100n_reescalada/n_total,digits=1))%)")
+rescaled_runs = filter(r -> r.rescaled, results)
+unrescaled_runs = filter(r -> !r.rescaled, results)
+n_rescaled = length(rescaled_runs)
+println("  ✓ output-bruto admissibility (Equation 2): $n_rescaled/$n_total matrices " *
+        "needed column-sum rescaling ($(round(100n_rescaled/n_total,digits=1))%)")
 
-it_resc = [r.iterações for r in reescaladas if r.convergiu]
-it_não  = [r.iterações for r in não_reescaladas if r.convergiu]
-frac_resc = [r.fração_racionada for r in reescaladas]
-frac_não  = [r.fração_racionada for r in não_reescaladas]
+it_resc = [r.iterations for r in rescaled_runs if r.converged]
+it_unresc  = [r.iterations for r in unrescaled_runs if r.converged]
+frac_resc = [r.rationed_fraction for r in rescaled_runs]
+frac_unresc  = [r.rationed_fraction for r in unrescaled_runs]
 println("  ✓ rescaled vs. non-rescaled matrices — convergence: ",
-        "$(count(r->r.convergiu,reescaladas))/$n_reescalada vs. ",
-        "$(count(r->r.convergiu,não_reescaladas))/$(length(não_reescaladas))")
+        "$(count(r->r.converged,rescaled_runs))/$n_rescaled vs. ",
+        "$(count(r->r.converged,unrescaled_runs))/$(length(unrescaled_runs))")
 println("    iterations to converge: mean=$(round(mean(it_resc),digits=1)) (rescaled) vs. ",
-        "mean=$(round(mean(it_não),digits=1)) (non-rescaled)")
+        "mean=$(round(mean(it_unresc),digits=1)) (non-rescaled)")
 println("    fraction rationed: mean=$(round(mean(frac_resc),digits=3)) (rescaled) vs. ",
-        "mean=$(round(mean(frac_não),digits=3)) (non-rescaled)")
+        "mean=$(round(mean(frac_unresc),digits=3)) (non-rescaled)")
 
 # Convergence rate broken down by N and density
 println("  ✓ convergence rate by (N, densidade):")
-for N in Ns, densidade in densidades
-    subset = filter(r -> r.N == N && r.densidade == densidade, resultados)
-    taxa = count(r -> r.convergiu, subset) / length(subset)
-    println("      N=$N densidade=$densidade: $(round(100taxa, digits=1))% ",
-            "($(count(r->r.convergiu, subset))/$(length(subset)))")
+for N in Ns, density in densities
+    subset = filter(r -> r.N == N && r.density == density, results)
+    rate = count(r -> r.converged, subset) / length(subset)
+    println("      N=$N densidade=$density: $(round(100rate, digits=1))% ",
+            "($(count(r->r.converged, subset))/$(length(subset)))")
 end
 
-fig6a = histogram(iterações_convergidas, bins = 20, xlabel = "Iterations to converge",
+fig6a = histogram(converged_iterations, bins = 20, xlabel = "Iterations to converge",
                   ylabel = "Count", title = "Convergence speed",
                   legend = false, color = :steelblue, size = (650, 420), margin = 5Plots.mm)
 savefig(fig6a, joinpath(FIG_DIR, "fig6a_convergence_iterations.pdf"))
 
-frações = [r.fração_racionada for r in resultados]
-fig6b = histogram(frações, bins = 20, xlabel = "Fraction of sectors rationed (κ<0.999)",
+fractions = [r.rationed_fraction for r in results]
+fig6b = histogram(fractions, bins = 20, xlabel = "Fraction of sectors rationed (κ<0.999)",
                   ylabel = "Count", title = "Rationing incidence",
                   legend = false, color = :firebrick, size = (650, 420), margin = 5Plots.mm)
 savefig(fig6b, joinpath(FIG_DIR, "fig6b_rationing_incidence.pdf"))
@@ -109,47 +109,47 @@ savefig(fig6b, joinpath(FIG_DIR, "fig6b_rationing_incidence.pdf"))
 println("\n[2/2] Coupling-mechanism comparison across many seeds...")
 
 n_seeds = 50
-dispersão_final = Dict(:mobilidade => Float64[], :realização => Float64[], :racionamento => Float64[])
+final_dispersion = Dict(:mobility => Float64[], :realization => Float64[], :rationing => Float64[])
 
 for seed in 1:n_seeds
     Random.seed!(seed)
-    sol_mob, _, p_mob = simular_Ndept(6, T = 200.0, seed = seed, acoplado = true, μ = 0.5)
+    sol_mob, _, p_mob = simulate_Ndept(6, T = 200.0, seed = seed, coupled = true, μ = 0.5)
     Random.seed!(seed)
-    sol_real, _, p_real = simular_Ndept(6, T = 200.0, seed = seed, acoplado = true, μ = 0.5,
-                                        realização = true)
+    sol_real, _, p_real = simulate_Ndept(6, T = 200.0, seed = seed, coupled = true, μ = 0.5,
+                                        realization = true)
     Random.seed!(seed)
-    sol_rac, _, p_rac = simular_Ndept(6, T = 200.0, seed = seed, acoplado = true, μ = 0.5,
-                                      racionamento = true)
+    sol_rat, _, p_rat = simulate_Ndept(6, T = 200.0, seed = seed, coupled = true, μ = 0.5,
+                                      rationing = true)
 
-    r_mob = calcular_taxas_lucro_precos(sol_mob, p_mob)
-    r_real = calcular_taxas_lucro_precos(sol_real, p_real)
-    r_rac = calcular_taxas_lucro_precos(sol_rac, p_rac)
+    r_mob = compute_price_profit_rates(sol_mob, p_mob)
+    r_real = compute_price_profit_rates(sol_real, p_real)
+    r_rat = compute_price_profit_rates(sol_rat, p_rat)
 
-    push!(dispersão_final[:mobilidade], std(r_mob[:, end]))
-    push!(dispersão_final[:realização], std(r_real[:, end]))
-    push!(dispersão_final[:racionamento], std(r_rac[:, end]))
+    push!(final_dispersion[:mobility], std(r_mob[:, end]))
+    push!(final_dispersion[:realization], std(r_real[:, end]))
+    push!(final_dispersion[:rationing], std(r_rat[:, end]))
 end
 
-for (mecanismo, vals) in dispersão_final
-    println("  ✓ $mecanismo: mean=$(round(mean(vals), digits=4)) ",
+for (mechanism, vals) in final_dispersion
+    println("  ✓ $mechanism: mean=$(round(mean(vals), digits=4)) ",
             "median=$(round(median(vals), digits=4)) ",
             "std=$(round(std(vals), digits=4)) ",
             "[$(round(minimum(vals), digits=4)), $(round(maximum(vals), digits=4))]")
 end
-n_rac_maior = count(dispersão_final[:racionamento] .> dispersão_final[:mobilidade])
-println("  ✓ rationing > mobility-only dispersion in $n_rac_maior/$n_seeds seeds ",
-        "($(round(100n_rac_maior/n_seeds, digits=1))%)")
+n_rat_larger = count(final_dispersion[:rationing] .> final_dispersion[:mobility])
+println("  ✓ rationing > mobility-only dispersion in $n_rat_larger/$n_seeds seeds ",
+        "($(round(100n_rat_larger/n_seeds, digits=1))%)")
 
-# Dependency-free stand-in for a boxplot (no StatsPlots — see src/distributiva.jl
+# Dependency-free stand-in for a boxplot (no StatsPlots — see src/distribution.jl
 # for the same convention): jittered per-seed points plus mean±std/median bars.
-mecanismos = [:mobilidade, :realização, :racionamento]
-rótulos = ["mobility only", "+ realization", "+ rationing"]
-cores = [:steelblue, :seagreen, :firebrick]
+mechanisms = [:mobility, :realization, :rationing]
+labels = ["mobility only", "+ realization", "+ rationing"]
+colors = [:steelblue, :seagreen, :firebrick]
 fig6c = plot(xlabel = "", ylabel = "Final profit-rate dispersion (std, t=200)",
              title = "Coupling mechanisms across $n_seeds random synthetic economies",
-             xticks = (1:3, rótulos), legend = false, size = (700, 450), margin = 5Plots.mm)
-for (i, (mecanismo, cor)) in enumerate(zip(mecanismos, cores))
-    vals = dispersão_final[mecanismo]
+             xticks = (1:3, labels), legend = false, size = (700, 450), margin = 5Plots.mm)
+for (i, (mechanism, cor)) in enumerate(zip(mechanisms, colors))
+    vals = final_dispersion[mechanism]
     xs = fill(i, length(vals)) .+ (rand(length(vals)) .- 0.5) .* 0.25
     scatter!(fig6c, xs, vals, color = cor, alpha = 0.35, markersize = 3, label = "")
     scatter!(fig6c, [i], [mean(vals)], color = cor, markersize = 9, markershape = :diamond,
@@ -159,5 +159,5 @@ end
 savefig(fig6c, joinpath(FIG_DIR, "fig6c_dispersion_distribution.pdf"))
 
 println("\n" * "="^70)
-println("Concluído. Figuras em paper/figures/ (fig6a/b/c).")
+println("Done. Figures in paper/figures/ (fig6a/b/c).")
 println("="^70)

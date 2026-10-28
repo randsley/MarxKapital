@@ -17,7 +17,7 @@ INE) and European (**AMECO**, all countries in the database) data.
 > **Real** sectoral and AMECO data are available as an option (via
 > official SDMX APIs), but the defaults remain **synthetic**.
 > Before any serious empirical use, read
-> [`docs/LIMITACOES.en.md`](docs/LIMITACOES.en.md) (limitations).
+> [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) (limitations).
 
 ## Installation
 
@@ -31,40 +31,40 @@ julia install_deps.jl        # installs DifferentialEquations, Plots, DataFrames
 
 ```julia
 include("src/MarxKapital.jl")
-ajuda_modelo()                 # help / model overview
+model_help()                  # help / model overview
 
 # Classical and generalized model
-exemplo_2dept()                 # two-department example
-exemplo_Ndept(10)                # N-department example
+example_2dept()                # two-department example
+example_Ndept(10)              # N-department example
 
 # N departments coupled through A: capital mobility, aggregate realization
 # pressure, or exact per-sector quantity rationing (optional, independent)
-simular_Ndept(10, acoplado = true, μ = 0.3)
-simular_Ndept(10, acoplado = true, realização = true)
-simular_Ndept(10, acoplado = true, racionamento = true)
+simulate_Ndept(10, coupled = true, μ = 0.3)
+simulate_Ndept(10, coupled = true, realization = true)
+simulate_Ndept(10, coupled = true, rationing = true)
 
 # Values → prices of production
-exemplo_transformacao()
+example_transformation()
 
 # Portuguese national-accounts calibration (synthetic by default;
-# fonte_dados=:eurostat for real data)
-params, validação = exemplo_portugal()
-params_real = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat)
+# data_source=:eurostat for real data)
+params, validation = example_portugal()
+params_real = calibrate_portugal_model(year = 2022, data_source = :eurostat)
 
-# AMECO — any country in the database (dados_setoriais=:eurostat for real
+# AMECO — any country in the database (sector_data=:eurostat for real
 # sectoral data, EU/EEA countries)
-listar_países_ameco()            # list AMECO countries
-params, dados = calibrar_com_ameco_v2("Alemanha", ano = 2022)   # "Alemanha" = Germany; método = :auto
+list_ameco_countries()           # list AMECO countries
+params, data = calibrate_with_ameco_v2("Germany", year = 2022)   # method = :auto
 
 # International comparison
-comparar_países_ameco(["Portugal", "Espanha", "Alemanha", "França"], ano = 2022)
+compare_ameco_countries(["Portugal", "Spain", "Germany", "France"], year = 2022)
 
 # Time series
-analisar_série_temporal_ameco("Portugal", anos = 2000:2022)
+analyze_ameco_time_series("Portugal", years = 2000:2022)
 
 # Wage-policy shock
-depts = criar_departamentos(6)
-simular_choque_salarial(depts, 0.10)   # +10% wages
+depts = create_departments(6)
+simulate_wage_shock(depts, 0.10)   # +10% wages
 ```
 
 Or run the full demo:
@@ -73,10 +73,11 @@ Or run the full demo:
 julia --project=. examples/demo.jl
 ```
 
-*Note: function and keyword-argument names remain in Portuguese
-throughout the codebase (`simular_Ndept`, `acoplado`, `racionamento`,
-`fonte_dados`, etc.) — this README explains what each call does, but the
-API itself is not translated.*
+*Note: since v1.0.0 the code and its API are in English. Up to v0.8.x
+function, keyword-argument and file names were in Portuguese
+(`simular_Ndept`, `acoplado`, `racionamento`, `fonte_dados`, …);
+[`docs/GLOSSARY.md`](docs/GLOSSARY.md) maps every old name to its new
+one.*
 
 ## Notebooks
 
@@ -98,24 +99,24 @@ julia -e 'using Pluto; Pluto.run()'   # then open a file in notebooks/pluto/
 
 ## AMECO data
 
-`obter_dados_ameco("Portugal", método = ...)` accepts:
+`fetch_ameco_data("Portugal", method = ...)` accepts:
 
-| método (method) | behavior                                                        |
+| method       | behavior                                                             |
 |--------------|----------------------------------------------------------------------|
 | `:auto`      | official SDMX API → recent local file → synthetic (fallback with warning) |
 | `:sdmx`      | forces retrieval via the official AMECO SDMX API                       |
 | `:download`  | alias for `:sdmx` (the legacy TXT download was discontinued)        |
-| `:local`     | requires `dados_ameco/ameco_completo.txt` already downloaded (legacy path) |
-| `:csv`       | processes an exported CSV (`ficheiro="..."`, legacy path)            |
-| `:sintético` | generates plausible synthetic series                                    |
+| `:local`     | requires `ameco_data/ameco_full.txt` already downloaded (legacy path) |
+| `:csv`       | processes an exported CSV (`file="..."`, legacy path)            |
+| `:synthetic` | generates plausible synthetic series                                    |
 | `:manual`    | shows download instructions and returns synthetic data                    |
 
 Since 2026-07 AMECO exposes an [official SDMX REST
 API](https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1)
 (the same platform as Eurostat's newer data tool) — the static TXT file
 that the `:local`/`:csv` methods still support was discontinued by the
-Commission. Run `verificar_sdmx_ameco()` to confirm access before a real
-analysis; see `docs/LIMITACOES.en.md` item 3 for the exact status of each
+Commission. Run `check_ameco_sdmx()` to confirm access before a real
+analysis; see `docs/LIMITATIONS.md` item 3 for the exact status of each
 variable.
 
 ## Automatic differentiation, TSSI and bifurcations
@@ -126,79 +127,79 @@ numerical continuation of fixed points (BifurcationKit):
 
 ```julia
 Random.seed!(5)
-sol, depts, p = simular_Ndept(6, T = 60.0, seed = 5, acoplado = true, realização = true)
+sol, depts, p = simulate_Ndept(6, T = 60.0, seed = 5, coupled = true, realization = true)
 X = sol.u[end]
 
-jacobiana_sistema(p, X)          # exact ∂f/∂X of the ODE right-hand side (also with racionamento=true)
-jacobiana_parametro(p, X, :μ)    # ∂f/∂μ (any field of p, scalar or vector)
-hessiana_sistema(p, X)           # H[k,i,j] = ∂²f_k/∂X_i∂X_j
-curvatura_fronteira(p.A, p.l, 0.2)   # w(r), w'(r), w''(r) of the wage-profit frontier
+system_jacobian(p, X)             # exact ∂f/∂X of the ODE right-hand side (also with rationing=true)
+parameter_jacobian(p, X, :μ)       # ∂f/∂μ (any field of p, scalar or vector)
+system_hessian(p, X)              # H[k,i,j] = ∂²f_k/∂X_i∂X_j
+frontier_curvature(p.A, p.l, 0.2)   # w(r), w'(r), w''(r) of the wage-profit frontier
 
 # Rationing map: exact Jacobian at the fixed point, spectrum, stability bound
 # α_max and the radius-minimizing relaxation α
-A = criar_matriz_tecnica(12, densidade = 0.5); σ_c = fill(0.5, 12)
+A = create_technical_matrix(12, density = 0.5); σ_c = fill(0.5, 12)
 S = 5 .+ 10rand(12); O = 0.3 .+ 0.5rand(12)
-jacobiana_racionamento(A, σ_c, S, O)
+rationing_jacobian(A, σ_c, S, O)
 
 # TSSI: inputs bought at t−τ are costed at t−τ prices (fixed lag τ);
 # compared against simultaneist (current-price) valuation
-v = valorizar_tssi(sol, p; τ = 1.0, h = 0.5)
-estabilidade_tssi(dados_tssi(X, p))   # does TSSI converge to simultaneist prices?
+v = tssi_valuation(sol, p; τ = 1.0, h = 0.5)
+tssi_stability(tssi_data(X, p))   # does TSSI converge to simultaneist prices?
 
 # Bifurcations: damped rationing iteration in the demand scale s, and the
 # TSSI price map in the surplus-value scale (τ fixed)
-bifurcacao_racionamento(A, σ_c, S, O; escala = (0.005, 2.0))
-bifurcacao_tssi(X, p; τ = 1.0, escala = (0.05, 10.0))
+rationing_bifurcation(A, σ_c, S, O; scale = (0.005, 2.0))
+tssi_bifurcation(X, p; τ = 1.0, scale = (0.05, 10.0))
 ```
 
 The rationing fixed point is differentiated through the implicit function
-theorem (not by unrolling the iteration), so `jacobiana_sistema` works with
-`racionamento=true`. A result from this analysis: ordered by rationing
+theorem (not by unrolling the iteration), so `system_jacobian` works with
+`rationing=true`. A result from this analysis: ordered by rationing
 severity, the rationing map's Jacobian is triangular with spectrum in
 `[−1, 0]`, and `−1` is an eigenvalue once any sector is rationed. Damped
 iteration therefore converges locally for every relaxation `α ∈ (0, 1)`,
 while undamped iteration (`α = 1`) sits exactly on a flip boundary (see
 `paper/main.tex`, Proposition 1). The default relaxation is `α = 2/3`
-(`RELAXAÇÃO_PADRÃO`), which minimizes the local contraction rate: about
+(`DEFAULT_RELAXATION`), which minimizes the local contraction rate: about
 30% fewer iterations than the previous 0.5, converging in all 6870 test
 runs (`paper/main.tex`, Table 2). The TSSI layer is valuation only: the
 dynamics are unchanged.
 
 ## Balanced growth and accumulation cycles
 
-With the optional cross-dual dynamics (`preços_mercado=true`), market
+With the optional cross-dual dynamics (`market_prices=true`), market
 prices respond to sectoral excess demand and capital moves on profit
 rates at those prices (Flaschel–Semmler). This gives the coupled model
 interior balanced-growth rays. Without market prices it has none: capital
 concentrates in one sector. The ODE is homogeneous of degree 1, so
 balanced growth is a fixed point of the system normalized to the simplex,
-and it can be continued and its bifurcations analysed:
+and it can be continued and its bifurcations analyzed:
 
 ```julia
 Random.seed!(5)
-sol, _, p = simular_Ndept(6, T = 1.0, seed = 5, acoplado = true, μ = 0.5,
-                          preços_mercado = true)          # β = 0.5 by default
+sol, _, p = simulate_Ndept(6, T = 1.0, seed = 5, coupled = true, μ = 0.5,
+                          market_prices = true)          # β = 0.5 by default
 X0 = sol.u[1]
 
-eq = crescimento_equilibrado(p, X0)       # g★, r★, k★, shares, eigenvalues, stability
-varrimento_salarial(p, X0; variante = :uniforme)          # g★, r★ against the wage share ω
+eq = balanced_growth(p, X0)       # g★, r★, k★, shares, eigenvalues, stability
+wage_sweep(p, X0; variant = :uniform)          # g★, r★ against the wage share ω
 
 # Hopf bifurcation in the mobility of variable capital μ_v (off by default),
 # with the normal form and the branch of limit cycles (collocation, Floquet)
 pb = merge(p, (β = 0.1,))
-res = bifurcacao_acumulação(pb, X0, :μ_v; intervalo = (0.0, 2.5))
+res = accumulation_bifurcation(pb, X0, :μ_v; interval = (0.0, 2.5))
 res.hopf[1]                               # θ, frequency, period, Lyapunov coefficient
-ciclo_simulado(pb, :μ_v, 1.1, X0)         # check the cycle by direct simulation
-curva_hopf(pb, X0)                        # Hopf boundary μ_v,H(ω)
-expoentes_lyapunov(pb, :μ_v, 1.9, X0)     # λ₁ > 0: chaos
-histerese_simulada(pb, :μ_v, 1.30:0.01:1.56, X0)   # coexisting attractors
+simulated_cycle(pb, :μ_v, 1.1, X0)        # check the cycle by direct simulation
+hopf_curve(pb, X0)                        # Hopf boundary μ_v,H(ω)
+lyapunov_exponents(pb, :μ_v, 1.9, X0)     # λ₁ > 0: chaos
+simulated_hysteresis(pb, :μ_v, 1.30:0.01:1.56, X0)   # coexisting attractors
 ```
 
 In every random economy tested, balanced growth loses stability at a
 supercritical Hopf bifurcation in `μ_v`. A higher wage share moves the
 boundary up. At higher `μ_v` the cycles give way to a torus, to a window
 where a stable cycle and the torus coexist, and to chaos. See `paper/main.tex`, Sections 3.6 and 5.6, and
-`docs/LIMITACOES.en.md` item 11.
+`docs/LIMITATIONS.md` item 11.
 
 ## Real sectoral data (Eurostat)
 
@@ -207,20 +208,20 @@ by default. Real Eurostat sectoral data are available as an option
 (`src/eurostat_sdmx.jl`):
 
 ```julia
-# Portuguese national accounts (INE) — 19 (:detalhada), 10 (:média), or 3
+# Portuguese national accounts (INE) — 19 (:detailed), 10 (:medium), or 3
 # (:macro) sectors, with a real technical matrix A (Eurostat IOT)
-params_real = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat, agregação = :detalhada)
+params_real = calibrate_portugal_model(year = 2022, data_source = :eurostat, aggregation = :detailed)
 
 # AMECO (3 macro-sectors), with a real technical matrix A (aggregated from
 # the 19-sector matrix)
-params_real, dados = calibrar_com_ameco_v2("Portugal", ano = 2022, dados_setoriais = :eurostat)
+params_real, data = calibrate_with_ameco_v2("Portugal", year = 2022, sector_data = :eurostat)
 
 # Capital stock via perpetual-inventory method instead of the directly
 # reported figure (optional)
-params_pim = calibrar_modelo_portugal(ano = 2022, fonte_dados = :eurostat, inventário_perpétuo = true)
+params_pim = calibrate_portugal_model(year = 2022, data_source = :eurostat, perpetual_inventory = true)
 
 # Manual check of Eurostat access (not run in the automated test suite)
-verificar_eurostat_setorial()
+check_eurostat_sectoral()
 ```
 
 Only covers EU/EEA countries; outside that coverage, or if the request
@@ -230,12 +231,12 @@ an error instead of silently degrading, since it is an explicit request
 for real data. The real matrix `A` uses `NAIO_10_CP1700` (the genuine
 symmetric input-output table — `NAIO_10_CP1620`, used previously, turned
 out to be a trade-and-transport-margins satellite table, not the IOT
-itself; see `docs/LIMITACOES.en.md` item 4-bis) with domestic-use flows
+itself; see `docs/LIMITATIONS.md` item 4-bis) with domestic-use flows
 only (`stk_flow=DOM`), no negative cells, reconciled directly against the
 gross output published by the table itself (`P1`). Since this table is a
 benchmark product (not annual — Portugal: 2010/2013/2015/2017/2020), a
 request for a year without a published table falls back to the nearest
-available year, with a warning. See `docs/LIMITACOES.en.md` items 4 and
+available year, with a warning. See `docs/LIMITATIONS.md` items 4 and
 4-bis for the exact status.
 
 ## Repository structure
@@ -244,23 +245,23 @@ available year, with a warning. See `docs/LIMITACOES.en.md` items 4 and
 marxkapital/
 ├── src/
 │   ├── MarxKapital.jl      # loader (using + includes)
-│   ├── estruturas.jl       # types and constants (AMECO)
-│   ├── nucleo.jl           # matrices, departments, ODEs, simulation
-│   ├── analise.jl          # profit rates, labor values, prices, transformation
-│   ├── distributiva.jl     # wage-profit curve and calibration validation
-│   ├── choques.jl          # wage shocks
-│   ├── diferenciacao.jl    # automatic differentiation: Jacobians, Hessians, rationing spectrum
+│   ├── types.jl            # types and constants (AMECO)
+│   ├── core.jl             # matrices, departments, ODEs, simulation
+│   ├── analysis.jl         # profit rates, labor values, prices, transformation
+│   ├── distribution.jl     # wage-profit curve and calibration validation
+│   ├── shocks.jl           # wage shocks
+│   ├── differentiation.jl  # automatic differentiation: Jacobians, Hessians, rationing spectrum
 │   ├── tssi.jl             # temporal single-system (TSSI) valuation, fixed lag τ
-│   ├── cruzado.jl          # cross-dual dynamics: market prices and capital mobility
-│   ├── crescimento.jl      # balanced growth: normalized system, wage-share sweep
-│   ├── bifurcacao.jl       # continuation and bifurcations: maps, Hopf, limit cycles (BifurcationKit)
-│   ├── calibracao_pt.jl    # Portuguese (INE) calibration, synthetic and real (Eurostat)
+│   ├── cross_dual.jl       # cross-dual dynamics: market prices and capital mobility
+│   ├── growth.jl           # balanced growth: normalized system, wage-share sweep
+│   ├── bifurcation.jl      # continuation and bifurcations: maps, Hopf, limit cycles (BifurcationKit)
+│   ├── calibration_pt.jl   # Portuguese (INE) calibration, synthetic and real (Eurostat)
 │   ├── ameco.jl            # AMECO: synthetic, calibration, comparison, series
 │   ├── ameco_sdmx.jl       # official AMECO SDMX API
 │   ├── ameco_download.jl   # automatic download + TXT/CSV parser (legacy)
 │   ├── eurostat_sdmx.jl    # Eurostat SDMX API: real sectoral data + IOT
-│   ├── visualizacao.jl     # plots
-│   └── exemplos.jl         # ready-made examples + help + testar_modelo
+│   ├── plotting.jl         # plots
+│   └── examples.jl         # ready-made examples + help + test_model
 ├── test/
 │   ├── runtests.jl         # test suite
 │   └── notebooks.jl        # smoke test: runs every notebook offline
@@ -268,14 +269,14 @@ marxkapital/
 ├── notebooks/              # worked examples (see notebooks/README.md)
 │   ├── jupyter/            # six narrative notebooks, with outputs
 │   └── pluto/              # three interactive notebooks
-├── docs/LIMITACOES.md      # required reading (docs/LIMITACOES.en.md for English)
+├── docs/LIMITATIONS.md     # required reading (+ .pt.md in Portuguese)
 ├── paper/                  # academic paper (LaTeX), reproducible from real data
 │   ├── main.tex            # methodology + empirical application (Portugal)
-│   ├── gerar_resultados.jl # generates every figure/table in the paper
+│   ├── generate_results.jl # generates every figure/table in the paper
 │   ├── matrix_audit.jl     # technical matrix A audit (manual check)
 │   ├── monte_carlo.jl      # systematic sweeps (convergence, dispersion)
-│   ├── jacobiana_bifurcacao.jl # exact Jacobian, bifurcations, TSSI (offline)
-│   ├── acumulacao_bifurcacao.jl # balanced growth, Hopf, cycles (offline)
+│   ├── jacobian_bifurcation.jl # exact Jacobian, bifurcations, TSSI (offline)
+│   ├── accumulation_bifurcation.jl # balanced growth, Hopf, cycles (offline)
 │   └── figures/
 ├── data/                   # (empty; downloaded data lands here, not version-controlled)
 ├── install_deps.jl
@@ -305,19 +306,19 @@ julia --project=. test/runtests.jl
 every push to `main` — see `.github/workflows/test.yml`. CI then runs every
 notebook (`julia test/notebooks.jl`, see `notebooks/README.md`). The suite covers
 the default synthetic/opt-in paths and runs fully offline; the real-data
-paths (`método=:sdmx`, `fonte_dados=:eurostat`, `dados_setoriais=:eurostat`)
+paths (`method=:sdmx`, `data_source=:eurostat`, `sector_data=:eurostat`)
 require network access and are not in CI — check them manually with
-`verificar_sdmx_ameco()`, `verificar_eurostat_setorial()`, and
+`check_ameco_sdmx()`, `check_eurostat_sectoral()`, and
 `paper/matrix_audit.jl`.
 
 ## Limitations
 
-Read [`docs/LIMITACOES.en.md`](docs/LIMITACOES.en.md). In summary: (1) the
+Read [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md). In summary: (1) the
 matrix A only feeds back into the N-department simulation optionally
-(`acoplado=true`), with three available mechanisms — capital mobility
+(`coupled=true`), with three available mechanisms — capital mobility
 (conserves aggregate constant capital exactly, by construction),
-aggregate realization pressure (`realização=true`), and exact per-sector
-quantity rationing (`racionamento=true`, solved by fixed point, no DAE
+aggregate realization pressure (`realization=true`), and exact per-sector
+quantity rationing (`rationing=true`, solved by fixed point, no DAE
 required); both supply-constrained mechanisms reconstruct genuine gross
 output from the model's own state (not a value-added-type approximation),
 and investment demand is converted to output scale before A is applied;
@@ -330,7 +331,7 @@ exactly against the table's own published output — a benchmark table, not
 annual), available as an option, but with fixed weights/random matrix A
 by default; (6) synthetic data remains the default behavior; (7) capital
 stock can be computed via perpetual inventory
-(`inventário_perpétuo=true`) instead of the directly reported figure,
+(`perpetual_inventory=true`) instead of the directly reported figure,
 also optional.
 
 ## Academic paper
@@ -339,7 +340,7 @@ also optional.
 (the model, the three coupling mechanisms, the rationing mechanism as a
 fixed point) and an empirical application to Portugal, with every
 figure/table generated reproducibly from real data
-(`paper/gerar_resultados.jl`, `paper/monte_carlo.jl`,
+(`paper/generate_results.jl`, `paper/monte_carlo.jl`,
 `paper/matrix_audit.jl` — no number entered by hand). Compile with
 `latexmk -pdf paper/main.tex`.
 

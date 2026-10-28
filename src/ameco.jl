@@ -1,521 +1,518 @@
 # ============================================================================
-# INTEGRAÇÃO COM AMECO — NÚCLEO
+# AMECO INTEGRATION — CORE
 # ============================================================================
-# Dados sintéticos, calibração, comparação internacional e séries temporais.
-# O download real está em ameco_download.jl.
+# Synthetic data, calibration, international comparison and time series.
+# The real download is in ameco_download.jl.
 # ============================================================================
 
-"""Lista, por categoria, todos os países disponíveis na AMECO."""
-function listar_países_ameco()
+"""Lists, by category, all the countries available in AMECO."""
+function list_ameco_countries()
     println("\n" * "="^70)
-    println("PAÍSES DISPONÍVEIS NA BASE AMECO")
+    println("COUNTRIES AVAILABLE IN THE AMECO DATABASE")
     println("="^70)
-    categorias = Dict(
-        "União Europeia (27)" => ["Alemanha", "Áustria", "Bélgica", "Bulgária",
-            "Chipre", "Croácia", "Dinamarca", "Eslováquia", "Eslovénia", "Espanha",
-            "Estónia", "Finlândia", "França", "Grécia", "Hungria", "Irlanda",
-            "Itália", "Letónia", "Lituânia", "Luxemburgo", "Malta", "Países Baixos",
-            "Polónia", "Portugal", "República Checa", "Roménia", "Suécia"],
-        "Área do Euro" => ["Área do Euro", "Área do Euro (19)"],
-        "Outros europeus" => ["Reino Unido", "Noruega", "Suíça", "Islândia"],
-        "Candidatos" => ["Turquia"],
-        "Comparação internacional" => ["Estados Unidos", "Japão"],
-        "Agregados" => ["União Europeia (27)", "União Europeia (28)"],
+    categories = Dict(
+        "European Union (27)" => ["Germany", "Austria", "Belgium", "Bulgaria",
+            "Cyprus", "Croatia", "Denmark", "Slovakia", "Slovenia", "Spain",
+            "Estonia", "Finland", "France", "Greece", "Hungary", "Ireland",
+            "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands",
+            "Poland", "Portugal", "Czechia", "Romania", "Sweden"],
+        "Euro Area" => ["Euro Area", "Euro Area (19)"],
+        "Other European" => ["United Kingdom", "Norway", "Switzerland", "Iceland"],
+        "Candidates" => ["Turkey"],
+        "International comparison" => ["United States", "Japan"],
+        "Aggregates" => ["European Union (27)", "European Union (28)"],
     )
-    for (cat, países) in sort(collect(categorias))
+    for (cat, countries) in sort(collect(categories))
         println("\n📍 $cat"); println("-"^70)
-        for p in sort(países)
-            println("  $p ($(CÓDIGOS_PAÍSES_AMECO[p]))")
+        for p in sort(countries)
+            println("  $p ($(AMECO_COUNTRY_CODES[p]))")
         end
     end
-    println("\n💡 Uso: obter_dados_ameco(\"Portugal\"); calibrar_com_ameco_v2(\"Portugal\")")
+    println("\n💡 Usage: fetch_ameco_data(\"Portugal\"); calibrate_with_ameco_v2(\"Portugal\")")
     println("="^70 * "\n")
 end
 
-"""Resolve nome ou código de país para o código ISO AMECO."""
-function _resolver_código_país(país::String)
-    haskey(CÓDIGOS_PAÍSES_AMECO, país) && return CÓDIGOS_PAÍSES_AMECO[país]
-    país in values(CÓDIGOS_PAÍSES_AMECO) && return país
-    error("País '$país' não encontrado. Use listar_países_ameco().")
+"""Resolves a country name or code to the AMECO ISO code."""
+function _resolve_country_code(country::String)
+    haskey(AMECO_COUNTRY_CODES, country) && return AMECO_COUNTRY_CODES[country]
+    country in values(AMECO_COUNTRY_CODES) && return country
+    error("Country '$country' not found. Use list_ameco_countries().")
 end
 
 """
-    gerar_dados_sintéticos_ameco(código_país, anos)
+    generate_synthetic_ameco_data(country_code, years)
 
-Séries temporais sintéticas mas plausíveis (tendência + ciclo) calibradas
-por parâmetros base de cada país. Para demonstração — não usar oficialmente.
+Synthetic but plausible time series (trend + cycle) calibrated by base
+parameters for each country. For demonstration only; not for official use.
 """
-function gerar_dados_sintéticos_ameco(código_país::String, anos::Vector{Int})
-    println("\n🔬 Gerando dados sintéticos AMECO para $código_país...")
-    n = length(anos)
+function generate_synthetic_ameco_data(country_code::String, years::Vector{Int})
+    println("\n🔬 Generating synthetic AMECO data for $country_code...")
+    n = length(years)
 
-    params_país = Dict(
-        "PT" => (PIB_base = 234_000, emprego_base = 4_900),
-        "ES" => (PIB_base = 1_400_000, emprego_base = 20_500),
-        "DE" => (PIB_base = 3_900_000, emprego_base = 44_900),
-        "FR" => (PIB_base = 2_800_000, emprego_base = 29_600),
-        "IT" => (PIB_base = 2_000_000, emprego_base = 25_600),
-        "NL" => (PIB_base = 1_000_000, emprego_base = 9_700),
-        "BE" => (PIB_base = 580_000, emprego_base = 5_000),
-        "EL" => (PIB_base = 215_000, emprego_base = 4_100),
-        "IE" => (PIB_base = 500_000, emprego_base = 2_500),
-        "EA19" => (PIB_base = 14_000_000, emprego_base = 165_000),
-        "US" => (PIB_base = 25_000_000, emprego_base = 160_000),
+    country_params = Dict(
+        "PT" => (GDP_base = 234_000, employment_base = 4_900),
+        "ES" => (GDP_base = 1_400_000, employment_base = 20_500),
+        "DE" => (GDP_base = 3_900_000, employment_base = 44_900),
+        "FR" => (GDP_base = 2_800_000, employment_base = 29_600),
+        "IT" => (GDP_base = 2_000_000, employment_base = 25_600),
+        "NL" => (GDP_base = 1_000_000, employment_base = 9_700),
+        "BE" => (GDP_base = 580_000, employment_base = 5_000),
+        "EL" => (GDP_base = 215_000, employment_base = 4_100),
+        "IE" => (GDP_base = 500_000, employment_base = 2_500),
+        "EA19" => (GDP_base = 14_000_000, employment_base = 165_000),
+        "US" => (GDP_base = 25_000_000, employment_base = 160_000),
     )
-    if !haskey(params_país, código_país)
-        @warn "País $código_país sem parâmetros específicos; a usar perfil PT."
+    if !haskey(country_params, country_code)
+        @warn "Country $country_code has no specific parameters; using the PT profile."
     end
-    base = get(params_país, código_país, params_país["PT"])
+    base = get(country_params, country_code, country_params["PT"])
 
     g_nom, g_real, infl = 0.015, 0.012, 0.02
     t = 1:n
-    ciclo = sin.(2π * t / 8) * 0.02
+    cycle = sin.(2π * t / 8) * 0.02
 
-    PIB       = base.PIB_base .* (1 + g_nom).^(t .- n) .* (1 .+ ciclo)
-    PIB_real  = base.PIB_base .* (1 + g_real).^(t .- n) .* (1 .+ ciclo * 0.8)
-    deflator  = PIB ./ PIB_real * 100
-    IPC       = 100 .* (1 + infl).^(t .- 1) .* (1 .+ rand(n) * 0.005 .- 0.0025)
+    GDP       = base.GDP_base .* (1 + g_nom).^(t .- n) .* (1 .+ cycle)
+    real_GDP  = base.GDP_base .* (1 + g_real).^(t .- n) .* (1 .+ cycle * 0.8)
+    deflator  = GDP ./ real_GDP * 100
+    CPI       = 100 .* (1 + infl).^(t .- 1) .* (1 .+ rand(n) * 0.005 .- 0.0025)
 
-    consumo_privado = PIB * 0.65
-    consumo_público = PIB * 0.18
-    FBCF            = PIB * 0.20
-    exportações     = PIB * 0.45
-    importações     = PIB * 0.43
+    private_consumption = GDP * 0.65
+    public_consumption = GDP * 0.18
+    GFCF            = GDP * 0.20
+    exports     = GDP * 0.45
+    imports     = GDP * 0.43
 
-    emprego = base.emprego_base .* (1 + 0.005).^(t .- n) .* (1 .+ ciclo * 0.3)
-    emprego_assalariado = emprego * 0.85
+    employment = base.employment_base .* (1 + 0.005).^(t .- n) .* (1 .+ cycle * 0.3)
+    employees = employment * 0.85
 
-    desemp_base = código_país == "PT" ? 7.0 : código_país == "DE" ? 3.5 :
-                  código_país == "ES" ? 13.0 : código_país == "EL" ? 12.0 : 6.0
-    desemprego = max.(desemp_base .+ ciclo * (-20) .+ rand(n) * 2 .- 1, 2.0)
-    população_ativa = emprego ./ (1 .- desemprego / 100)
+    unemp_base = country_code == "PT" ? 7.0 : country_code == "DE" ? 3.5 :
+                  country_code == "ES" ? 13.0 : country_code == "EL" ? 12.0 : 6.0
+    unemployment = max.(unemp_base .+ cycle * (-20) .+ rand(n) * 2 .- 1, 2.0)
+    labor_force = employment ./ (1 .- unemployment / 100)
 
-    remunerações = PIB * 0.52
-    produtividade = PIB_real ./ emprego
-    custos_unit = (remunerações ./ emprego) ./ produtividade * 100
+    compensation = GDP * 0.52
+    productivity = real_GDP ./ employment
+    unit_costs = (compensation ./ employment) ./ productivity * 100
 
-    receitas = PIB * 0.43
-    despesas = PIB * 0.46
-    saldo = (receitas .- despesas) ./ PIB * 100
-    dívida_base = código_país == "PT" ? 120.0 : código_país == "EL" ? 180.0 :
-                  código_país == "IT" ? 140.0 : código_país == "DE" ? 60.0 : 80.0
-    dívida = dívida_base .+ cumsum(saldo) * 0.1
+    revenue = GDP * 0.43
+    expenditure = GDP * 0.46
+    balance = (revenue .- expenditure) ./ GDP * 100
+    debt_base = country_code == "PT" ? 120.0 : country_code == "EL" ? 180.0 :
+                  country_code == "IT" ? 140.0 : country_code == "DE" ? 60.0 : 80.0
+    debt = debt_base .+ cumsum(balance) * 0.1
 
-    bal_comercial = (exportações .- importações) ./ PIB * 100
-    bal_corrente = bal_comercial .+ rand(n) * 2 .- 1
+    trade_bal = (exports .- imports) ./ GDP * 100
+    current_bal = trade_bal .+ rand(n) * 2 .- 1
 
-    stock_capital = PIB * 3.0 .+ cumsum(FBCF) * 0.1
-    ccf = 0.05 .* stock_capital
+    capital_stock = GDP * 3.0 .+ cumsum(GFCF) * 0.1
+    cfc = 0.05 .* capital_stock
 
-    println("  ✓ $n anos ($(anos[1])-$(anos[end])) | PIB médio $(round(mean(PIB)/1000, digits=1)) mil M | desemprego médio $(round(mean(desemprego), digits=1))%")
+    println("  ✓ $n years ($(years[1])-$(years[end])) | mean GDP $(round(mean(GDP)/1000, digits=1)) bn | mean unemployment $(round(mean(unemployment), digits=1))%")
 
-    nome_país = something(findfirst(==(código_país), CÓDIGOS_PAÍSES_AMECO), código_país)
-    notas = Dict("tipo" => "Dados sintéticos", "baseado_em" => "Padrões AMECO reais",
-                 "advertência" => "Demonstração — não usar em análise oficial")
+    country_name = something(findfirst(==(country_code), AMECO_COUNTRY_CODES), country_code)
+    notes = Dict("type" => "Synthetic data", "based_on" => "Real AMECO patterns",
+                 "warning" => "Demonstration only; do not use for official analysis")
 
-    return DadosAMECO(nome_país, código_país, anos,
-        PIB, PIB_real, consumo_privado, consumo_público, FBCF, exportações, importações,
-        emprego, emprego_assalariado, desemprego, população_ativa,
-        remunerações, produtividade, custos_unit, deflator, deflator, IPC, ccf,
-        receitas, despesas, saldo, dívida, bal_corrente, bal_comercial,
-        stock_capital, "AMECO (sintético)", now(), notas)
+    return AMECOData(country_name, country_code, years,
+        GDP, real_GDP, private_consumption, public_consumption, GFCF, exports, imports,
+        employment, employees, unemployment, labor_force,
+        compensation, productivity, unit_costs, deflator, deflator, CPI, cfc,
+        revenue, expenditure, balance, debt, current_bal, trade_bal,
+        capital_stock, "AMECO (synthetic)", now(), notes)
 end
 
-"""Constrói DadosAMECO a partir de séries extraídas (dicionário nome → vetor)."""
-function construir_dados_ameco(código_país, anos, dados::Dict, fonte)
-    nome_país = something(findfirst(==(código_país), CÓDIGOS_PAÍSES_AMECO), código_país)
-    g(key, d = 0.0) = get(dados, key, fill(d, length(anos)))
-    return DadosAMECO(nome_país, código_país, anos,
-        g("PIB_corrente"), g("PIB_constante"), g("consumo_privado"), g("consumo_público"),
-        g("FBCF"), g("exportações"), g("importações"), g("emprego_total"),
-        g("emprego_assalariado"), g("taxa_desemprego"), g("população_ativa"),
-        g("remunerações"), g("produtividade_trabalho"), g("custos_unit_trabalho"),
-        g("deflator_PIB"), g("deflator_FBCF"), g("IPC"), g("CCF"), g("receitas_governo"), g("despesas_governo"),
-        g("saldo_orçamental"), g("dívida_pública"), g("balança_corrente"),
-        g("balança_comercial", NaN), g("stock_capital_líquido"),
-        fonte, now(), Dict{String, String}())
+"""Builds an AMECOData from extracted series (name → vector dictionary)."""
+function build_ameco_data(country_code, years, data::Dict, source)
+    country_name = something(findfirst(==(country_code), AMECO_COUNTRY_CODES), country_code)
+    g(key, d = 0.0) = get(data, key, fill(d, length(years)))
+    return AMECOData(country_name, country_code, years,
+        g("GDP_current"), g("GDP_constant"), g("private_consumption"), g("public_consumption"),
+        g("GFCF"), g("exports"), g("imports"), g("employment_total"),
+        g("employees"), g("unemployment_rate"), g("labor_force"),
+        g("compensation"), g("labor_productivity"), g("unit_labor_costs"),
+        g("GDP_deflator"), g("GFCF_deflator"), g("CPI"), g("CFC"), g("government_revenue"), g("government_expenditure"),
+        g("budget_balance"), g("public_debt"), g("current_account"),
+        g("trade_balance", NaN), g("net_capital_stock"),
+        source, now(), Dict{String, String}())
 end
 
 # ----------------------------------------------------------------------------
-# Calibração a partir de dados AMECO
+# Calibration from AMECO data
 # ----------------------------------------------------------------------------
 
-"""Distribuição setorial (macro: 3 setores) do VAB por país."""
-function _dist_setorial_vab(código_país)
-    código_país == "PT" ? [0.02, 0.22, 0.76] :
-    código_país == "DE" ? [0.01, 0.30, 0.69] :
-    código_país == "EL" ? [0.04, 0.16, 0.80] : [0.02, 0.25, 0.73]
+"""Sectoral distribution (macro: 3 sectors) of GVA by country."""
+function _sector_gva_shares(country_code)
+    country_code == "PT" ? [0.02, 0.22, 0.76] :
+    country_code == "DE" ? [0.01, 0.30, 0.69] :
+    country_code == "EL" ? [0.04, 0.16, 0.80] : [0.02, 0.25, 0.73]
 end
 
-"""Distribuição setorial (macro: 3 setores) do emprego por país."""
-function _dist_setorial_emprego(código_país)
-    código_país == "PT" ? [0.04, 0.24, 0.72] : [0.03, 0.26, 0.71]
+"""Sectoral distribution (macro: 3 sectors) of employment by country."""
+function _sector_employment_shares(country_code)
+    country_code == "PT" ? [0.04, 0.24, 0.72] : [0.03, 0.26, 0.71]
 end
 
-"""Distribuição setorial (macro: 3 setores) do stock de capital líquido.
-Quotas do Eurostat para Portugal (`NAMA_10_NFA_ST`, 2019/2022: ≈ 0.016 /
-0.16 / 0.82), usadas para todos os países: o Terciário inclui a habitação."""
-_dist_setorial_stock(código_país) = [0.02, 0.16, 0.82]
+"""Sectoral distribution (macro: 3 sectors) of the net capital stock.
+Eurostat shares for Portugal (`NAMA_10_NFA_ST`, 2019/2022: ≈ 0.016 /
+0.16 / 0.82), used for every country: the Tertiary sector includes housing."""
+_sector_stock_shares(country_code) = [0.02, 0.16, 0.82]
 
-"""Soma valores setoriais (secção NACE → valor) por grupo de secções."""
-function _somar_por_grupo(valores::Dict{String, Float64}, grupos::Vector{Vector{String}})
-    [sum(get(valores, s, 0.0) for s in secções) for secções in grupos]
+"""Sums sectoral values (NACE section → value) by group of sections."""
+function _sum_by_group(values::Dict{String, Float64}, groups::Vector{Vector{String}})
+    [sum(get(values, s, 0.0) for s in sections) for sections in groups]
 end
 
 """
-    calibrar_com_dados_ameco(dados::DadosAMECO, ano, agregação; dados_setoriais=:fixo)
+    calibrate_with_ameco_data(data::AMECOData, year, aggregation; sector_data=:fixed)
 
-Calibra o modelo a partir de uma estrutura DadosAMECO já carregada.
-Atualmente só a agregação `:macro` (Primário/Secundário/Terciário) está
-implementada. Se o ano pedido não tiver PIB válido, usa o ano válido mais
-próximo.
+Calibrates the model from an already loaded AMECOData structure. Only the
+`:macro` aggregation (Primary/Secondary/Tertiary) is implemented at present.
+If the requested year has no valid GDP, the closest valid year is used.
 
-`dados_setoriais`:
-- `:fixo` (omissão) — reparte os totais AMECO por pesos fixos
-  (`_dist_setorial_vab`/`_dist_setorial_emprego`), como sempre.
-- `:eurostat` — usa VAB, remunerações, CCF, emprego, FBCF e stock de capital
-  setoriais reais do Eurostat (`src/eurostat_sdmx.jl`), agregados aos 3
-  setores macro, e uma matriz técnica `A` real: construída aos 19 setores
-  finos (`construir_matriz_io_eurostat`, já não-negativa) e agregada aos 3
-  setores macro pela fórmula de Leontief (`agregar_matriz_io`) — não a
-  partir dos fluxos brutos do IOT diretamente, o que reintroduziria o
-  problema das margens de comércio/transporte (ver `docs/LIMITACOES.md`
-  item 4, agora resolvido desta forma, com a ressalva de que a linha do
-  Terciário fica conservadora). Só cobre países da UE/EEE; sem cobertura,
-  ou se o pedido (dados ou matriz) falhar, cai para `:fixo` com aviso —
-  nunca lança erro por esta via (ao contrário do caminho INE, aqui o pedido
-  não é obrigatoriamente por dados reais explícitos, já que
-  `calibrar_com_ameco_v2` pode ser chamado para qualquer país AMECO,
-  incluindo os fora da cobertura Eurostat).
+`sector_data`:
+- `:fixed` (default): splits the AMECO totals by fixed weights
+  (`_sector_gva_shares`/`_sector_employment_shares`), as before.
+- `:eurostat`: uses real sectoral GVA, compensation, CFC, employment, GFCF
+  and capital stock from Eurostat (`src/eurostat_sdmx.jl`), aggregated to the
+  3 macro sectors, and a real technical matrix `A`: built at the 19 fine
+  sectors (`build_eurostat_io_matrix`, already non-negative) and aggregated
+  to the 3 macro sectors by the Leontief formula (`aggregate_io_matrix`),
+  not directly from the raw IOT flows, which would reintroduce the
+  trade/transport margins problem (see `docs/LIMITATIONS.md` item 4, now
+  solved this way, with the caveat that the Tertiary row is conservative).
+  It only covers EU/EEA countries; without coverage, or if the request (data
+  or matrix) fails, it falls back to `:fixed` with a warning. It never throws
+  on this path: unlike the INE path, the request here is not necessarily an
+  explicit request for real data, since `calibrate_with_ameco_v2` can be
+  called for any AMECO country, including those outside Eurostat's coverage.
 
-`inventário_perpétuo=true` (só tem efeito com `dados_setoriais=:eurostat`)
-substitui o stock líquido reportado pelo Eurostat por uma série própria
-calculada pelo método do inventário perpétuo, aos 19 setores finos
-(`_stock_capital_pim_por_secção`, `src/calibracao_pt.jl`), agregada só
-depois aos 3 setores macro — agregar a série já calculada é mais correto do
-que recalcular a partir de FBCF já somado a 3 grupos. Ver
-`docs/LIMITACOES.md` item 7.
+`perpetual_inventory=true` (only has an effect with `sector_data=:eurostat`)
+replaces the net stock reported by Eurostat with an own series computed by
+the perpetual inventory method at the 19 fine sectors
+(`_pim_capital_stock_by_section`, `src/calibration_pt.jl`), aggregated to the
+3 macro sectors only afterwards: aggregating the already computed series is
+more correct than recomputing from GFCF already summed into 3 groups. See
+`docs/LIMITATIONS.md` item 7.
 """
-function calibrar_com_dados_ameco(dados::DadosAMECO, ano::Int, agregação::Symbol;
-                                  dados_setoriais::Symbol = :fixo,
-                                  inventário_perpétuo::Bool = false)
+function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symbol;
+                                  sector_data::Symbol = :fixed,
+                                  perpetual_inventory::Bool = false)
     println("\n" * "="^70)
-    println("CALIBRAÇÃO COM DADOS AMECO — $(dados.país) | Ano: $ano")
-    println("Fonte: $(dados.fonte)")
+    println("CALIBRATION WITH AMECO DATA — $(data.country) | Year: $year")
+    println("Source: $(data.source)")
     println("="^70)
 
-    agregação == :macro || error("Apenas agregação :macro implementada")
+    aggregation == :macro || error("Only the :macro aggregation is implemented")
 
-    idx = findfirst(==(ano), dados.anos)
-    isnothing(idx) && error("Ano $ano indisponível. Anos: $(dados.anos[1])-$(dados.anos[end])")
+    idx = findfirst(==(year), data.years)
+    isnothing(idx) && error("Year $year unavailable. Years: $(data.years[1])-$(data.years[end])")
 
-    if isnan(dados.PIB[idx]) || dados.PIB[idx] <= 0
-        válidos = findall(x -> !isnan(x) && x > 0, dados.PIB)
-        isempty(válidos) && error("Nenhum PIB válido nos dados")
-        idx = válidos[argmin(abs.(dados.anos[válidos] .- ano))]
-        ano = dados.anos[idx]
-        @warn "PIB indisponível; a usar ano $ano (mais próximo com dados)."
+    if isnan(data.GDP[idx]) || data.GDP[idx] <= 0
+        valid = findall(x -> !isnan(x) && x > 0, data.GDP)
+        isempty(valid) && error("No valid GDP in the data")
+        idx = valid[argmin(abs.(data.years[valid] .- year))]
+        year = data.years[idx]
+        @warn "GDP unavailable; using year $year (the closest with data)."
     end
 
-    setores = ["Primário", "Secundário", "Terciário"]
-    códigos = ["PRIM", "SEC", "TER"]
+    sectors = ["Primary", "Secondary", "Tertiary"]
+    codes = ["PRIM", "SEC", "TER"]
     N = 3
 
-    PIB_total    = dados.PIB[idx]
-    emprego_tot  = dados.emprego[idx]
-    remun_tot    = dados.remunerações[idx]
-    FBCF_total   = dados.FBCF[idx]
-    stock_tot    = dados.stock_capital_total[idx]
+    GDP_total    = data.GDP[idx]
+    employment_total  = data.employment[idx]
+    comp_total    = data.compensation[idx]
+    GFCF_total   = data.GFCF[idx]
+    stock_total    = data.total_capital_stock[idx]
 
-    println("\n📊 Dados ($ano): PIB $(round(PIB_total/1000, digits=1)) mil M | " *
-            "Emprego $(round(emprego_tot/1000, digits=2)) M | " *
-            "Stock K $(round(stock_tot/1000, digits=1)) mil M")
+    println("\n📊 Data ($year): GDP $(round(GDP_total/1000, digits=1)) bn | " *
+            "Employment $(round(employment_total/1000, digits=2)) M | " *
+            "Stock K $(round(stock_total/1000, digits=1)) bn")
 
-    VAB = emprego = remunerações = stock_capital = FBCF_setorial = CCF = Float64[]
+    GVA = employment = compensation = capital_stock = GFCF_sectoral = CFC = Float64[]
     A_real = zeros(0, 0)
-    setoriais_reais = false
+    real_sectoral = false
 
-    if dados_setoriais == :eurostat
+    if sector_data == :eurostat
         try
-            vab_s, remun_s, ccf_s = obter_vab_remuneracoes_ccf_eurostat(dados.código_país, ano)
-            emprego_s = obter_emprego_setorial_eurostat(dados.código_país, ano)
-            fbcf_s = obter_fbcf_setorial_eurostat(dados.código_país, ano)
-            stock_s = obter_stock_capital_setorial_eurostat(dados.código_país, ano)
-            secções_completas = [s for s in SECÇÕES_NACE if haskey(vab_s, s) && haskey(remun_s, s) &&
-                                 haskey(ccf_s, s) && haskey(emprego_s, s) && haskey(fbcf_s, s) && haskey(stock_s, s)]
-            length(secções_completas) < 10 &&
-                error("cobertura insuficiente ($(length(secções_completas))/19 secções)")
+            gva_s, comp_s, cfc_s = fetch_eurostat_gva_compensation_cfc(data.country_code, year)
+            employment_s = fetch_eurostat_sector_employment(data.country_code, year)
+            gfcf_s = fetch_eurostat_sector_gfcf(data.country_code, year)
+            stock_s = fetch_eurostat_sector_capital_stock(data.country_code, year)
+            complete_sections = [s for s in NACE_SECTIONS if haskey(gva_s, s) && haskey(comp_s, s) &&
+                                 haskey(cfc_s, s) && haskey(employment_s, s) && haskey(gfcf_s, s) && haskey(stock_s, s)]
+            length(complete_sections) < 10 &&
+                error("insufficient coverage ($(length(complete_sections))/19 sections)")
 
-            if inventário_perpétuo
-                stock_s = _stock_capital_pim_por_secção(dados.código_país, ano, secções_completas, stock_s)
-                println("  ✓ stock de capital recalculado por inventário perpétuo (19 setores finos).")
+            if perpetual_inventory
+                stock_s = _pim_capital_stock_by_section(data.country_code, year, complete_sections, stock_s)
+                println("  ✓ capital stock recomputed by perpetual inventory (19 fine sectors).")
             end
 
-            VAB           = _somar_por_grupo(vab_s, GRUPOS_MACRO_NACE)
-            remunerações  = _somar_por_grupo(remun_s, GRUPOS_MACRO_NACE)
-            CCF           = _somar_por_grupo(ccf_s, GRUPOS_MACRO_NACE)
-            emprego       = _somar_por_grupo(emprego_s, GRUPOS_MACRO_NACE)
-            FBCF_setorial = _somar_por_grupo(fbcf_s, GRUPOS_MACRO_NACE)
-            stock_capital = _somar_por_grupo(stock_s, GRUPOS_MACRO_NACE)
+            GVA           = _sum_by_group(gva_s, NACE_MACRO_GROUPS)
+            compensation  = _sum_by_group(comp_s, NACE_MACRO_GROUPS)
+            CFC           = _sum_by_group(cfc_s, NACE_MACRO_GROUPS)
+            employment       = _sum_by_group(employment_s, NACE_MACRO_GROUPS)
+            GFCF_sectoral = _sum_by_group(gfcf_s, NACE_MACRO_GROUPS)
+            capital_stock = _sum_by_group(stock_s, NACE_MACRO_GROUPS)
 
-            # Matriz A real: constrói-se aos 19 setores finos (limpa, não-negativa —
-            # ver construir_matriz_io_eurostat) e agrega-se aos 3 setores macro pela
-            # fórmula de Leontief (agregar_matriz_io), não a partir dos fluxos brutos
-            # do IOT diretamente — isso reintroduziria o problema das margens de
-            # comércio/transporte (ver docs/LIMITACOES.md item 4).
-            A19 = construir_matriz_io_eurostat(dados.código_país, ano,
-                [[s] for s in SECÇÕES_NACE], vab_s)
-            A_real = agregar_matriz_io(A19, SECÇÕES_NACE, GRUPOS_MACRO_NACE, vab_s)
+            # Real matrix A: built at the 19 fine sectors (clean, non-negative;
+            # see build_eurostat_io_matrix) and aggregated to the 3 macro sectors
+            # by the Leontief formula (aggregate_io_matrix), not directly from the
+            # raw IOT flows, which would reintroduce the trade/transport margins
+            # problem (see docs/LIMITATIONS.md item 4).
+            A19 = build_eurostat_io_matrix(data.country_code, year,
+                [[s] for s in NACE_SECTIONS], gva_s)
+            A_real = aggregate_io_matrix(A19, NACE_SECTIONS, NACE_MACRO_GROUPS, gva_s)
 
-            setoriais_reais = true
-            println("  ✓ dados setoriais reais (Eurostat, $(length(secções_completas))/19 secções), matriz A real.")
+            real_sectoral = true
+            println("  ✓ real sectoral data (Eurostat, $(length(complete_sections))/19 sections), real matrix A.")
         catch e
-            @warn "Dados setoriais/matriz A Eurostat indisponíveis para $(dados.código_país) ($e); a usar pesos fixos e A aleatória."
+            @warn "Eurostat sectoral data/matrix A unavailable for $(data.country_code) ($e); using fixed weights and a random A."
         end
     end
 
-    if !setoriais_reais
-        dist_VAB = _dist_setorial_vab(dados.código_país)
-        dist_emp = _dist_setorial_emprego(dados.código_país)
-        VAB           = PIB_total * dist_VAB
-        emprego       = emprego_tot * dist_emp
-        remunerações  = remun_tot * dist_VAB
-        stock_capital = stock_tot * _dist_setorial_stock(dados.código_país)
-        FBCF_setorial = FBCF_total * dist_VAB
-        # CCF real da AMECO (UKCT), repartido como o VAB (as quotas setoriais
-        # reais do CCF seguem de perto as do VAB); só sem série se recorre a
-        # uma taxa de depreciação típica sobre o stock.
-        CCF_total = dados.CCF[idx]
-        if isfinite(CCF_total) && CCF_total > 0
-            CCF = CCF_total * dist_VAB
+    if !real_sectoral
+        dist_GVA = _sector_gva_shares(data.country_code)
+        dist_emp = _sector_employment_shares(data.country_code)
+        GVA           = GDP_total * dist_GVA
+        employment       = employment_total * dist_emp
+        compensation  = comp_total * dist_GVA
+        capital_stock = stock_total * _sector_stock_shares(data.country_code)
+        GFCF_sectoral = GFCF_total * dist_GVA
+        # Real AMECO CFC (UKCT), split like GVA (the real sectoral CFC shares
+        # track the GVA shares closely); only without the series does it fall
+        # back to a typical depreciation rate on the stock.
+        CFC_total = data.CFC[idx]
+        if isfinite(CFC_total) && CFC_total > 0
+            CFC = CFC_total * dist_GVA
         else
-            @warn "CCF AMECO indisponível em $ano; a usar 6% do stock de capital."
-            CCF = stock_capital * 0.06
+            @warn "AMECO CFC unavailable in $year; using 6% of the capital stock."
+            CFC = capital_stock * 0.06
         end
     end
 
-    V = remunerações
-    C = stock_capital
-    EBE = VAB .- remunerações
-    rendimento = EBE .- CCF
+    V = compensation
+    C = capital_stock
+    GOS = GVA .- compensation
+    income = GOS .- CFC
 
-    # Piso em e, como em estimar_parametros_setoriais (docs/LIMITACOES.md item 8),
-    # e r = e/(k+1) a partir do e já com piso, para os parâmetros ficarem coerentes.
-    e_bruto = rendimento ./ remunerações
-    e = max.(e_bruto, 0.1)
-    n_saturados = count(e_bruto .< 0.1)
-    n_saturados > 0 && println("  ⚠ e saturado no piso 0.1 em $n_saturados/$N setores " *
-                               "(taxa de mais-valia < 0.1 antes do piso)")
+    # Floor on e, as in estimate_sector_parameters (docs/LIMITATIONS.md item 8),
+    # and r = e/(k+1) from the floored e, so that the parameters stay consistent.
+    e_raw = income ./ compensation
+    e = max.(e_raw, 0.1)
+    n_saturated = count(e_raw .< 0.1)
+    n_saturated > 0 && println("  ⚠ e saturated at the 0.1 floor in $n_saturated/$N sectors " *
+                               "(surplus-value rate < 0.1 before the floor)")
     k = C ./ V
     r = e ./ (k .+ 1)
 
-    println("\n📐 Parâmetros marxianos:")
+    println("\n📐 Marxian parameters:")
     for i in 1:N
-        println("  $(setores[i]): e=$(round(e[i], digits=2)) k=$(round(k[i], digits=2)) r=$(round(r[i]*100, digits=2))%")
+        println("  $(sectors[i]): e=$(round(e[i], digits=2)) k=$(round(k[i], digits=2)) r=$(round(r[i]*100, digits=2))%")
     end
 
-    A = setoriais_reais ? A_real : criar_matriz_tecnica(N, densidade = 0.3)
-    l = emprego ./ VAB; l = l / maximum(l)
-    σ_c = clamp.(FBCF_setorial ./ rendimento, 0.2, 0.7)
+    A = real_sectoral ? A_real : create_technical_matrix(N, density = 0.3)
+    l = employment ./ GVA; l = l / maximum(l)
+    σ_c = clamp.(GFCF_sectoral ./ income, 0.2, 0.7)
     σ_v = fill(0.15, N)
-    δ = CCF ./ stock_capital
+    δ = CFC ./ capital_stock
 
-    fonte_setorial = setoriais_reais ? " + Eurostat (setorial real)" : ""
-    resultado = ParâmetrosCalibrados(N, setores, códigos, C, V, VAB, e, k, r, A, l,
-        σ_c, σ_v, δ, "AMECO — $(dados.fonte)$fonte_setorial", ano, now(), 0.80)
+    sector_source = real_sectoral ? " + Eurostat (real sectoral)" : ""
+    result = CalibratedParameters(N, sectors, codes, C, V, GVA, e, k, r, A, l,
+        σ_c, σ_v, δ, "AMECO — $(data.source)$sector_source", year, now(), 0.80)
 
-    println("\n✅ CALIBRAÇÃO CONCLUÍDA — e médio $(round(mean(e), digits=2)) | r médio $(round(mean(r)*100, digits=2))%")
+    println("\n✅ CALIBRATION COMPLETE — mean e $(round(mean(e), digits=2)) | mean r $(round(mean(r)*100, digits=2))%")
     println("="^70 * "\n")
-    return resultado, dados
+    return result, data
 end
 
 """
-    calibrar_com_ameco_v2(país; ano=2022, método=:auto, dados_setoriais=:fixo, inventário_perpétuo=false)
+    calibrate_with_ameco_v2(country; year=2022, method=:auto, sector_data=:fixed, perpetual_inventory=false)
 
-Obtém dados AMECO (ver `obter_dados_ameco`) e calibra o modelo.
-`método` ∈ (:auto, :sdmx, :download, :local, :csv, :sintético, :manual).
-`dados_setoriais` ∈ (:fixo, :eurostat), `inventário_perpétuo` — ver
-`calibrar_com_dados_ameco`.
+Fetches AMECO data (see `fetch_ameco_data`) and calibrates the model.
+`method` ∈ (:auto, :sdmx, :download, :local, :csv, :synthetic, :manual).
+`sector_data` ∈ (:fixed, :eurostat), `perpetual_inventory`: see
+`calibrate_with_ameco_data`.
 """
-function calibrar_com_ameco_v2(país::String; ano = 2022, método = :auto,
-                               agregação_setorial = :macro, dados_setoriais = :fixo,
-                               inventário_perpétuo = false)
-    dados = obter_dados_ameco(país, anos = 1995:ano, método = método)
-    return calibrar_com_dados_ameco(dados, ano, agregação_setorial;
-                                    dados_setoriais = dados_setoriais,
-                                    inventário_perpétuo = inventário_perpétuo)
+function calibrate_with_ameco_v2(country::String; year = 2022, method = :auto,
+                               sector_aggregation = :macro, sector_data = :fixed,
+                               perpetual_inventory = false)
+    data = fetch_ameco_data(country, years = 1995:year, method = method)
+    return calibrate_with_ameco_data(data, year, sector_aggregation;
+                                    sector_data = sector_data,
+                                    perpetual_inventory = perpetual_inventory)
 end
 
 # ----------------------------------------------------------------------------
-# Comparação internacional
+# International comparison
 # ----------------------------------------------------------------------------
 
 """
-    comparar_países_ameco(países; ano=2022, método=:sintético)
+    compare_ameco_countries(countries; year=2022, method=:synthetic)
 
-Calibra vários países e produz tabela + gráficos comparativos dos indicadores
-marxianos.
+Calibrates several countries and produces a comparison table and plots of
+the Marxian indicators.
 """
-function comparar_países_ameco(países::Vector{String}; ano = 2022, método = :sintético)
+function compare_ameco_countries(countries::Vector{String}; year = 2022, method = :synthetic)
     println("\n" * "="^70)
-    println("COMPARAÇÃO INTERNACIONAL — AMECO | Ano: $ano")
-    println("Países: $(join(países, ", "))")
+    println("INTERNATIONAL COMPARISON — AMECO | Year: $year")
+    println("Countries: $(join(countries, ", "))")
     println("="^70)
 
-    resultados = []
-    for país in países
-        println("\n🌍 $país...")
-        params, dados = calibrar_com_ameco_v2(país, ano = ano, método = método)
-        push!(resultados, (país = país, params = params, dados = dados))
+    results = []
+    for country in countries
+        println("\n🌍 $country...")
+        params, data = calibrate_with_ameco_v2(country, year = year, method = method)
+        push!(results, (country = country, params = params, data = data))
     end
 
     df = DataFrame(
-        País = [r.país for r in resultados],
-        PIB = [round(sum(r.params.VAB) / 1000, digits = 1) for r in resultados],   # mil M
-        Taxa_Exploração = [round(mean(r.params.e), digits = 2) for r in resultados],
-        Comp_Orgânica = [round(mean(r.params.k), digits = 2) for r in resultados],
-        Taxa_Lucro = [round(mean(r.params.r) * 100, digits = 2) for r in resultados],
-        Quota_Salarial = [round(sum(r.params.V) / sum(r.params.VAB) * 100, digits = 1) for r in resultados],
+        Country = [r.country for r in results],
+        GDP = [round(sum(r.params.GVA) / 1000, digits = 1) for r in results],   # billions
+        Exploitation_Rate = [round(mean(r.params.e), digits = 2) for r in results],
+        Organic_Composition = [round(mean(r.params.k), digits = 2) for r in results],
+        Profit_Rate = [round(mean(r.params.r) * 100, digits = 2) for r in results],
+        Wage_Share = [round(sum(r.params.V) / sum(r.params.GVA) * 100, digits = 1) for r in results],
     )
     println("\n", df)
 
-    p1 = bar(df.País, df.Taxa_Exploração, title = "Taxa de Exploração (e)",
+    p1 = bar(df.Country, df.Exploitation_Rate, title = "Rate of Exploitation (e)",
              legend = false, color = :steelblue, alpha = 0.7)
-    p2 = bar(df.País, df.Comp_Orgânica, title = "Composição Orgânica (k)",
+    p2 = bar(df.Country, df.Organic_Composition, title = "Organic Composition (k)",
              legend = false, color = :coral, alpha = 0.7)
-    p3 = bar(df.País, df.Taxa_Lucro, title = "Taxa de Lucro (%)",
+    p3 = bar(df.Country, df.Profit_Rate, title = "Profit Rate (%)",
              legend = false, color = :green, alpha = 0.7)
-    p4 = bar(df.País, df.Quota_Salarial, title = "Quota Salarial (% PIB)",
+    p4 = bar(df.Country, df.Wage_Share, title = "Wage Share (% GDP)",
              legend = false, color = :purple, alpha = 0.7)
     plt = plot(p1, p2, p3, p4, layout = (2, 2), size = (1400, 1000),
-               plot_title = "Comparação Internacional ($ano)")
+               plot_title = "International Comparison ($year)")
     display(plt)
 
-    return (resultados = resultados, tabela = df, plot = plt)
+    return (results = results, table = df, plot = plt)
 end
 
 # ----------------------------------------------------------------------------
-# Séries temporais
+# Time series
 # ----------------------------------------------------------------------------
 
 """
-    analisar_série_temporal_com_dados(dados; valorização=:corrente)
+    analyze_time_series_with_data(data; valuation=:current)
 
-Calcula indicadores marxianos ano a ano a partir de `DadosAMECO`.
+Computes Marxian indicators year by year from `AMECOData`.
 
-`stock_capital_total` (item AMECO `OKND`) é reportado a **preços constantes
-de 2020** ("Net capital stock at 2020 prices"), não a preços correntes —
-confirmado junto do codelist SDMX (`CL_AMECO_ITEM`), que não tem nenhum
-equivalente de stock de capital a preços correntes. `remunerações` (`UWCD`)
-e `PIB` (`UVGD`) são, pelo contrário, séries a preços correntes.
+`total_capital_stock` (AMECO item `OKND`) is reported at **constant 2020
+prices** ("Net capital stock at 2020 prices"), not at current prices, as
+confirmed with the SDMX codelist (`CL_AMECO_ITEM`), which has no
+current-price capital stock equivalent. `compensation` (`UWCD`) and `GDP`
+(`UVGD`), on the other hand, are current-price series.
 
-- `valorização=:corrente` (por omissão, compatível com versões anteriores):
-  usa `V` e `VAB` a preços correntes tal como reportados, mesmo sabendo que
-  isto mistura a valorização de `C` (constante) com a de `V`/`VAB`
-  (corrente) — um desfasamento que, por si só, pode empurrar `k=C/V` para
-  baixo ao longo de décadas de inflação salarial nominal, sem que a
-  composição orgânica real tenha mudado.
-- `valorização=:consistente`: deflaciona `V` pelo `deflator_PIB` (=
-  `PIB_corrente/PIB_constante×100`) e usa `PIB_real` (constante) em vez de
-  `PIB` (corrente), colocando `C`, `V` e `VAB` na mesma base de preços
-  constantes — a comparação correta para isolar se a queda de `k` é um
-  efeito real ou um artefacto de valorização.
-- `valorização=:consistente_fbcf`: variante de `:consistente` que deflaciona
-  `V` pelo `deflator_FBCF` (item `PIGT`, "Price deflator gross fixed
-  capital formation", também indexado a 2020=100) em vez do deflator do
-  PIB. `stock_capital_total` é construído por acumulação de FBCF a preços
-  constantes (inventário perpétuo implícito da AMECO), pelo que o deflator
-  do investimento — não o deflator geral do PIB — é o que efetivamente
-  determina a base de preços de `C`; esta variante testa se a conclusão de
-  `:consistente` é sensível a essa escolha (preços de bens de capital
-  tendem a cair, historicamente, face ao deflator do PIB geral).
+- `valuation=:current` (default, compatible with earlier versions): uses `V`
+  and `GVA` at current prices as reported, even though this mixes the
+  valuation of `C` (constant) with that of `V`/`GVA` (current). That mismatch
+  alone can push `k=C/V` down over decades of nominal wage inflation without
+  any change in the real organic composition.
+- `valuation=:consistent`: deflates `V` by the `GDP_deflator`
+  (= `GDP_current/GDP_constant×100`) and uses `real_GDP` (constant) instead of
+  `GDP` (current), putting `C`, `V` and `GVA` on the same constant-price
+  basis. This is the right comparison to tell whether the fall in `k` is a
+  real effect or a valuation artifact.
+- `valuation=:consistent_gfcf`: a variant of `:consistent` that deflates `V`
+  by the `GFCF_deflator` (item `PIGT`, "Price deflator gross fixed capital
+  formation", also indexed to 2020=100) instead of the GDP deflator.
+  `total_capital_stock` is built by accumulating GFCF at constant prices
+  (AMECO's implicit perpetual inventory), so the investment deflator, not
+  the general GDP deflator, is what actually sets the price basis of `C`.
+  This variant tests whether the conclusion of `:consistent` is sensitive to
+  that choice (capital goods prices have historically tended to fall
+  relative to the general GDP deflator).
 
-O excedente/mais-valia de um período usa `rend = VAB - V - CCF`, onde `CCF`
-(item AMECO `UKCT`, "Consumption of fixed capital... total economy") é o
-capital constante realmente \\emph{transferido/consumido} no período —
-não uma fração fixa arbitrária do stock `C` (versão anterior deste código
-usava `C*0.10`, uma aproximação que, por misturar um stock a preços
-constantes de 2020 com fluxos correntes, quebrava a invariância algébrica
-que `e=(VAB-V)/V` deveria ter sob um deflator comum — ver `docs/` para a
-verificação). `CCF` é deflacionado com o mesmo índice usado para `V`/`VAB`
-em cada convenção, preservando essa invariância para a parte
-`(VAB-V)/V` e isolando corretamente o efeito do desconto de depreciação.
-A taxa de lucro `r=rend/(C+V)` continua a dividir por `C` (stock avançado)
-— fórmula clássica de Marx (lucro sobre capital adiantado), distinta da
-composição do numerador `rend`.
+A period's surplus/surplus value uses `inc = GVA - V - CFC`, where `CFC`
+(AMECO item `UKCT`, "Consumption of fixed capital... total economy") is the
+constant capital actually \\emph{transferred/used up} in the period, not an
+arbitrary fixed fraction of the stock `C`. (An earlier version of this code
+used `C*0.10`, an approximation that, by mixing a stock at constant 2020
+prices with current flows, broke the algebraic invariance that
+`e=(GVA-V)/V` should have under a common deflator; see `docs/` for the
+check.) `CFC` is deflated with the same index used for `V`/`GVA` in each
+convention, which preserves that invariance for the `(GVA-V)/V` part and
+correctly isolates the effect of the depreciation deduction. The profit rate
+`r=inc/(C+V)` still divides by `C` (the advanced stock), Marx's classic
+formula (profit on capital advanced), which is distinct from the
+composition of the numerator `inc`.
 """
-function analisar_série_temporal_com_dados(dados::DadosAMECO; valorização::Symbol = :corrente)
-    n = length(dados.anos)
+function analyze_time_series_with_data(data::AMECOData; valuation::Symbol = :current)
+    n = length(data.years)
     e_t = fill(NaN, n); k_t = fill(NaN, n); r_t = fill(NaN, n); q_t = fill(NaN, n)
     for i in 1:n
-        C = dados.stock_capital_total[i]
-        if valorização == :corrente
-            V, VAB, CCF = dados.remunerações[i], dados.PIB[i], dados.CCF[i]
-        elseif valorização == :consistente
-            def = dados.deflator_PIB[i]
-            fator = (!isnan(def) && def > 0) ? 100 / def : NaN
-            V, VAB, CCF = dados.remunerações[i] * fator, dados.PIB_real[i], dados.CCF[i] * fator
-        elseif valorização == :consistente_fbcf
-            def = dados.deflator_FBCF[i]
-            fator = (!isnan(def) && def > 0) ? 100 / def : NaN
-            V, VAB, CCF = dados.remunerações[i] * fator, dados.PIB_real[i], dados.CCF[i] * fator
+        C = data.total_capital_stock[i]
+        if valuation == :current
+            V, GVA, CFC = data.compensation[i], data.GDP[i], data.CFC[i]
+        elseif valuation == :consistent
+            def = data.GDP_deflator[i]
+            factor = (!isnan(def) && def > 0) ? 100 / def : NaN
+            V, GVA, CFC = data.compensation[i] * factor, data.real_GDP[i], data.CFC[i] * factor
+        elseif valuation == :consistent_gfcf
+            def = data.GFCF_deflator[i]
+            factor = (!isnan(def) && def > 0) ? 100 / def : NaN
+            V, GVA, CFC = data.compensation[i] * factor, data.real_GDP[i], data.CFC[i] * factor
         else
-            error("valorização desconhecida: $valorização (use :corrente, :consistente ou :consistente_fbcf)")
+            error("unknown valuation: $valuation (use :current, :consistent or :consistent_gfcf)")
         end
-        if !isnan(V) && !isnan(C) && !isnan(VAB) && !isnan(CCF) && V > 0 && C > 0
-            rend = VAB - V - CCF
-            e_t[i] = rend / V
+        if !isnan(V) && !isnan(C) && !isnan(GVA) && !isnan(CFC) && V > 0 && C > 0
+            inc = GVA - V - CFC
+            e_t[i] = inc / V
             k_t[i] = C / V
-            r_t[i] = rend / (C + V)
-            q_t[i] = V / VAB
+            r_t[i] = inc / (C + V)
+            q_t[i] = V / GVA
         end
     end
-    return (anos = dados.anos, e = e_t, k = k_t, r = r_t, quota_salarial = q_t)
+    return (years = data.years, e = e_t, k = k_t, r = r_t, wage_share = q_t)
 end
 
 """
-    analisar_série_temporal_ameco(país; anos=1995:2023, método=:sintético)
+    analyze_ameco_time_series(country; years=1995:2023, method=:synthetic)
 
-Obtém dados e produz a análise temporal (4 painéis) dos indicadores marxianos.
+Fetches the data and produces the time-series analysis (4 panels) of the Marxian indicators.
 """
-function analisar_série_temporal_ameco(país::String; anos = 1995:2023,
-                                       método = :sintético, ficheiro = nothing,
-                                       valorização::Symbol = :corrente)
+function analyze_ameco_time_series(country::String; years = 1995:2023,
+                                       method = :synthetic, file = nothing,
+                                       valuation::Symbol = :current)
     println("\n" * "="^70)
-    println("ANÁLISE DE SÉRIE TEMPORAL — $país | $(first(anos))-$(last(anos))")
+    println("TIME-SERIES ANALYSIS — $country | $(first(years))-$(last(years))")
     println("="^70)
 
-    dados = obter_dados_ameco(país, anos = anos, método = método,
-                              ficheiro = ficheiro)
-    st = analisar_série_temporal_com_dados(dados; valorização = valorização)
+    data = fetch_ameco_data(country, years = years, method = method,
+                              file = file)
+    st = analyze_time_series_with_data(data; valuation = valuation)
 
-    p1 = plot(st.anos, st.e, xlabel = "Ano", ylabel = "e",
-              title = "Taxa de Exploração", lw = 2, label = "", color = :blue)
-    p2 = plot(st.anos, st.k, xlabel = "Ano", ylabel = "k",
-              title = "Composição Orgânica", lw = 2, label = "", color = :red)
-    p3 = plot(st.anos, st.r * 100, xlabel = "Ano", ylabel = "r (%)",
-              title = "Taxa de Lucro", lw = 2, label = "", color = :green)
-    p4 = plot(st.anos, st.quota_salarial * 100, xlabel = "Ano", ylabel = "% PIB",
-              title = "Quota Salarial", lw = 2, label = "", color = :purple)
+    p1 = plot(st.years, st.e, xlabel = "Year", ylabel = "e",
+              title = "Rate of Exploitation", lw = 2, label = "", color = :blue)
+    p2 = plot(st.years, st.k, xlabel = "Year", ylabel = "k",
+              title = "Organic Composition", lw = 2, label = "", color = :red)
+    p3 = plot(st.years, st.r * 100, xlabel = "Year", ylabel = "r (%)",
+              title = "Profit Rate", lw = 2, label = "", color = :green)
+    p4 = plot(st.years, st.wage_share * 100, xlabel = "Year", ylabel = "% GDP",
+              title = "Wage Share", lw = 2, label = "", color = :purple)
     plt = plot(p1, p2, p3, p4, layout = (2, 2), size = (1400, 1000),
-               plot_title = "Análise Temporal: $país")
+               plot_title = "Time-Series Analysis: $country")
     display(plt)
 
     v(x) = filter(!isnan, x)
-    println("\n📈 MÉDIAS DO PERÍODO:")
+    println("\n📈 PERIOD AVERAGES:")
     println("  e: $(round(mean(v(st.e)), digits=2)) | k: $(round(mean(v(st.k)), digits=2)) | " *
-            "r: $(round(mean(v(st.r))*100, digits=2))% | quota salarial: $(round(mean(v(st.quota_salarial))*100, digits=1))%")
+            "r: $(round(mean(v(st.r))*100, digits=2))% | wage share: $(round(mean(v(st.wage_share))*100, digits=1))%")
     println("="^70 * "\n")
 
-    return (dados = dados, e = st.e, k = st.k, r = st.r,
-            quota_salarial = st.quota_salarial, plot = plt)
+    return (data = data, e = st.e, k = st.k, r = st.r,
+            wage_share = st.wage_share, plot = plt)
 end
 
-"""Cria um vetor de Departamento a partir de ParâmetrosCalibrados."""
-function criar_departamentos_de_params(params::ParâmetrosCalibrados)
-    depts = Departamento[]
+"""Creates a vector of Department from CalibratedParameters."""
+function departments_from_params(params::CalibratedParameters)
+    depts = Department[]
     for i in 1:params.N
-        push!(depts, Departamento(params.nomes_setores[i], c = params.C[i],
+        push!(depts, Department(params.sector_names[i], c = params.C[i],
                                   v = params.V[i], e = params.e[i], σ_c = params.σ_c[i],
                                   σ_v = params.σ_v[i], δ = params.δ[i]))
     end

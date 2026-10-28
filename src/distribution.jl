@@ -1,213 +1,214 @@
 # ============================================================================
-# ANÁLISE DISTRIBUTIVA E VALIDAÇÃO DE CALIBRAÇÃO
+# DISTRIBUTIONAL ANALYSIS AND CALIBRATION VALIDATION
 # ============================================================================
 
 """
-    curva_salario_lucro(A, l; n_pontos=100, plotar=true)
+    wage_profit_curve(A, l; n_points=100, show_plot=true)
 
-Fronteira de possibilidades distributivas (curva w-r): o trade-off entre
-salário real e taxa de lucro determinado pela tecnologia. O bem 1 é
-numerário (p₁ = 1).
+Frontier of distributional possibilities (w-r curve): the trade-off between
+the real wage and the profit rate set by the technology. Good 1 is the
+numeraire (p₁ = 1).
 """
-function curva_salario_lucro(A, l; n_pontos = 100, plotar = true)
+function wage_profit_curve(A, l; n_points = 100, show_plot = true)
     println("\n" * "="^70)
-    println("FRONTEIRA DE POSSIBILIDADES DISTRIBUTIVAS")
+    println("FRONTIER OF DISTRIBUTIONAL POSSIBILITIES")
     println("="^70)
 
     N = size(A, 1)
-    R_max = calcular_taxa_lucro_maxima(A, l)
-    println("\nTaxa máxima de lucro (w=0): $(round(R_max*100, digits=2))%")
+    R_max = compute_max_profit_rate(A, l)
+    println("\nMaximum profit rate (w=0): $(round(R_max*100, digits=2))%")
 
-    r_valores = range(0, R_max * 0.99, length = n_pontos)
-    w_valores = zeros(n_pontos)
-    p_matriz = zeros(N, n_pontos)
+    r_values = range(0, R_max * 0.99, length = n_points)
+    w_values = zeros(n_points)
+    p_matrix = zeros(N, n_points)
 
-    for (i, r) in enumerate(r_valores)
-        p_temp = calcular_precos_producao(A, l, 1.0, r)
-        w_valores[i] = 1.0 / p_temp[1]
-        p_matriz[:, i] = p_temp / p_temp[1]
+    for (i, r) in enumerate(r_values)
+        p_temp = compute_production_prices(A, l, 1.0, r)
+        w_values[i] = 1.0 / p_temp[1]
+        p_matrix[:, i] = p_temp / p_temp[1]
     end
 
-    w_max = w_valores[1]
-    println("Salário máximo (r=0): $(round(w_max, digits=4))")
+    w_max = w_values[1]
+    println("Maximum wage (r=0): $(round(w_max, digits=4))")
 
-    dw_dr = diff(w_valores) ./ diff(r_valores)
-    r_mid = (r_valores[1:end-1] + r_valores[2:end]) / 2
-    w_mid = (w_valores[1:end-1] + w_valores[2:end]) / 2
-    elasticidade = dw_dr .* (r_mid ./ w_mid)
-    elasticidade_média = mean(elasticidade)
-    println("Elasticidade média ε(w,r): $(round(elasticidade_média, digits=3))")
+    dw_dr = diff(w_values) ./ diff(r_values)
+    r_mid = (r_values[1:end-1] + r_values[2:end]) / 2
+    w_mid = (w_values[1:end-1] + w_values[2:end]) / 2
+    elasticity = dw_dr .* (r_mid ./ w_mid)
+    mean_elasticity = mean(elasticity)
+    println("Mean elasticity ε(w,r): $(round(mean_elasticity, digits=3))")
 
-    if plotar
-        p1 = plot(r_valores * 100, w_valores, xlabel = "Taxa de Lucro r (%)",
-                  ylabel = "Salário Real w", title = "Fronteira Distributiva w-r",
-                  label = "Curva w(r)", lw = 3, color = :blue, legend = :topright)
-        scatter!([0, R_max * 100 * 0.99], [w_max, w_valores[end]],
+    if show_plot
+        p1 = plot(r_values * 100, w_values, xlabel = "Profit Rate r (%)",
+                  ylabel = "Real Wage w", title = "Wage-Profit Frontier w-r",
+                  label = "Curve w(r)", lw = 3, color = :blue, legend = :topright)
+        scatter!([0, R_max * 100 * 0.99], [w_max, w_values[end]],
                  label = "", markersize = 6, color = :red)
 
-        p2 = plot(r_mid * 100, elasticidade, xlabel = "Taxa de Lucro r (%)",
-                  ylabel = "Elasticidade ε(w,r)", title = "Elasticidade",
+        p2 = plot(r_mid * 100, elasticity, xlabel = "Profit Rate r (%)",
+                  ylabel = "Elasticity ε(w,r)", title = "Elasticity",
                   label = "ε = (dw/dr)·(r/w)", lw = 2, color = :purple)
-        hline!([elasticidade_média], linestyle = :dash, color = :red, label = "Média")
+        hline!([mean_elasticity], linestyle = :dash, color = :red, label = "Mean")
 
-        p3 = plot(xlabel = "Taxa de Lucro r (%)", ylabel = "Preço Relativo",
-                  title = "Evolução dos Preços", legend = :outertopright)
+        p3 = plot(xlabel = "Profit Rate r (%)", ylabel = "Relative Price",
+                  title = "Price Paths", legend = :outertopright)
         for i in 1:min(N, 5)
-            plot!(r_valores * 100, p_matriz[i, :], label = "Bem $i", lw = 2, alpha = 0.7)
+            plot!(r_values * 100, p_matrix[i, :], label = "Good $i", lw = 2, alpha = 0.7)
         end
 
-        p4 = plot(w_valores, r_valores * 100, xlabel = "Salário Real w",
-                  ylabel = "Taxa de Lucro r (%)", title = "Espaço de Fase",
+        p4 = plot(w_values, r_values * 100, xlabel = "Real Wage w",
+                  ylabel = "Profit Rate r (%)", title = "Phase Space",
                   label = "", lw = 2, color = :green)
 
         plt = plot(p1, p2, p3, p4, layout = (2, 2), size = (1400, 1000))
         display(plt)
     end
 
-    return (r = r_valores, w = w_valores, R_max = R_max, w_max = w_max,
-            elasticidade_média = elasticidade_média, elasticidade = elasticidade,
-            preços = p_matriz)
+    return (r = r_values, w = w_values, R_max = R_max, w_max = w_max,
+            mean_elasticity = mean_elasticity, elasticity = elasticity,
+            prices = p_matrix)
 end
 
 """
-    validar_taxas_lucro_calibradas(params)
+    validate_calibrated_profit_rates(params)
 
-Verifica se as taxas de lucro calibradas são teoricamente viáveis (dentro da
-restrição tecnológica R_max), avalia dispersão, consistência e posição na
-fronteira, e devolve uma pontuação de qualidade em [0, 100].
+Checks whether the calibrated profit rates are theoretically feasible
+(within the technological bound R_max), assesses their dispersion,
+consistency and position on the frontier, and returns a quality score in
+[0, 100].
 """
-function validar_taxas_lucro_calibradas(params::ParâmetrosCalibrados)
+function validate_calibrated_profit_rates(params::CalibratedParameters)
     println("\n" * "="^70)
-    println("VALIDAÇÃO DE TAXAS DE LUCRO")
+    println("PROFIT RATE VALIDATION")
     println("="^70)
-    println("\nAno base: $(params.ano_base)  |  Setores: $(params.N)")
+    println("\nBase year: $(params.base_year)  |  Sectors: $(params.N)")
 
-    R_max = calcular_taxa_lucro_maxima(params.A, params.l)
+    R_max = compute_max_profit_rate(params.A, params.l)
 
-    r_média   = mean(params.r)
-    r_mediana = median(params.r)
+    r_mean   = mean(params.r)
+    r_median = median(params.r)
     r_std     = std(params.r)
 
-    println("\n📊 ESTATÍSTICAS")
+    println("\n📊 STATISTICS")
     println("-"^70)
-    println("  Média:   $(round(r_média*100, digits=2))%")
-    println("  Mediana: $(round(r_mediana*100, digits=2))%")
-    println("  Mín/Máx: $(round(minimum(params.r)*100, digits=2))% / $(round(maximum(params.r)*100, digits=2))%")
-    println("  Desvio-padrão: $(round(r_std*100, digits=2))pp")
-    println("  Coef. variação: $(round(r_std/r_média, digits=3))")
-    println("\n⚙️  Taxa máxima teórica (R_max): $(round(R_max*100, digits=2))%")
+    println("  Mean:     $(round(r_mean*100, digits=2))%")
+    println("  Median:   $(round(r_median*100, digits=2))%")
+    println("  Min/Max:  $(round(minimum(params.r)*100, digits=2))% / $(round(maximum(params.r)*100, digits=2))%")
+    println("  Standard deviation: $(round(r_std*100, digits=2))pp")
+    println("  Coef. of variation: $(round(r_std/r_mean, digits=3))")
+    println("\n⚙️  Theoretical maximum rate (R_max): $(round(R_max*100, digits=2))%")
 
-    # Teste 1 — viabilidade da média
-    viável_média = r_média < R_max
-    margem_média = (R_max - r_média) / R_max * 100
-    println("\n🔍 TESTE 1: Viabilidade da Taxa Média")
-    if viável_média
-        println("  ✓ Viável — margem: $(round(margem_média, digits=1))%")
-        margem_média < 10 && println("  ⚠️  Margem pequena — próximo do limite")
+    # Test 1: feasibility of the mean
+    feasible_mean = r_mean < R_max
+    mean_margin = (R_max - r_mean) / R_max * 100
+    println("\n🔍 TEST 1: Feasibility of the Mean Rate")
+    if feasible_mean
+        println("  ✓ Feasible, margin: $(round(mean_margin, digits=1))%")
+        mean_margin < 10 && println("  ⚠️  Small margin, close to the bound")
     else
-        println("  ✗ Excede o máximo (possível renda/monopólio ou A subestimada)")
+        println("  ✗ Exceeds the maximum (possible rent/monopoly, or A underestimated)")
     end
 
-    # Teste 2 — viabilidade setorial
-    setores_problemáticos = findall(params.r .>= R_max)
-    println("\n🔍 TESTE 2: Viabilidade Setorial")
-    if isempty(setores_problemáticos)
-        println("  ✓ Todos os setores dentro do limite")
+    # Test 2: sectoral feasibility
+    problem_sectors = findall(params.r .>= R_max)
+    println("\n🔍 TEST 2: Sectoral Feasibility")
+    if isempty(problem_sectors)
+        println("  ✓ All sectors within the bound")
     else
-        println("  ✗ $(length(setores_problemáticos)) setores excedem R_max")
-        for idx in setores_problemáticos
-            println("    • $(params.nomes_setores[idx]): $(round(params.r[idx]*100, digits=1))%")
+        println("  ✗ $(length(problem_sectors)) sectors exceed R_max")
+        for idx in problem_sectors
+            println("    • $(params.sector_names[idx]): $(round(params.r[idx]*100, digits=1))%")
         end
     end
 
-    # Teste 3 — dispersão
-    cv = r_std / r_média
-    println("\n🔍 TESTE 3: Dispersão (CV = $(round(cv, digits=2)))")
-    println(cv < 0.3 ? "  ✓ Baixa" : cv < 0.6 ? "  ⚠️  Moderada" : "  ✗ Alta")
-    z = (params.r .- r_média) / r_std
-    outliers_altos = findall(z .> 2)
-    if !isempty(outliers_altos)
-        println("  Lucros anormalmente altos (>2σ):")
-        for idx in outliers_altos
-            println("    • $(params.nomes_setores[idx]): $(round(params.r[idx]*100, digits=1))%")
+    # Test 3: dispersion
+    cv = r_std / r_mean
+    println("\n🔍 TEST 3: Dispersion (CV = $(round(cv, digits=2)))")
+    println(cv < 0.3 ? "  ✓ Low" : cv < 0.6 ? "  ⚠️  Moderate" : "  ✗ High")
+    z = (params.r .- r_mean) / r_std
+    high_outliers = findall(z .> 2)
+    if !isempty(high_outliers)
+        println("  Abnormally high profits (>2σ):")
+        for idx in high_outliers
+            println("    • $(params.sector_names[idx]): $(round(params.r[idx]*100, digits=1))%")
         end
     end
 
-    # Teste 4 — consistência
-    k_média = mean(params.k)
-    e_implícita = r_média * (k_média + 1)
-    println("\n🔍 TESTE 4: Consistência")
-    println("  k médio = $(round(k_média, digits=2))  →  e implícita = $(round(e_implícita, digits=2))")
-    println(0.5 < e_implícita < 3.0 ? "  ✓ Razoável" : "  ⚠️  Fora do esperado")
+    # Test 4: consistency
+    k_mean = mean(params.k)
+    e_implied = r_mean * (k_mean + 1)
+    println("\n🔍 TEST 4: Consistency")
+    println("  mean k = $(round(k_mean, digits=2))  →  implied e = $(round(e_implied, digits=2))")
+    println(0.5 < e_implied < 3.0 ? "  ✓ Reasonable" : "  ⚠️  Outside the expected range")
 
-    # Teste 5 — posição na fronteira
-    posição_r = r_média / R_max * 100
-    println("\n🔍 TESTE 5: Posição na Fronteira: $(round(posição_r, digits=1))% de R_max")
-    println(posição_r < 30 ? "  → Baixa taxa de lucro" :
-            posição_r < 70 ? "  → Zona intermédia" : "  → Alta taxa de lucro")
+    # Test 5: position on the frontier
+    r_position = r_mean / R_max * 100
+    println("\n🔍 TEST 5: Position on the Frontier: $(round(r_position, digits=1))% of R_max")
+    println(r_position < 30 ? "  → Low profit rate" :
+            r_position < 70 ? "  → Intermediate zone" : "  → High profit rate")
 
-    # Visualização (sem boxplot: robusto sem StatsPlots)
-    p1 = histogram(params.r * 100, bins = 15, xlabel = "Taxa de Lucro (%)",
-                   ylabel = "Frequência", title = "Distribuição", label = "",
+    # Plots (no boxplot, so it works without StatsPlots)
+    p1 = histogram(params.r * 100, bins = 15, xlabel = "Profit Rate (%)",
+                   ylabel = "Frequency", title = "Distribution", label = "",
                    alpha = 0.7, color = :steelblue)
-    vline!([r_média * 100], color = :red, lw = 2, linestyle = :dash, label = "Média")
+    vline!([r_mean * 100], color = :red, lw = 2, linestyle = :dash, label = "Mean")
     vline!([R_max * 100], color = :orange, lw = 2, linestyle = :dot, label = "R_max")
 
-    p2 = scatter(params.k, params.r * 100, xlabel = "Composição Orgânica k",
-                 ylabel = "Taxa de Lucro r (%)", title = "Relação r-k",
+    p2 = scatter(params.k, params.r * 100, xlabel = "Organic Composition k",
+                 ylabel = "Profit Rate r (%)", title = "r-k Relation",
                  label = "", markersize = 6, alpha = 0.7)
     k_range = range(minimum(params.k), maximum(params.k), length = 100)
-    plot!(k_range, e_implícita ./ (k_range .+ 1) * 100, color = :red, lw = 2,
-          linestyle = :dash, label = "Teórico")
+    plot!(k_range, e_implied ./ (k_range .+ 1) * 100, color = :red, lw = 2,
+          linestyle = :dash, label = "Theoretical")
 
-    ordem = sortperm(params.r, rev = true)
-    top5 = ordem[1:min(5, params.N)]
-    bottom5 = ordem[max(1, params.N - 4):params.N]
-    nomes = [params.nomes_setores[top5]; params.nomes_setores[bottom5]]
-    valores = [params.r[top5]; params.r[bottom5]] * 100
-    p3 = bar(nomes, valores, xlabel = "Setor", ylabel = "Taxa de Lucro (%)",
+    order = sortperm(params.r, rev = true)
+    top5 = order[1:min(5, params.N)]
+    bottom5 = order[max(1, params.N - 4):params.N]
+    name_list = [params.sector_names[top5]; params.sector_names[bottom5]]
+    values = [params.r[top5]; params.r[bottom5]] * 100
+    p3 = bar(name_list, values, xlabel = "Sector", ylabel = "Profit Rate (%)",
              title = "Top/Bottom 5", legend = false, orientation = :horizontal,
              color = [fill(:green, length(top5)); fill(:red, length(bottom5))], alpha = 0.7)
     hline!([R_max * 100], color = :orange, lw = 2, linestyle = :dot)
 
-    p4 = histogram(params.r * 100, bins = 20, xlabel = "Taxa de Lucro (%)",
-                   ylabel = "Frequência", title = "Distribuição Detalhada",
+    p4 = histogram(params.r * 100, bins = 20, xlabel = "Profit Rate (%)",
+                   ylabel = "Frequency", title = "Detailed Distribution",
                    legend = :topright, orientation = :horizontal, alpha = 0.7,
                    color = :steelblue, label = "")
-    vline!([r_média * 100], color = :red, lw = 2, label = "Média")
-    vline!([r_mediana * 100], color = :green, lw = 2, linestyle = :dash, label = "Mediana")
+    vline!([r_mean * 100], color = :red, lw = 2, label = "Mean")
+    vline!([r_median * 100], color = :green, lw = 2, linestyle = :dash, label = "Median")
     vline!([R_max * 100], color = :orange, lw = 2, linestyle = :dot, label = "R_max")
     q25 = quantile(params.r, 0.25) * 100
     q75 = quantile(params.r, 0.75) * 100
     vline!([q25, q75], color = :gray, lw = 1, linestyle = :dot, alpha = 0.5, label = "Q1/Q3")
 
     plt = plot(p1, p2, p3, p4, layout = (2, 2), size = (1400, 1000),
-               plot_title = "Diagnóstico de Validação")
+               plot_title = "Validation Diagnostics")
     display(plt)
 
-    # Pontuação
-    pontuação = 0.0
-    viável_média && (pontuação += 1.0)
-    if isempty(setores_problemáticos)
-        pontuação += 1.0
+    # Score
+    score = 0.0
+    feasible_mean && (score += 1.0)
+    if isempty(problem_sectors)
+        score += 1.0
     else
-        pontuação += max(0, 1.0 - length(setores_problemáticos) / params.N)
+        score += max(0, 1.0 - length(problem_sectors) / params.N)
     end
-    cv < 0.5 && (pontuação += 1.0)
-    (0.5 < e_implícita < 3.0) && (pontuação += 1.0)
-    (20 < posição_r < 80) && (pontuação += 1.0)
-    pontuação_final = pontuação / 5 * 100
+    cv < 0.5 && (score += 1.0)
+    (0.5 < e_implied < 3.0) && (score += 1.0)
+    (20 < r_position < 80) && (score += 1.0)
+    final_score = score / 5 * 100
 
     println("\n" * "-"^70)
-    println("  PONTUAÇÃO FINAL: $(round(pontuação_final, digits=1))%  " *
-            (pontuação_final >= 80 ? "✅ ALTA QUALIDADE" :
-             pontuação_final >= 60 ? "⚠️  ACEITÁVEL" : "❌ PROBLEMÁTICA"))
+    println("  FINAL SCORE: $(round(final_score, digits=1))%  " *
+            (final_score >= 80 ? "✅ HIGH QUALITY" :
+             final_score >= 60 ? "⚠️  ACCEPTABLE" : "❌ PROBLEMATIC"))
     println("="^70 * "\n")
 
-    return (R_max = R_max, r_média = r_média, r_mediana = r_mediana,
-            dispersão = r_std, cv = cv, viável_média = viável_média,
-            margem = viável_média ? margem_média : missing,
-            setores_problemáticos = setores_problemáticos,
-            e_implícita = e_implícita, posição_fronteira = posição_r,
-            pontuação = pontuação_final, plot = plt)
+    return (R_max = R_max, r_mean = r_mean, r_median = r_median,
+            dispersion = r_std, cv = cv, feasible_mean = feasible_mean,
+            margin = feasible_mean ? mean_margin : missing,
+            problem_sectors = problem_sectors,
+            e_implied = e_implied, frontier_position = r_position,
+            score = final_score, plot = plt)
 end

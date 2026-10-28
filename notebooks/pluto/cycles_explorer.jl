@@ -30,7 +30,7 @@ end
 md"""
 # Accumulation cycles explorer
 
-The cross-dual model (`preços_mercado = true`): market prices respond to sectoral excess demand, and capital moves on profit rates at those prices. It has interior balanced-growth rays. Raising the mobility of variable capital `μ_v` destabilizes balanced growth at a supercritical Hopf bifurcation; further up come a torus, a window where a stable cycle and the torus coexist, and chaos (paper, Sections 3.6 and 5.6).
+The cross-dual model (`market_prices = true`): market prices respond to sectoral excess demand, and capital moves on profit rates at those prices. It has interior balanced-growth rays. Raising the mobility of variable capital `μ_v` destabilizes balanced growth at a supercritical Hopf bifurcation; further up come a torus, a window where a stable cycle and the torus coexist, and chaos (paper, Sections 3.6 and 5.6).
 
 Move the sliders and watch the eigenvalues of balanced growth cross the imaginary axis and the trajectory change from a point, to a cycle, to irregular motion. The economy is the paper's: six sectors, seed 5.
 
@@ -40,8 +40,8 @@ The code uses the MarxKapital API, whose names are Portuguese.
 # ╔═╡ b2fcf8fc-d316-11f1-9e7e-49cd356c53e4
 begin
 	Random.seed!(5)
-	sol0, _, p0 = simular_Ndept(6, T = 1.0, seed = 5, acoplado = true, μ = 0.5,
-	                            preços_mercado = true)
+	sol0, _, p0 = simulate_Ndept(6, T = 1.0, seed = 5, coupled = true, μ = 0.5,
+	                            market_prices = true)
 	X0 = sol0.u[1]
 end;
 
@@ -53,31 +53,31 @@ Mobility of variable capital `μ_v`: $(@bind μ_v Slider(0.0:0.01:2.5, default =
 
 Speed of price adjustment `β`: $(@bind β Slider(0.05:0.05:1.0, default = 0.1, show_value = true))
 
-Rates of surplus value × $(@bind escala_e Slider(0.5:0.05:2.0, default = 1.0, show_value = true))
+Rates of surplus value × $(@bind e_scale Slider(0.5:0.05:2.0, default = 1.0, show_value = true))
 
 Simulation length: $(@bind T Slider(1000:500:6000, default = 2500, show_value = true))
 """
 
 # ╔═╡ b2fcf910-d316-11f1-9bcd-af73e561aadd
-pβ = com_parâmetro(merge(p0, (β = β,)), :escala_e, escala_e);
+pβ = with_parameter(merge(p0, (β = β,)), :e_scale, e_scale);
 
 # ╔═╡ b2fcf91a-d316-11f1-a596-5fc7deaf0216
-pθ = com_parâmetro(pβ, :μ_v, μ_v);
+pθ = with_parameter(pβ, :μ_v, μ_v);
 
 # ╔═╡ b2fcf924-d316-11f1-9ac0-6feb0f265760
-eq = crescimento_equilibrado(pθ, X0);
+eq = balanced_growth(pθ, X0);
 
 # ╔═╡ b2fcf92e-d316-11f1-84c9-3d36630574b1
 md"""
-Balanced growth: `g★ = $(round(eq.g, digits = 4))`, aggregate rate of profit `$(round(eq.r_agregada, digits = 4))`, wage share `ω = $(round(eq.ω, digits = 3))`. Largest real part of the eigenvalues: `$(round(maximum(real.(eq.valores_próprios)), digits = 5))`, so the ray is **$(eq.estável ? "stable" : "unstable")**$(eq.convergiu ? "" : " (Newton did not converge: treat with care)").
+Balanced growth: `g★ = $(round(eq.g, digits = 4))`, aggregate rate of profit `$(round(eq.r_aggregate, digits = 4))`, wage share `ω = $(round(eq.ω, digits = 3))`. Largest real part of the eigenvalues: `$(round(maximum(real.(eq.eigenvalues)), digits = 5))`, so the ray is **$(eq.stable ? "stable" : "unstable")**$(eq.converged ? "" : " (Newton did not converge: treat with care)").
 """
 
 # ╔═╡ b2fcf938-d316-11f1-9727-d11f0258f5a2
-s = simular_normalizado(pθ, X0; T = Float64(T), saveat = 0.5);
+s = simulate_normalized(pθ, X0; T = Float64(T), saveat = 0.5);
 
 # ╔═╡ b2fcf942-d316-11f1-80f6-83abd3866ef7
 let
-	λs = eq.valores_próprios
+	λs = eq.eigenvalues
 	keep = s.t .> T / 2
 	plot(
 		begin
@@ -101,16 +101,16 @@ The largest real part of the eigenvalues along `μ_v`, at the current `β` and r
 
 # ╔═╡ b2fcf956-d316-11f1-b54c-2be237c335da
 # Depends on β and the rates of surplus value only, so moving μ_v does not recompute it.
-varrimento_μ_v = let grelha = 0.0:0.05:2.5
-	(θ = grelha, parte_real = map(grelha) do θ
-		e = crescimento_equilibrado(com_parâmetro(pβ, :μ_v, θ), X0; T_aquecimento = 200.0)
-		e.convergiu ? maximum(real.(e.valores_próprios)) : NaN   # gaps where Newton fails
+sweep_μ_v = let grid_pts = 0.0:0.05:2.5
+	(θ = grid_pts, real_part = map(grid_pts) do θ
+		e = balanced_growth(with_parameter(pβ, :μ_v, θ), X0; T_warmup = 200.0)
+		e.converged ? maximum(real.(e.eigenvalues)) : NaN   # gaps where Newton fails
 	end)
 end;
 
 # ╔═╡ b2fcf962-d316-11f1-a9b8-c3a9d5aa2417
 begin
-	plot(varrimento_μ_v.θ, varrimento_μ_v.parte_real, lw = 2, legend = false, xlabel = "μ_v",
+	plot(sweep_μ_v.θ, sweep_μ_v.real_part, lw = 2, legend = false, xlabel = "μ_v",
 	     ylabel = "max Re λ", title = "stability of balanced growth")
 	hline!([0.0], color = :black, ls = :dash)
 	vline!([μ_v], ls = :dot)

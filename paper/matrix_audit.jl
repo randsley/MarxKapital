@@ -15,11 +15,11 @@
 
 include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
 
-const PAÍS = "PT"
-const ANO = 2022
+const COUNTRY = "PT"
+const YEAR = 2022
 
 println("\n" * "="^70)
-println("AUDITORIA DA MATRIZ TÉCNICA A — Portugal")
+println("AUDIT OF THE TECHNICAL MATRIX A — Portugal")
 println("="^70)
 
 # ----------------------------------------------------------------------------
@@ -29,36 +29,36 @@ println("="^70)
 # ----------------------------------------------------------------------------
 
 println("\n[1/3] stk_flow (domestic-use vs. total-use) — checking directly...")
-url_stkflow = "$URL_BASE_EUROSTAT_SDMX/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR..CPA_A01.CPA_A01.$PAÍS" *
+url_stkflow = "$EUROSTAT_SDMX_BASE_URL/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR..CPA_A01.CPA_A01.$COUNTRY" *
               "?format=SDMX-CSV"
 resp = HTTP.get(url_stkflow, ["Accept-Encoding" => "identity"], status_exception = false)
 df_stk = CSV.read(IOBuffer(resp.body), DataFrame)
-valores_stk_flow = unique(df_stk.stk_flow)
-println("  ✓ valores de stk_flow devolvidos (dimensão não fixada): ", valores_stk_flow)
-if "DOM" in valores_stk_flow
-    println("  ✓ NAIO_10_CP1700 publica DOM (uso doméstico), IMP (importado) e TOTAL — ",
-            "ao contrário de NAIO_10_CP1620 (só TOTAL). A construção em produção usa DOM: ",
-            "a matriz A representa interdependência produtiva doméstica, sem tratar inputs ",
-            "importados como se fossem fornecidos por um setor doméstico.")
+stk_flow_values = unique(df_stk.stk_flow)
+println("  ✓ stk_flow values returned (dimension not fixed): ", stk_flow_values)
+if "DOM" in stk_flow_values
+    println("  ✓ NAIO_10_CP1700 publishes DOM (domestic use), IMP (imported) and TOTAL, ",
+            "unlike NAIO_10_CP1620 (TOTAL only). The production construction uses DOM: ",
+            "matrix A represents domestic productive interdependence, without treating ",
+            "imported inputs as if they were supplied by a domestic sector.")
 end
 
 # ----------------------------------------------------------------------------
 # 2. Available reference years (this is a benchmark table, not annual)
 # ----------------------------------------------------------------------------
 
-println("\n[2/3] Anos de referência disponíveis (NAIO_10_CP1700 não é anual)...")
-url_anos = "$URL_BASE_EUROSTAT_SDMX/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR.TOTAL.CPA_A01.B1G.$PAÍS" *
+println("\n[2/3] Available reference years (NAIO_10_CP1700 is not annual)...")
+url_years = "$EUROSTAT_SDMX_BASE_URL/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR.TOTAL.CPA_A01.B1G.$COUNTRY" *
            "?format=SDMX-CSV"
-resp = HTTP.get(url_anos, ["Accept-Encoding" => "identity"], status_exception = false)
-df_anos = CSV.read(IOBuffer(resp.body), DataFrame)
-anos_disponíveis = sort(Int.(df_anos.TIME_PERIOD))
-ano_usado = _ano_iot_mais_próximo(PAÍS, ANO)
-println("  ✓ anos disponíveis para $PAÍS: ", anos_disponíveis)
-println("  ✓ para o pedido ano=$ANO, usa-se o ano de referência mais próximo: $ano_usado")
-if ano_usado != ANO
-    println("  ⚠ Isto significa que a matriz A do perfil setorial de $ANO (Tabela 1) tem, na ",
-            "prática, um vintage de $ano_usado — um desfasamento explícito, não um perfil de ",
-            "um único ano genuinamente coerente. Ver Secção 6.2 do artigo.")
+resp = HTTP.get(url_years, ["Accept-Encoding" => "identity"], status_exception = false)
+df_years = CSV.read(IOBuffer(resp.body), DataFrame)
+available_years = sort(Int.(df_years.TIME_PERIOD))
+year_used = _nearest_iot_year(COUNTRY, YEAR)
+println("  ✓ years available for $COUNTRY: ", available_years)
+println("  ✓ for the request year=$YEAR, the nearest reference year is used: $year_used")
+if year_used != YEAR
+    println("  ⚠ This means that matrix A of the $YEAR sectoral profile (Table 1) in ",
+            "practice has a $year_used vintage: an explicit lag, not a genuinely ",
+            "consistent single-year profile. See Section 6.2 of the paper.")
 end
 
 # ----------------------------------------------------------------------------
@@ -66,60 +66,60 @@ end
 #    published P1 (gross output) row — the diagnostic the review asked for.
 # ----------------------------------------------------------------------------
 
-println("\n[3/3] Reconciliação: A corrigida vs. P1 (output bruto) da própria tabela...")
-secções = SECÇÕES_NACE
-G = length(secções)
-secção_idx = Dict(s => i for (i, s) in enumerate(secções))
+println("\n[3/3] Reconciliation: corrected A vs. the table's own P1 (gross output)...")
+sections = NACE_SECTIONS
+G = length(sections)
+section_idx = Dict(s => i for (i, s) in enumerate(sections))
 
-url = "$URL_BASE_EUROSTAT_SDMX/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR.DOM...$PAÍS" *
-      "?format=SDMX-CSV&startPeriod=$ano_usado&endPeriod=$ano_usado"
+url = "$EUROSTAT_SDMX_BASE_URL/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR.DOM...$COUNTRY" *
+      "?format=SDMX-CSV&startPeriod=$year_used&endPeriod=$year_used"
 resp = HTTP.get(url, ["Accept-Encoding" => "identity"], retry = true, readtimeout = 60,
                 status_exception = false)
 df = CSV.read(IOBuffer(resp.body), DataFrame)
 
 F = zeros(G, G)
 P1 = zeros(G)
-negativos = 0
+negatives = 0
 for row in eachrow(df)
     ismissing(row.OBS_VALUE) && continue
     v = Float64(row.OBS_VALUE)
     pu, pa = String(row.prd_use), String(row.prd_ava)
     if pa == "P1" && startswith(pu, "CPA_")
-        sj = _secção_do_código_a64(pu)
-        haskey(secção_idx, sj) && (P1[secção_idx[sj]] += v)
+        sj = _section_of_a64_code(pu)
+        haskey(section_idx, sj) && (P1[section_idx[sj]] += v)
         continue
     end
     (startswith(pa, "CPA_") && startswith(pu, "CPA_")) || continue
-    si, sj = _secção_do_código_a64(pa), _secção_do_código_a64(pu)
-    (haskey(secção_idx, si) && haskey(secção_idx, sj)) || continue
-    v < 0 && (negativos += 1)
-    F[secção_idx[si], secção_idx[sj]] += max(v, 0.0)
+    si, sj = _section_of_a64_code(pa), _section_of_a64_code(pu)
+    (haskey(section_idx, si) && haskey(section_idx, sj)) || continue
+    v < 0 && (negatives += 1)
+    F[section_idx[si], section_idx[sj]] += max(v, 0.0)
 end
-println("  ✓ células negativas produto×indústria: $negativos ",
-        "(a tabela de margens usada antes desta correção tinha 272-317; a tabela real não devia ter nenhuma)")
+println("  ✓ negative product×industry cells: $negatives ",
+        "(the margins table used before this fix had 272-317; the real table should have none)")
 
-vab_s, _, _ = obter_vab_remuneracoes_ccf_eurostat(PAÍS, ano_usado)
-output_bruto_via_vab = [sum(F[:, j]) + get(vab_s, secções[j], 0.0) for j in 1:G]
+gva_s, _, _ = fetch_eurostat_gva_compensation_cfc(COUNTRY, year_used)
+gross_output_via_gva = [sum(F[:, j]) + get(gva_s, sections[j], 0.0) for j in 1:G]
 
-resíduos = Float64[]
+residuals = Float64[]
 for j in 1:G
     if P1[j] > 0
-        resíduo_pct = 100 * (output_bruto_via_vab[j] - P1[j]) / P1[j]
-        push!(resíduos, resíduo_pct)
-        println("  $(secções[j]): via-VAB=$(round(output_bruto_via_vab[j],digits=1))  ",
-                "P1(tabela)=$(round(P1[j],digits=1))  resíduo=$(round(resíduo_pct,digits=1))%")
+        residual_pct = 100 * (gross_output_via_gva[j] - P1[j]) / P1[j]
+        push!(residuals, residual_pct)
+        println("  $(sections[j]): via-GVA=$(round(gross_output_via_gva[j],digits=1))  ",
+                "P1(table)=$(round(P1[j],digits=1))  residual=$(round(residual_pct,digits=1))%")
     end
 end
-println("  ✓ resíduo médio absoluto (via-VAB vs. P1 da própria tabela): ",
-        "$(round(mean(abs.(resíduos)), digits = 1))%, máximo: $(round(maximum(abs.(resíduos)), digits = 1))%")
-println("  ✓ nota: a construção em produção usa P1 diretamente quando disponível ",
-        "(reconciliação por construção); este resíduo mede apenas a via de reserva ",
-        "(Σfluxos+VAB externo), para diagnóstico.")
+println("  ✓ mean absolute residual (via-GVA vs. the table's own P1): ",
+        "$(round(mean(abs.(residuals)), digits = 1))%, maximum: $(round(maximum(abs.(residuals)), digits = 1))%")
+println("  ✓ note: the production construction uses P1 directly when available ",
+        "(reconciliation by construction); this residual only measures the fallback ",
+        "path (Σflows+external GVA), for diagnosis.")
 
-A_produção = construir_matriz_io_eurostat(PAÍS, ANO, [[s] for s in secções], vab_s)
-println("\n  ✓ ρ(A) da construção em produção (usa P1 diretamente): ",
-        round(maximum(abs.(eigvals(A_produção))), digits = 4))
+A_production = build_eurostat_io_matrix(COUNTRY, YEAR, [[s] for s in sections], gva_s)
+println("\n  ✓ ρ(A) of the production construction (uses P1 directly): ",
+        round(maximum(abs.(eigvals(A_production))), digits = 4))
 
 println("\n" * "="^70)
-println("Concluído.")
+println("Done.")
 println("="^70)

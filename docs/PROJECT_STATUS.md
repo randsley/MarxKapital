@@ -1,6 +1,6 @@
 # MarxKapital — Project Status
 
-*[🇵🇹 Ler em português](ESTADO_DO_PROJETO.md)*
+*[🇵🇹 Ler em português](PROJECT_STATUS.pt.md)*
 
 Tracking document, started at version 0.3.0 and updated since; the work
 described in the following sections corresponds to version **0.6.0**,
@@ -9,8 +9,8 @@ matrix, the reconstruction of genuine gross output in the dynamical
 model, the exact conservation of the mobility term, and the academic
 paper in `paper/`. Describes what has been done, what remains to be
 resolved, and concrete implementation recommendations. Lives in
-`docs/ESTADO_DO_PROJETO.md` (this file's Portuguese original), alongside
-`docs/LIMITACOES.md`.
+`docs/PROJECT_STATUS.md` (Portuguese version: `.pt.md`), alongside
+`docs/LIMITATIONS.md`.
 
 Date: last updated 2026-07-30. Project author: Nigel Randsley.
 
@@ -27,7 +27,7 @@ European (AMECO) data. Functional for demonstration and methodological
 development, with automated tests in CI. The default data remain
 synthetic/fixed-weight and are not suitable for publishable empirical
 analysis in that mode — **real** sectoral and AMECO data are available
-as an option, via official SDMX APIs (see `docs/LIMITACOES.md`).
+as an option, via official SDMX APIs (see `docs/LIMITATIONS.md`).
 
 The code was reorganized from a monolithic file into a modular
 repository, with tests, examples, and documentation. The AMECO
@@ -38,23 +38,23 @@ international comparison, and time series.
 
 ## 2. What has been done
 
-### 2.1 Model core (`src/nucleo.jl`, `src/estruturas.jl`)
+### 2.1 Model core (`src/core.jl`, `src/types.jl`)
 
-- `Departamento` (Department) type with invariants validated in the
+- `Department` (Department) type with invariants validated in the
   constructor: `c`, `v`, `e`, `k = c/v`, reinvestment shares (`σ_c`,
   `σ_v`, `γ`) summing to 1, and depreciation `δ`. Helper methods:
-  `taxa_lucro` (profit rate), `mais_valia` (surplus value),
-  `capital_total`, `valor_produto`.
+  `profit_rate` (profit rate), `surplus_value` (surplus value),
+  `total_capital`, `product_value`.
 - Classical two-department model (means of production and consumption
   goods) and generalized N-department model.
 - Construction of a technical matrix `A` with three structures
-  (`:aleatoria` random, `:triangular`, `:blocos` blocks), always
+  (`:random` random, `:triangular`, `:blocks` blocks), always
   normalized to a spectral radius below 1 (a productive economy). A
   `seed` argument for reproducibility.
 - Integration of the accumulation dynamics with
   `DifferentialEquations.jl` (Tsit5), for 2 and N departments.
 
-### 2.2 Value and price analysis (`src/analise.jl`)
+### 2.2 Value and price analysis (`src/analysis.jl`)
 
 - Profit rates, organic compositions, and the average rate over time.
 - Labor values `λ = (I − A)⁻¹ l`.
@@ -65,7 +65,7 @@ international comparison, and time series.
   against prices, percentage deviations, divergence as a function of
   the profit rate, correlation).
 
-### 2.3 Distributive analysis and validation (`src/distributiva.jl`)
+### 2.3 Distributive analysis and validation (`src/distribution.jl`)
 
 - Distributive-possibility frontier (wage-profit curve), with
   elasticity and the evolution of relative prices.
@@ -74,14 +74,14 @@ international comparison, and time series.
   on the frontier, and a quality score in [0, 100]. Uses robust
   histograms, with no hard dependency on boxplots.
 
-### 2.4 Policy and shocks (`src/choques.jl`)
+### 2.4 Policy and shocks (`src/shocks.jl`)
 
 - Wage-shock simulation: a `Δw` increase raises `V`, proportionally
   reduces `e`, and adjusts `r`. Compares the base scenario against the
   shock, with the same `seed` in both, guaranteeing comparability.
 - Comparison of multiple shock scenarios.
 
-### 2.5 National calibration (`src/calibracao_pt.jl`)
+### 2.5 National calibration (`src/calibration_pt.jl`)
 
 - Generation of synthetic data with the Portuguese sectoral structure
   (19 NACE Rev.3 sections): VAB, compensation, gross operating surplus,
@@ -89,23 +89,23 @@ international comparison, and time series.
   formation, and capital stock.
 - Processing of Supply and Use Tables, with Marxian indicators per
   sector.
-- Estimation of sectoral parameters and the `calibrar_modelo_portugal`
+- Estimation of sectoral parameters and the `calibrate_portugal_model`
   pipeline.
 
 ### 2.6 AMECO integration (`src/ameco.jl`, `src/ameco_download.jl`)
 
-- Data structures (`DadosAMECO`, 29 fields) and dictionaries of
+- Data structures (`AMECOData`, 29 fields) and dictionaries of
   countries and variable mnemonics.
 - Generation of plausible synthetic series (trend plus cycle),
   calibrated by country profile.
 - Automatic download of the full TXT database
-  (`descarregar_ameco_automatico`), trying multiple URLs and logging
+  (`download_ameco_auto`), trying multiple URLs and logging
   the retrieval date.
-- Fixed-width parser (`ler_ficheiro_ameco_txt`), with parameterizable
+- Fixed-width parser (`read_ameco_txt_file`), with parameterizable
   offsets.
-- Exported-CSV processor (`processar_csv_ameco`).
-- Unified entry point `obter_dados_ameco` with methods `:auto`,
-  `:download`, `:local`, `:csv`, `:sintético`, and `:manual`.
+- Exported-CSV processor (`parse_ameco_csv`).
+- Unified entry point `fetch_ameco_data` with methods `:auto`,
+  `:download`, `:local`, `:csv`, `:synthetic`, and `:manual`.
 - Calibration from AMECO data, international country comparison, and
   time-series analysis of Marxian indicators.
 
@@ -117,7 +117,7 @@ international comparison, and time series.
 - `install_deps.jl`, `Project.toml`, `.gitignore`, `LICENSE` (MIT),
   `README.md`, `CHANGELOG.md`.
 - Test suite (`test/runtests.jl`) and demo (`examples/demo.jl`).
-- `docs/LIMITACOES.md` with the known limitations.
+- `docs/LIMITATIONS.md` with the known limitations.
 
 ### 2.8 Fixes applied in this phase
 
@@ -126,7 +126,7 @@ international comparison, and time series.
 - ODE parameters passed as a `NamedTuple` (type-stable) instead of a
   `Dict`, eliminating SciMLBase's performance warning.
 - Replacement of incorrect uses of LinearAlgebra's `I` constant with
-  `matriz_identidade(N)`.
+  `identity_matrix(N)`.
 - Calibration validation with robust histograms, no mandatory boxplot.
 - Elimination of the undefined-`match_obj` bug in the old AMECO update
   flow.
@@ -141,34 +141,34 @@ positional constructors). Since then, the test suite runs by real
 compilation — locally and in CI (GitHub Actions, Julia 1.10 and 1, on
 every push to `main`, see `.github/workflows/test.yml`) — 111 tests, all
 passing. The real-data (network) paths are checked manually with
-`verificar_sdmx_ameco()`/`verificar_eurostat_setorial()`, outside the
-automated suite by design (see `docs/LIMITACOES.md`).
+`check_ameco_sdmx()`/`check_eurostat_sectoral()`, outside the
+automated suite by design (see `docs/LIMITATIONS.md`).
 
 ---
 
 ## 3. What remains to be resolved
 
-Ordered by priority. Full detail is in `docs/LIMITACOES.md`.
+Ordered by priority. Full detail is in `docs/LIMITATIONS.md`.
 
 ### 3.1 Resolved: matrix A did not feed back into the N-department dynamics
 
-In `sistema_Ndept!`, each sector's accumulation depends only on its own
+In `system_Ndept!`, each sector's accumulation depends only on its own
 surplus value; the matrix `A` is carried in the parameters but does not
 enter the equations. Sectors behave as independent, which contradicts
 the logic of expanded reproduction (one sector's output is another
 sector's constant capital).
 
-**Fixed, with three optional mechanisms in `sistema_Ndept_io!`
-(`acoplado=true`), independent of each other:**
+**Fixed, with three optional mechanisms in `system_Ndept_io!`
+(`coupled=true`), independent of each other:**
 1. Capital mobility: `μ·(rᵢ − r̄)·Cᵢ`, with `rᵢ` valued at Sraffian
    prices of production and `r̄` the mean of `r` weighted by `C` — the
    only choice for which the term conserves aggregate constant capital
    exactly (`Σμ(rᵢ-r̄)Cᵢ=0` by construction, verified by test).
-2. Aggregate realization pressure (`realização=true`):
+2. Aggregate realization pressure (`realization=true`):
    `ρ_real = Σmin(xᵢ,(A·x)ᵢ)/Σ(A·x)ᵢ` damps reinvestment when the
    technical structure cannot sustain current outputs.
-3. Exact per-sector quantity rationing (`racionamento=true`, takes
-   precedence over `realização`): solves Bénassy/Barro-Grossman-style
+3. Exact per-sector quantity rationing (`rationing=true`, takes
+   precedence over `realization`): solves Bénassy/Barro-Grossman-style
    rationing by fixed-point iteration — each sector bounded by its
    scarcest input (Leontief technology), without needing to expose the
    system as a DAE or a new solver dependency. Verified with a
@@ -184,17 +184,17 @@ consumption. Investment demand in the rationing mechanism uses
 `Δxⱼ=σ_c,ⱼSⱼ·xⱼ/Cⱼ` (desired output expansion, via the current
 capital-output ratio), not the expenditure `σ_c,ⱼSⱼ` directly.
 
-`sistema_Ndept!` remains the default (independent sectors).
-`verificar_equilibrio_Ndept` generalizes the two-department model's
-after-the-fact check — see `docs/LIMITACOES.md` item 1 for the details
+`system_Ndept!` remains the default (independent sectors).
+`check_equilibrium_Ndept` generalizes the two-department model's
+after-the-fact check — see `docs/LIMITATIONS.md` item 1 for the details
 of each mechanism and the most recent fixes.
 
 ### 3.2 Resolved: `R_max` in the wage shock was illustrative
 
-In `simular_choque_salarial`, the reported `R_max` used an auxiliary
+In `simulate_wage_shock`, the reported `R_max` used an auxiliary
 matrix `A_ref` and `l = ones(N)`, not the simulation's matrix or labor
 coefficients. **Fixed:** it now uses `p_base.A` (returned by
-`simular_Ndept_customizado`) and `l = [d.v for d in depts]`, reflecting
+`simulate_Ndept_custom`) and `l = [d.v for d in depts]`, reflecting
 the simulated scenario.
 
 ### 3.3 Resolved: the AMECO download now uses the official SDMX API
@@ -202,47 +202,47 @@ the simulated scenario.
 The old static TXT file was discontinued by the Commission (URLs
 confirmed dead in 2026-07). **Fixed:** `src/ameco_sdmx.jl` uses the
 official AMECO SDMX REST API (`webgate.ec.europa.eu/ecfin/redisstat`),
-now the default automatic path (`obter_dados_ameco`, methods
+now the default automatic path (`fetch_ameco_data`, methods
 `:auto`/`:sdmx`). Verified with real Portuguese data (GDP, employment,
 compensation, GFCF, capital stock). **Nearly fully resolved:**
-`MAPA_AMECO_SDMX` now maps 24 variables plus 2 calculated (GDP deflator,
-trade balance) — 26 series in total, including `deflator_FBCF` and
-`CCF` (consumption of fixed capital), added to fix a valuation problem
-in the exploitation time series (see `docs/LIMITACOES.md` item 9); only
+`AMECO_SDMX_MAP` now maps 24 variables plus 2 calculated (GDP deflator,
+trade balance) — 26 series in total, including `GFCF_deflator` and
+`CFC` (consumption of fixed capital), added to fix a valuation problem
+in the exploitation time series (see `docs/LIMITATIONS.md` item 9); only
 gross capital stock was confirmed unavailable in this API (not
-"pending") — see `docs/LIMITACOES.md` item 3 for the exact list.
+"pending") — see `docs/LIMITATIONS.md` item 3 for the exact list.
 
 ### 3.4 Resolved: AMECO calibration was macro-only, with fixed weights by default
 
-`calibrar_com_dados_ameco` only implements the `:macro` aggregation
+`calibrate_with_ameco_data` only implements the `:macro` aggregation
 (Primary, Secondary, Tertiary). By default, GDP, employment, and
 capital-stock splits use fixed per-country weights; countries without a
 specific profile fall back to the EU average profile. **Fixed
-(optional):** `dados_setoriais=:eurostat` uses real Eurostat sectoral
+(optional):** `sector_data=:eurostat` uses real Eurostat sectoral
 data instead of fixed weights, with automatic fallback for countries
 outside EU/EEA coverage, **now including the matrix `A`**: built at the
 19 fine sectors (real, non-negative, dataflow `NAIO_10_CP1700` — see
-`docs/LIMITACOES.md` item 4-bis for the earlier dataflow bug, found and
+`docs/LIMITATIONS.md` item 4-bis for the earlier dataflow bug, found and
 fixed) and aggregated to the 3 macro sectors by the Leontief formula
-(`agregar_matriz_io`), rather than aggregating raw IOT flows directly.
+(`aggregate_io_matrix`), rather than aggregating raw IOT flows directly.
 
 ### 3.5 Resolved: incomplete INE aggregation
 
-`calibrar_modelo_portugal` accepted the `agregação` argument, but only
-`:detalhada` (19 sectors) was wired up. **Fixed:** `:macro` (3 sectors,
-the same aggregation as the AMECO path) and `:média` (10 sectors, NACE
-Rev.2 "A10" level) implemented via `agregar_setores`, working with both
+`calibrate_portugal_model` accepted the `aggregation` argument, but only
+`:detailed` (19 sectors) was wired up. **Fixed:** `:macro` (3 sectors,
+the same aggregation as the AMECO path) and `:medium` (10 sectors, NACE
+Rev.2 "A10" level) implemented via `aggregate_sectors`, working with both
 synthetic and real data.
 
 ### 3.6 Resolved (optional): perpetual-inventory capital stock; AMECO depreciation fixed
 
 Constant capital is approximated by the reported capital stock by
-default; `inventário_perpétuo=true` replaces this with its own series
+default; `perpetual_inventory=true` replaces this with its own series
 (PIM, `Kₜ=(1-δ)Kₜ₋₁+FBCFₜ`, δ estimated per sector from CCF/stock, not
-fixed) — see `docs/LIMITACOES.md` item 7. Separately, the AMECO time
-series (`analisar_série_temporal_com_dados`) used a flat 10% deduction
+fixed) — see `docs/LIMITATIONS.md` item 7. Separately, the AMECO time
+series (`analyze_time_series_with_data`) used a flat 10% deduction
 from the stock as "depreciation"; fixed to use real AMECO CCF, deflated
-consistently with the other terms — see `docs/LIMITACOES.md` item 9.
+consistently with the other terms — see `docs/LIMITATIONS.md` item 9.
 Still to differentiate: depreciation rates by asset type (structures,
 machinery, ICT), which Eurostat does not publish directly.
 
@@ -266,18 +266,18 @@ trade-and-transport-margins satellite table), which understated
 intersectoral flows by more than an order of magnitude and explained an
 implausible spectral radius and `R_max` reported until this fix. Fixed
 with `NAIO_10_CP1700` (the real table), `stk_flow=DOM` (domestic use
-only) — see `docs/LIMITACOES.md` item 4-bis for the full history.
+only) — see `docs/LIMITATIONS.md` item 4-bis for the full history.
 
 ### 3.10 Resolved: dynamical model's gross output and investment demand
 
-The output used by the coupling mechanisms (`realização`,
-`racionamento`) was a value-added-type flow (`W=δC+V+S`), which omits
+The output used by the coupling mechanisms (`realization`,
+`rationing`) was a value-added-type flow (`W=δC+V+S`), which omits
 circulating intermediate consumption — not gross output in the sense
 used to build `A`. Fixed by reconstructing genuine gross output from
 the model's own cost-output identity, without new state; investment
 demand in the rationing mechanism converts planned expenditure to
 output scale via the capital-output ratio, instead of applying `A`
-directly to expenditure. See `docs/LIMITACOES.md` item 1.
+directly to expenditure. See `docs/LIMITATIONS.md` item 1.
 
 ---
 
@@ -297,7 +297,7 @@ Recommended approach, in two steps:
    that the supply of each good equal intermediate use plus final use
    (worker and capitalist consumption, plus net investment). In the
    two-department model this reduces to the condition already checked
-   by `verificar_equilibrio_2dept`.
+   by `check_equilibrium_2dept`.
 
 2. **Capital mobility.** Introduce a reallocation term that shifts
    investment toward sectors with an above-average profit rate:
@@ -312,22 +312,22 @@ Recommended approach, in two steps:
    (which depend on `A`), not just `e/(k+1)`. This is how `A` enters
    the dynamics through valuation.
 
-Practical suggestion: keep `sistema_Ndept!` as is (documented as the
-"independent sectors" version) and add `sistema_Ndept_io!` with the
+Practical suggestion: keep `system_Ndept!` as is (documented as the
+"independent sectors" version) and add `system_Ndept_io!` with the
 coupling, selectable by argument. Validate by requiring that, in the
 steady-state limit, profit rates converge to `r̄` and sectoral balances
 close.
 
 **Step 2 (mobility) — done**, exactly as recommended above.
 **Step 1 (reproduction consistency) — done**, with two mechanisms: an
-aggregate pressure (`realização=true`) and exact per-sector quantity
-rationing (`racionamento=true`, solved by fixed point, no DAE needed) —
-see `docs/LIMITACOES.md` item 1.
+aggregate pressure (`realization=true`) and exact per-sector quantity
+rationing (`rationing=true`, solved by fixed point, no DAE needed) —
+see `docs/LIMITATIONS.md` item 1.
 
 ### 4.2 Fix `R_max` in the shock
 
-Have `simular_Ndept_customizado` return the matrix `A` actually used.
-Reuse it in `simular_choque_salarial` to compute `R_max` with the
+Have `simulate_Ndept_custom` return the matrix `A` actually used.
+Reuse it in `simulate_wage_shock` to compute `R_max` with the
 departments' real labor coefficients (e.g. `l_i` proportional to
 employment or to `V_i`), instead of `ones(N)`. This makes the reported
 feasibility limit correspond to the simulated scenario.
@@ -339,16 +339,16 @@ feasibility limit correspond to the simulated scenario.
   by the Commission; replaced by the official SDMX API
   (`src/ameco_sdmx.jl`), which returns structured data directly, with
   no fixed-width parsing. The "known value" check (Portugal's GDP) was
-  done — see `verificar_sdmx_ameco()` and `docs/LIMITACOES.md` item 3.
+  done — see `check_ameco_sdmx()` and `docs/LIMITATIONS.md` item 3.
 - **Confirm mnemonics** — done for 24 of the 25 variables (22 mapped
   directly plus 2 calculated); only gross capital stock confirmed
   unavailable in this API. Some old (never-verified) mnemonics turned
-  out to be incorrect — see `docs/LIMITACOES.md` item 3.
+  out to be incorrect — see `docs/LIMITATIONS.md` item 3.
 - ~~Map SDMX chapter per variable~~ — done (see above).
 - ~~Eurostat alternative~~ — **done**: `src/eurostat_sdmx.jl` uses
   `NAMA_10_A64`/`_E`/`_P5` for VAB/compensation/CCF/employment/GFCF,
   `NAMA_10_NFA_ST` for capital stock, and `NAIO_10_CP1700` (the real
-  symmetric IOT table — see item 3.9 and `docs/LIMITACOES.md` item 4-bis
+  symmetric IOT table — see item 3.9 and `docs/LIMITATIONS.md` item 4-bis
   for the dataflow fix) for the matrix `A`.
 
 ### 4.4 Real sectoral calibration (done for 19, 10, and 3 sectors; real A on both paths)
@@ -357,28 +357,28 @@ feasibility limit correspond to the simulated scenario.
   data~~ — done, `src/eurostat_sdmx.jl` (VAB, compensation, CCF,
   employment, GFCF, capital stock via
   `NAMA_10_A64`/`NAMA_10_A64_E`/`NAMA_10_A64_P5`/`NAMA_10_NFA_ST`),
-  opt-in on both paths (`fonte_dados=:eurostat` for INE,
-  `dados_setoriais=:eurostat` for AMECO).
+  opt-in on both paths (`data_source=:eurostat` for INE,
+  `sector_data=:eurostat` for AMECO).
 - ~~Build the matrix `A` from Eurostat tables~~ — done for both paths.
-  INE: 19 sectors, `construir_matriz_io_eurostat` via `NAIO_10_CP1700`
+  INE: 19 sectors, `build_eurostat_io_matrix` via `NAIO_10_CP1700`
   (the real symmetric IOT table, `stk_flow=DOM` — a later fix replaced
   `NAIO_10_CP1620`, which turned out to be a margins satellite table,
-  not the IOT itself; see `docs/LIMITACOES.md` item 4-bis). AMECO (3
+  not the IOT itself; see `docs/LIMITATIONS.md` item 4-bis). AMECO (3
   macro sectors): aggregating the already-clean 19-sector matrix (not
   raw flows) by the standard Leontief aggregation formula
-  (`agregar_matriz_io`) gives a real, non-negative matrix, without the
+  (`aggregate_io_matrix`) gives a real, non-negative matrix, without the
   Tertiary-row caveat that used to appear here before the dataflow fix —
   verified with exact reconciliation against the output published by
   the table itself.
 - ~~Estimate capital stock per sector by the perpetual-inventory
-  method~~ — done (optional, `inventário_perpétuo=true`;
-  `calcular_stock_capital_pim`, `src/eurostat_sdmx.jl`). Uses a single
+  method~~ — done (optional, `perpetual_inventory=true`;
+  `compute_pim_capital_stock`, `src/eurostat_sdmx.jl`). Uses a single
   depreciation rate per sector (estimated, not fixed) — an
   asset-type-differentiated PIM would also require depreciation profiles
   by asset type, which Eurostat does not publish directly; left undone
-  (see `docs/LIMITACOES.md` item 7).
-- ~~Actually implement the `:média` and `:macro` aggregations in the
-  INE path~~ — done, `agregar_setores` (`src/calibracao_pt.jl`).
+  (see `docs/LIMITATIONS.md` item 7).
+- ~~Actually implement the `:medium` and `:macro` aggregations in the
+  INE path~~ — done, `aggregate_sectors` (`src/calibration_pt.jl`).
 
 ### 4.5 Tests and continuous integration — done
 
@@ -392,9 +392,9 @@ feasibility limit correspond to the simulated scenario.
   push to `main`.
 
 Not covered by CI (network needed, opt-in by design — see
-`docs/LIMITACOES.md`): `método=:sdmx`, `fonte_dados=:eurostat`,
-`dados_setoriais=:eurostat`. Checked manually via
-`verificar_sdmx_ameco()`/`verificar_eurostat_setorial()`.
+`docs/LIMITATIONS.md`): `method=:sdmx`, `data_source=:eurostat`,
+`sector_data=:eurostat`. Checked manually via
+`check_ameco_sdmx()`/`check_eurostat_sectoral()`.
 
 ### 4.6 Medium-term directions
 
@@ -421,9 +421,9 @@ Proposed sequence, from most structural to most exploratory:
    headless CI.~~ — done.
 2. ~~Fix the shock's `R_max`~~ — done.
 3. ~~Couple `A` to the N-dept dynamics with capital mobility~~ — done
-   (optional, `acoplado=true`), plus aggregate realization pressure
-   (`realização=true`) and exact per-sector quantity rationing
-   (`racionamento=true`, fixed point, no DAE); dispersion convergence
+   (optional, `coupled=true`), plus aggregate realization pressure
+   (`realization=true`) and exact per-sector quantity rationing
+   (`rationing=true`, fixed point, no DAE); dispersion convergence
    and damping validated by test.
 4. ~~Strengthen AMECO access~~ — done (official SDMX API, 26 series
    obtained — 24 mapped directly + 2 calculated; 1 confirmed
@@ -432,7 +432,7 @@ Proposed sequence, from most structural to most exploratory:
    real matrix `A` on both paths (INE 19/10/3 sectors; AMECO 3 sectors,
    see §4.4). Default behavior remains synthetic/fixed-weight.
 6. ~~Estimate capital stock via perpetual inventory~~ — done, optional
-   (`inventário_perpétuo=true`).
+   (`perpetual_inventory=true`).
 7. ~~Fix the technical matrix A's wrong dataflow~~ — done
    (`NAIO_10_CP1700`, `stk_flow=DOM` — see §3.9).
 8. ~~Reconstruct genuine gross output in the dynamical model~~ — done,
@@ -441,7 +441,7 @@ Proposed sequence, from most structural to most exploratory:
    weighted by `C` — see §3.1).
 10. ~~Write the academic paper (methodology + empirical
     application)~~ — done, `paper/main.tex`, reproducible from real data
-    (`paper/gerar_resultados.jl`, `paper/monte_carlo.jl`,
+    (`paper/generate_results.jl`, `paper/monte_carlo.jl`,
     `paper/matrix_audit.jl`).
 11. Medium-term extensions (financialization, ecology, unequal exchange,
     heterogeneous agents) — still to do.
@@ -453,19 +453,19 @@ Proposed sequence, from most structural to most exploratory:
 - [x] Tests run locally with no errors
 - [x] Headless CI configured
 - [x] Shock `R_max` computed with real A and l
-- [x] `sistema_Ndept_io!` with coupling via A and capital mobility (optional, `acoplado=true`)
-- [x] Optional aggregate realization pressure (`realização=true`) and `verificar_equilibrio_Ndept` (after-the-fact check)
-- [x] Exact per-sector quantity rationing (`racionamento=true`, fixed point, no DAE or `NonlinearSolve.jl`)
+- [x] `system_Ndept_io!` with coupling via A and capital mobility (optional, `coupled=true`)
+- [x] Optional aggregate realization pressure (`realization=true`) and `check_equilibrium_Ndept` (after-the-fact check)
+- [x] Exact per-sector quantity rationing (`rationing=true`, fixed point, no DAE or `NonlinearSolve.jl`)
 - [x] AMECO download via the official SDMX API (replaces the discontinued TXT file)
-- [x] SDMX API validated with a known value (`verificar_sdmx_ameco()`)
+- [x] SDMX API validated with a known value (`check_ameco_sdmx()`)
 - [x] AMECO mnemonics confirmed (26 series obtained; 1 confirmed unavailable)
-- [x] Matrix A from real supply-and-use tables (INE 19/10/3 sectors; AMECO 3 sectors, aggregated — see LIMITACOES item 4-bis)
+- [x] Matrix A from real supply-and-use tables (INE 19/10/3 sectors; AMECO 3 sectors, aggregated — see LIMITATIONS item 4-bis)
 - [x] Sectoral calibration with real national accounts by branch (both paths, opt-in)
-- [x] Capital stock via perpetual inventory (optional, `inventário_perpétuo=true`; single depreciation rate per sector, not differentiated by asset type)
-- [x] `:média` and `:macro` INE aggregations implemented
+- [x] Capital stock via perpetual inventory (optional, `perpetual_inventory=true`; single depreciation rate per sector, not differentiated by asset type)
+- [x] `:medium` and `:macro` INE aggregations implemented
 - [x] Technical matrix A fixed for the real dataflow (`NAIO_10_CP1700`, `stk_flow=DOM`, zero negative cells, exact reconciliation against P1)
 - [x] Genuine gross output reconstructed in the dynamical model (no new state); investment demand in output scale (`Δx`), not expenditure
-- [x] Reconstruction admissibility condition checked and fixed once per simulation (`_garantir_admissibilidade_output`), not reclaimed at every evaluation
+- [x] Reconstruction admissibility condition checked and fixed once per simulation (`_ensure_output_admissibility`), not reclaimed at every evaluation
 - [x] Mobility term conserves aggregate constant capital exactly (`r̄` weighted by `C`)
 - [x] AMECO time series uses real CCF (not a flat 10% deduction); `e` invariant under a common deflator, verified
 - [x] `e=0.1` floor in the sectoral calibration explicitly reported (count of saturated sectors)

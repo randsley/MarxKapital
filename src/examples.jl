@@ -1,194 +1,194 @@
 # ============================================================================
-# EXEMPLOS PRONTOS E AJUDA
+# READY-MADE EXAMPLES AND HELP
 # ============================================================================
 
-"""Exemplo: modelo de 2 departamentos."""
-function exemplo_2dept()
+"""Example: the 2-department model."""
+function example_2dept()
     println("\n" * "="^70)
-    println("MODELO DE DOIS DEPARTAMENTOS")
+    println("TWO-DEPARTMENT MODEL")
     println("="^70)
-    sol, depts, p = simular_2dept(T = 50.0)
+    sol, depts, p = simulate_2dept(T = 50.0)
     for (i, d) in enumerate(depts)
-        println("  Dept $i — $(d.nome): C=$(d.c) V=$(d.v) k=$(round(d.k, digits=2)) e=$(d.e)")
+        println("  Dept $i — $(d.name): C=$(d.c) V=$(d.v) k=$(round(d.k, digits=2)) e=$(d.e)")
     end
-    plotar_2dept(sol, depts, p)
+    plot_2dept(sol, depts, p)
     return sol, depts, p
 end
 
-"""Exemplo: modelo de N departamentos."""
-function exemplo_Ndept(N = 5; seed = 42)
+"""Example: the N-department model."""
+function example_Ndept(N = 5; seed = 42)
     println("\n" * "="^70)
-    println("MODELO DE $N DEPARTAMENTOS")
+    println("$N-DEPARTMENT MODEL")
     println("="^70)
-    nomes = ["Energia", "Indústria", "Manufatura", "Serviços", "Consumo"]
-    N > 5 && append!(nomes, ["Dept_$i" for i in 6:N])
-    sol, depts, p = simular_Ndept(N, T = 100.0, nomes = nomes[1:N], seed = seed)
+    name_list = ["Energy", "Industry", "Manufacturing", "Services", "Consumption"]
+    N > 5 && append!(name_list, ["Dept_$i" for i in 6:N])
+    sol, depts, p = simulate_Ndept(N, T = 100.0, name_list = name_list[1:N], seed = seed)
     for (i, d) in enumerate(depts)
-        println("  $i. $(d.nome): k=$(round(d.k, digits=2)) e=$(round(d.e, digits=2)) r=$(round(taxa_lucro(d), digits=3))")
+        println("  $i. $(d.name): k=$(round(d.k, digits=2)) e=$(round(d.e, digits=2)) r=$(round(profit_rate(d), digits=3))")
     end
     println("\nρ(A) = $(round(maximum(abs.(eigvals(p.A))), digits=4))")
-    plotar_Ndept(sol, depts, p)
+    plot_Ndept(sol, depts, p)
     return sol, depts, p
 end
 
-"""Exemplo: problema da transformação."""
-exemplo_transformacao() = problema_transformacao(5)
+"""Example: the transformation problem."""
+example_transformation() = transformation_problem(5)
 
-"""Exemplo: calibração INE (Portugal) + validação."""
-function exemplo_portugal()
-    params = calibrar_modelo_portugal(ano = 2022)
-    validação = validar_taxas_lucro_calibradas(params)
-    return params, validação
+"""Example: INE calibration (Portugal) + validation."""
+function example_portugal()
+    params = calibrate_portugal_model(year = 2022)
+    validation = validate_calibrated_profit_rates(params)
+    return params, validation
 end
 
-# --- Exemplos AMECO ---
+# --- AMECO examples ---
 
-"""Exemplo: Portugal via AMECO (sintético) + validação + série temporal."""
-function exemplo_ameco_portugal()
-    listar_países_ameco()
-    params, dados = calibrar_com_ameco_v2("Portugal", ano = 2022, método = :sintético)
-    validação = validar_taxas_lucro_calibradas(params)
-    temporal = analisar_série_temporal_ameco("Portugal", anos = 2000:2022)
-    return (params = params, dados = dados, validação = validação, temporal = temporal)
+"""Example: Portugal via AMECO (synthetic) + validation + time series."""
+function example_ameco_portugal()
+    list_ameco_countries()
+    params, data = calibrate_with_ameco_v2("Portugal", year = 2022, method = :synthetic)
+    validation = validate_calibrated_profit_rates(params)
+    temporal = analyze_ameco_time_series("Portugal", years = 2000:2022)
+    return (params = params, data = data, validation = validation, temporal = temporal)
 end
 
-"""Exemplo: comparação do Sul da Europa."""
-exemplo_comparação_sul_europa() =
-    comparar_países_ameco(["Portugal", "Espanha", "Itália", "Grécia"], ano = 2022)
+"""Example: Southern Europe comparison."""
+example_southern_europe() =
+    compare_ameco_countries(["Portugal", "Spain", "Italy", "Greece"], year = 2022)
 
-"""Exemplo: comparação de grandes economias europeias."""
-exemplo_comparação_grandes_economias() =
-    comparar_países_ameco(["Alemanha", "França", "Itália", "Espanha", "Países Baixos"], ano = 2022)
+"""Example: comparison of large European economies."""
+example_large_economies() =
+    compare_ameco_countries(["Germany", "France", "Italy", "Spain", "Netherlands"], year = 2022)
 
-"""Exemplo: workflow AMECO completo (auto → calibração → validação → choque)."""
-function exemplo_workflow_completo_ameco(país = "Portugal"; método = :auto)
+"""Example: full AMECO workflow (auto → calibration → validation → shock)."""
+function example_full_ameco_workflow(country = "Portugal"; method = :auto)
     println("\n" * "="^80)
-    println("WORKFLOW COMPLETO AMECO — $país")
+    println("FULL AMECO WORKFLOW — $country")
     println("="^80)
-    dados = obter_dados_ameco(país, método = método)
-    params, _ = calibrar_com_dados_ameco(dados, 2022, :macro)
-    validação = validar_taxas_lucro_calibradas(params)
-    depts = criar_departamentos_de_params(params)
-    choque = simular_choque_salarial(depts, 0.10, plotar = false)
-    println("\n✅ Concluído — qualidade $(round(validação.pontuação, digits=1))% | " *
-            "impacto choque $(round(choque.impacto_r_final, digits=2))pp")
-    return (dados = dados, params = params, validação = validação, choque = choque)
+    data = fetch_ameco_data(country, method = method)
+    params, _ = calibrate_with_ameco_data(data, 2022, :macro)
+    validation = validate_calibrated_profit_rates(params)
+    depts = departments_from_params(params)
+    shock = simulate_wage_shock(depts, 0.10, show_plot = false)
+    println("\n✅ Done: quality $(round(validation.score, digits=1))% | " *
+            "shock impact $(round(shock.final_r_impact, digits=2))pp")
+    return (data = data, params = params, validation = validation, shock = shock)
 end
 
-# --- Ajuda ---
+# --- Help ---
 
-"""Guia de uso resumido."""
-function ajuda_modelo()
+"""Short usage guide."""
+function model_help()
     println("""
     ╔═══════════════════════════════════════════════════════════════════════╗
-    ║  MarxKapital — MODELO MARXIANO DE N DEPARTAMENTOS                      ║
+    ║  MarxKapital — N-DEPARTMENT MARXIAN MODEL                              ║
     ╚═══════════════════════════════════════════════════════════════════════╝
 
-    BÁSICO
-      exemplo_2dept()                       Modelo clássico de 2 departamentos
-      exemplo_Ndept(10)                     Modelo de N departamentos
-      exemplo_transformacao()               Valores → preços de produção
-      exemplo_portugal()                    Calibração INE (sintético)
+    BASICS
+      example_2dept()                       Classic 2-department model
+      example_Ndept(10)                     N-department model
+      example_transformation()              Values → production prices
+      example_portugal()                    INE calibration (synthetic)
 
-    AMECO (todos os países da UE + comparação)
-      listar_países_ameco()                 Países disponíveis
-      calibrar_com_ameco_v2("Portugal")     Calibrar via AMECO (:auto)
-      obter_dados_ameco("Alemanha")         Obter séries (auto/sdmx/local/csv/sintético)
-      comparar_países_ameco([...])          Comparação internacional
-      analisar_série_temporal_ameco("PT")   Evolução histórica
-      verificar_sdmx_ameco()                Verificar acesso à API SDMX oficial
+    AMECO (all EU countries + comparison)
+      list_ameco_countries()                Available countries
+      calibrate_with_ameco_v2("Portugal")   Calibrate via AMECO (:auto)
+      fetch_ameco_data("Germany")           Fetch series (auto/sdmx/local/csv/synthetic)
+      compare_ameco_countries([...])        International comparison
+      analyze_ameco_time_series("PT")       Historical evolution
+      check_ameco_sdmx()                    Check access to the official SDMX API
 
-    DADOS SETORIAIS REAIS (Eurostat, opt-in — ver README.md "Real sectoral data (Eurostat)" / README.pt.md "Dados setoriais reais")
-      calibrar_modelo_portugal(fonte_dados=:eurostat)          INE, 19 setores, matriz A real
-      calibrar_com_ameco_v2("Portugal", dados_setoriais=:eurostat)  AMECO, 3 setores macro
-      verificar_eurostat_setorial()         Verificar acesso à API do Eurostat
+    REAL SECTORAL DATA (Eurostat, opt-in; see README.md "Real sectoral data (Eurostat)")
+      calibrate_portugal_model(data_source=:eurostat)             INE, 19 sectors, real matrix A
+      calibrate_with_ameco_v2("Portugal", sector_data=:eurostat)  AMECO, 3 macro sectors
+      check_eurostat_sectoral()             Check access to the Eurostat API
 
-    ANÁLISE
-      curva_salario_lucro(A, l)             Fronteira distributiva w-r
-      simular_choque_salarial(depts, 0.10)  Choque de +10% nos salários
-      curvatura_fronteira(A, l, r)          w(r), w'(r), w''(r) exatos (AD)
+    ANALYSIS
+      wage_profit_curve(A, l)               Wage-profit frontier w-r
+      simulate_wage_shock(depts, 0.10)      +10% wage shock
+      frontier_curvature(A, l, r)           Exact w(r), w'(r), w''(r) (AD)
 
-    DIFERENCIAÇÃO AUTOMÁTICA, TSSI E BIFURCAÇÕES
-      jacobiana_sistema(p, X)               Jacobiana exata da EDO (ForwardDiff)
-      hessiana_sistema(p, X)                Hessianas do lado direito da EDO
-      jacobiana_racionamento(A,σ_c,S,O)     Espetro do mapa de racionamento, α_max, α ótimo
-      valorizar_tssi(sol, p; τ=1.0)         Valores/preços TSSI com desfasamento τ
-      comparar_tssi_simultaneo(sol, p)      Taxa de lucro TSSI vs. simultaneísta
-      bifurcacao_racionamento(A,σ_c,S,O)    Continuação na escala da procura (BifurcationKit)
-      bifurcacao_tssi(X, p; τ=1.0)          Continuação do mapa de preços TSSI
+    AUTOMATIC DIFFERENTIATION, TSSI AND BIFURCATIONS
+      system_jacobian(p, X)                 Exact Jacobian of the ODE (ForwardDiff)
+      system_hessian(p, X)                  Hessians of the ODE right-hand side
+      rationing_jacobian(A,σ_c,S,O)         Rationing map spectrum, α_max, optimal α
+      tssi_valuation(sol, p; τ=1.0)         TSSI values/prices with lag τ
+      compare_tssi_simultaneous(sol, p)     TSSI vs. simultaneist profit rate
+      rationing_bifurcation(A,σ_c,S,O)      Continuation in the demand scale (BifurcationKit)
+      tssi_bifurcation(X, p; τ=1.0)         Continuation of the TSSI price map
 
-    CRESCIMENTO EQUILIBRADO E CICLOS (preços_mercado=true)
-      crescimento_equilibrado(p, X0)        Raio de crescimento equilibrado g★, estabilidade
-      varrimento_salarial(p, X0)            g★, r★ contra a parcela salarial ω
-      bifurcacao_acumulação(p, X0, :μ_v; intervalo=(0,2.5))
-                                            Hopf, forma normal e ciclos-limite
-      ciclo_simulado(p, :μ_v, θ, X0)        Verificação por simulação (secção de Poincaré)
-      curva_hopf(p, X0)                     Fronteira de Hopf no plano (ω, μ_v)
-      expoentes_lyapunov(p, :μ_v, θ, X0)    Expoentes de Lyapunov (λ₁ > 0: caos)
-      histerese_simulada(p, :μ_v, grelha, X0)
-                                            Atratores coexistentes (varrimento ↑↓)
+    BALANCED GROWTH AND CYCLES (market_prices=true)
+      balanced_growth(p, X0)                Balanced-growth ray g★, stability
+      wage_sweep(p, X0)                     g★, r★ against the wage share ω
+      accumulation_bifurcation(p, X0, :μ_v; interval=(0,2.5))
+                                            Hopf, normal form and limit cycles
+      simulated_cycle(p, :μ_v, θ, X0)       Check by simulation (Poincaré section)
+      hopf_curve(p, X0)                     Hopf boundary in the (ω, μ_v) plane
+      lyapunov_exponents(p, :μ_v, θ, X0)    Lyapunov exponents (λ₁ > 0: chaos)
+      simulated_hysteresis(p, :μ_v, grid_pts, X0)
+                                            Coexisting attractors (↑↓ sweep)
 
-    TESTES / AJUDA
-      testar_modelo()                       Bateria de validação
-      ajuda_modelo()                        Este guia
+    TESTS / HELP
+      test_model()                          Validation battery
+      model_help()                          This guide
 
-    Detalhe de qualquer função: ?nome_da_função
+    Details of any function: ?function_name
     """)
 end
 
-"""Bateria mínima de testes de sanidade."""
-function testar_modelo()
+"""Minimal battery of sanity tests."""
+function test_model()
     println("\n" * "="^70)
-    println("TESTES DE VALIDAÇÃO")
+    println("VALIDATION TESTS")
     println("="^70)
-    passados = 0; total = 0
+    passed = 0; total = 0
 
     total += 1
     try
-        d = Departamento("Teste", c = 100, v = 50, e = 1.5)
+        d = Department("Test", c = 100, v = 50, e = 1.5)
         @assert abs(d.σ_c + d.σ_v + d.γ - 1.0) < 1e-6
-        println("✓ Teste 1: Departamento válido"); passados += 1
-    catch e; println("✗ Teste 1: $e"); end
+        println("✓ Test 1: valid Department"); passed += 1
+    catch e; println("✗ Test 1: $e"); end
 
     total += 1
     try
-        A = criar_matriz_tecnica(5, seed = 1)
+        A = create_technical_matrix(5, seed = 1)
         ρ = maximum(abs.(eigvals(A)))
         @assert ρ < 1.0
-        println("✓ Teste 2: Matriz produtiva (ρ=$(round(ρ, digits=3)))"); passados += 1
-    catch e; println("✗ Teste 2: $e"); end
+        println("✓ Test 2: productive matrix (ρ=$(round(ρ, digits=3)))"); passed += 1
+    catch e; println("✗ Test 2: $e"); end
 
     total += 1
     try
-        sol, _, _ = simular_Ndept(3, T = 10.0, seed = 1)
+        sol, _, _ = simulate_Ndept(3, T = 10.0, seed = 1)
         @assert all(isfinite.(sol[end]))
-        println("✓ Teste 3: Simulação converge"); passados += 1
-    catch e; println("✗ Teste 3: $e"); end
+        println("✓ Test 3: simulation converges"); passed += 1
+    catch e; println("✗ Test 3: $e"); end
 
     total += 1
     try
-        A = criar_matriz_tecnica(3, seed = 1)
-        λ = calcular_valores_trabalho(A, [0.5, 0.4, 0.3])
+        A = create_technical_matrix(3, seed = 1)
+        λ = compute_labor_values(A, [0.5, 0.4, 0.3])
         @assert all(λ .> 0)
-        println("✓ Teste 4: Valores-trabalho positivos"); passados += 1
-    catch e; println("✗ Teste 4: $e"); end
+        println("✓ Test 4: positive labor values"); passed += 1
+    catch e; println("✗ Test 4: $e"); end
 
     total += 1
     try
-        params = calibrar_modelo_portugal(ano = 2022)
+        params = calibrate_portugal_model(year = 2022)
         @assert params.N == 19
-        println("✓ Teste 5: Calibração INE (19 setores)"); passados += 1
-    catch e; println("✗ Teste 5: $e"); end
+        println("✓ Test 5: INE calibration (19 sectors)"); passed += 1
+    catch e; println("✗ Test 5: $e"); end
 
     total += 1
     try
-        params, _ = calibrar_com_ameco_v2("Portugal", ano = 2022, método = :sintético)
+        params, _ = calibrate_with_ameco_v2("Portugal", year = 2022, method = :synthetic)
         @assert params.N == 3
-        println("✓ Teste 6: Calibração AMECO (sintético)"); passados += 1
-    catch e; println("✗ Teste 6: $e"); end
+        println("✓ Test 6: AMECO calibration (synthetic)"); passed += 1
+    catch e; println("✗ Test 6: $e"); end
 
     println("\n" * "="^70)
-    println("RESULTADO: $passados/$total testes passaram")
+    println("RESULT: $passed/$total tests passed")
     println("="^70 * "\n")
-    return passados == total
+    return passed == total
 end

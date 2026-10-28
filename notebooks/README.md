@@ -5,14 +5,14 @@ Worked examples of MarxKapital in two formats:
 - **`jupyter/`**: six narrative notebooks, committed with their outputs, so they can be read on GitHub without running anything.
 - **`pluto/`**: three interactive [Pluto](https://plutojl.org) notebooks with sliders, which recompute as you change the parameters.
 
-Everything runs offline on the synthetic defaults. The prose is in English. The code uses the MarxKapital API, whose names are Portuguese (see the main [README](../README.md)).
+Everything runs offline on the synthetic defaults. The prose and the MarxKapital API are both in English.
 
 ## Jupyter
 
 | Notebook | Contents |
 |---|---|
 | [01_accumulation_basics](jupyter/01_accumulation_basics.ipynb) | Departments, the rate of profit, the two-department model, N departments, raising the rate of exploitation |
-| [02_values_and_prices](jupyter/02_values_and_prices.ipynb) | Labour values, prices of production, the wage–profit frontier and its curvature, the transformation problem |
+| [02_values_and_prices](jupyter/02_values_and_prices.ipynb) | Labor values, prices of production, the wage–profit frontier and its curvature, the transformation problem |
 | [03_calibration_and_shocks](jupyter/03_calibration_and_shocks.ipynb) | INE and AMECO calibration (synthetic), validation, international comparison, time series, wage shocks |
 | [04_coupled_sectors_and_ad](jupyter/04_coupled_sectors_and_ad.ipynb) | Capital mobility, realization and rationing, exact Jacobians, the rationing map's spectrum and its bifurcation |
 | [05_tssi_valuation](jupyter/05_tssi_valuation.ipynb) | TSSI against simultaneist valuation, the production lag, stability and bifurcation of TSSI prices |
@@ -63,5 +63,5 @@ The committed Jupyter outputs keep only the PNG of each plot. If you change a no
 
 ```bash
 jupyter nbconvert --to notebook --execute --inplace notebooks/jupyter/0*.ipynb
-julia notebooks/limpar_saidas.jl
+julia notebooks/strip_outputs.jl
 ```

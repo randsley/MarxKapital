@@ -20,9 +20,9 @@ end
 md"""
 # Wage–profit frontier explorer
 
-Pick an economy (number of sectors, random seed, density of the technical matrix `A`) and a uniform rate of profit `r̄`. The notebook shows where `r̄` sits on the wage–profit frontier and how far prices of production are from labour values at that rate.
+Pick an economy (number of sectors, random seed, density of the technical matrix `A`) and a uniform rate of profit `r̄`. The notebook shows where `r̄` sits on the wage–profit frontier and how far prices of production are from labor values at that rate.
 
-- Labour values: `λ = (I − Aᵀ)⁻¹ l`
+- Labor values: `λ = (I − Aᵀ)⁻¹ l`
 - Prices of production: `p = w(1 + r̄)[I − (1 + r̄)Aᵀ]⁻¹ l`, with wage `w = 1`
 - Maximum rate of profit: `R = 1/ρ(A) − 1`
 
@@ -45,17 +45,17 @@ md"""
 
 Sectors `N`: $(@bind N Slider(3:10, default = 5, show_value = true))
 
-Seed: $(@bind semente Slider(1:50, default = 3, show_value = true))
+Seed: $(@bind seed Slider(1:50, default = 3, show_value = true))
 
-Density of `A`: $(@bind densidade Slider(0.1:0.05:0.9, default = 0.3, show_value = true))
+Density of `A`: $(@bind density Slider(0.1:0.05:0.9, default = 0.3, show_value = true))
 """
 
 # ╔═╡ b2fd1080-d316-11f1-b542-790f07dba06f
 begin
-	A = criar_matriz_tecnica(N, seed = semente, densidade = densidade)
-	l = 0.3 .+ 0.3 .* rand(Random.MersenneTwister(semente), N)   # direct labour per unit
-	λ = calcular_valores_trabalho(A, l)
-	fr = curva_salario_lucro(A, l; plotar = false)
+	A = create_technical_matrix(N, seed = seed, density = density)
+	l = 0.3 .+ 0.3 .* rand(Random.MersenneTwister(seed), N)   # direct labor per unit
+	λ = compute_labor_values(A, l)
+	fr = wage_profit_curve(A, l; show_plot = false)
 	R = fr.R_max
 end;
 
@@ -63,20 +63,20 @@ end;
 md"""
 ## Rate of profit
 
-`r̄` as a fraction of `R`: $(@bind fração Slider(0.0:0.01:0.98, default = 0.4, show_value = true))
+`r̄` as a fraction of `R`: $(@bind fraction Slider(0.0:0.01:0.98, default = 0.4, show_value = true))
 """
 
 # ╔═╡ b2fd1094-d316-11f1-8abb-150e3e06eadf
 begin
-	r̄ = fração * R
-	curv = curvatura_fronteira(A, l, r̄)
-	preços = calcular_precos_producao(A, l, 1.0, r̄)
-	razão = (preços .* sum(λ) ./ sum(preços)) ./ λ   # prices normalized to total value
+	r̄ = fraction * R
+	curv = frontier_curvature(A, l, r̄)
+	prices = compute_production_prices(A, l, 1.0, r̄)
+	ratio = (prices .* sum(λ) ./ sum(prices)) ./ λ   # prices normalized to total value
 end;
 
 # ╔═╡ b2fd109e-d316-11f1-8d84-7f34cc1372cb
 md"""
-At `r̄ = $(round(r̄, digits = 3))` (maximum `R = $(round(R, digits = 3))`) the wage is `w = $(round(curv.w, digits = 3))`, the slope of the frontier `w′ = $(round(curv.dw, digits = 3))`, and its curvature `w″ = $(round(curv.d2w, digits = 3))`: the frontier is locally **$(curv.forma)**.
+At `r̄ = $(round(r̄, digits = 3))` (maximum `R = $(round(R, digits = 3))`) the wage is `w = $(round(curv.w, digits = 3))`, the slope of the frontier `w′ = $(round(curv.dw, digits = 3))`, and its curvature `w″ = $(round(curv.d2w, digits = 3))`: the frontier is locally **$(curv.shape)**.
 """
 
 # ╔═╡ b2fd10a8-d316-11f1-a1ce-cf573caa5f55
@@ -87,15 +87,15 @@ plot(
 		scatter!([r̄], [curv.w], markersize = 7, label = "r̄")
 	end,
 	begin
-		bar(1:N, razão, legend = false, xlabel = "sector", ylabel = "price / value",
-		    title = "Prices of production / values at r̄", ylims = (0, max(1.6, 1.05maximum(razão))))
+		bar(1:N, ratio, legend = false, xlabel = "sector", ylabel = "price / value",
+		    title = "Prices of production / values at r̄", ylims = (0, max(1.6, 1.05maximum(ratio))))
 		hline!([1.0], color = :black, ls = :dash)
 	end,
 	layout = (1, 2), size = (900, 380))
 
 # ╔═╡ b2fd10b4-d316-11f1-b0c0-d7e6c6bcc925
 md"""
-Value–price correlation at `r̄`: $(round(cor(λ ./ sum(λ), preços ./ sum(preços)), digits = 4)). At `r̄ = 0` prices are proportional to values, and the correlation is 1.
+Value–price correlation at `r̄`: $(round(cor(λ ./ sum(λ), prices ./ sum(prices)), digits = 4)). At `r̄ = 0` prices are proportional to values, and the correlation is 1.
 """
 
 # ╔═╡ Cell order:

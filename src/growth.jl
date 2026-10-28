@@ -1,219 +1,219 @@
 # ============================================================================
-# CRESCIMENTO EQUILIBRADO: O SISTEMA NORMALIZADO
+# BALANCED GROWTH: THE NORMALIZED SYSTEM
 # ----------------------------------------------------------------------------
-# O lado direito de `sistema_Ndept!`/`sistema_Ndept_io!` é homogéneo de grau 1
-# no estado X = [C; V] (`f(λX) = λf(X)`), pelo que as trajetórias não
-# estabilizam em níveis: os estados estacionários relevantes são raios de
-# crescimento equilibrado, `f(X★) = g★·X★`. São os pontos fixos do sistema
-# normalizado no simplex,
+# The right-hand side of `system_Ndept!`/`system_Ndept_io!` is homogeneous of
+# degree 1 in the state X = [C; V] (`f(λX) = λf(X)`), so trajectories do not
+# settle in levels: the relevant steady states are balanced-growth rays,
+# `f(X★) = g★·X★`. They are the fixed points of the normalized system on the
+# simplex,
 #
 #     y = X/ΣX,      ẏ = f(y) − (1ᵀf(y))·y,
 #
-# escrito em 2N−1 coordenadas livres (a última é 1 − Σ das outras), para que
-# a restrição do simplex não seja uma direção degenerada da jacobiana.
+# written in 2N−1 free coordinates (the last one is 1 − Σ of the others), so
+# that the simplex constraint is not a degenerate direction of the Jacobian.
 #
-# Sem preços de mercado, a taxa de lucro de um setor não depende da sua
-# dimensão relativa e as condições de equilíbrio são sobredeterminadas: não
-# há crescimento equilibrado interior (o capital concentra-se num setor),
-# mesmo com `μ_v`, `realização` ou `racionamento`. Com a dinâmica cruzada
-# (`src/cruzado.jl`) há, e é o caso analisado em `bifurcacao_acumulação`.
+# Without market prices, a sector's profit rate does not depend on its
+# relative size and the equilibrium conditions are overdetermined: there is
+# no interior balanced growth (capital concentrates in one sector), even with
+# `μ_v`, `realization` or `rationing`. With the cross-dual dynamics
+# (`src/cross_dual.jl`) there is, and that is the case studied in `accumulation_bifurcation`.
 # ============================================================================
 
-_cruzado(p) = haskey(p, :β)
+_is_cross_dual(p) = haskey(p, :β)
 
 """
-Estado completo a partir das coordenadas livres `z`: quantidades
-`y = [z₁…z₂ₙ₋₁; 1 − Σ]` no simplex e, no sistema cruzado, log-preços com
-média zero `q = [z…; −Σ]` (só os preços relativos importam).
+Full state from the free coordinates `z`: quantities
+`y = [z₁…z₂ₙ₋₁; 1 − Σ]` on the simplex and, in the cross-dual system,
+mean-zero log prices `q = [z…; −Σ]` (only relative prices matter).
 """
-function _do_livre(z, p)
+function _from_free(z, p)
     nq = 2 * length(p.e)
     y = [z[1:nq-1]; 1 - sum(z[1:nq-1])]
-    _cruzado(p) || return y
+    _is_cross_dual(p) || return y
     qf = z[nq:end]
     return [y; qf; -sum(qf)]
 end
 
-"""Coordenadas livres de um estado completo `X` (normaliza quantidades e preços)."""
-function _para_livre(X, p)
+"""Free coordinates of a full state `X` (normalizes quantities and prices)."""
+function _to_free(X, p)
     nq = 2 * length(p.e)
     y = X[1:nq] ./ sum(X[1:nq])
-    _cruzado(p) || return y[1:end-1]
+    _is_cross_dual(p) || return y[1:end-1]
     q = X[nq+1:end] .- mean(X[nq+1:end])
     return [y[1:end-1]; q[1:end-1]]
 end
 
-"""Projeção do lado direito no estado completo normalizado (quantidades no
-simplex, log-preços com média zero)."""
-function _projetar(fX, X, p)
+"""Projection of the right-hand side onto the normalized full state
+(quantities on the simplex, mean-zero log prices)."""
+function _project(fX, X, p)
     nq = 2 * length(p.e)
     hy = fX[1:nq] .- sum(fX[1:nq]) .* X[1:nq]
-    _cruzado(p) || return hy
+    _is_cross_dual(p) || return hy
     return [hy; fX[nq+1:end] .- mean(fX[nq+1:end])]
 end
 
 """
-    sistema_normalizado(p; t=0.0)
+    normalized_system(p; t=0.0)
 
-Lado direito do sistema normalizado nas coordenadas livres, `z ↦ h(z)`:
-`ẏ = f(y) − (1ᵀf(y))·y` para as quantidades (2N−1 coordenadas livres) e,
-no sistema cruzado (`p` com `β`), `q̇ − média(q̇)` para os log-preços (N−1).
-Os seus zeros são os raios de crescimento equilibrado de `f` (com preços
-relativos constantes, no sistema cruzado).
+Right-hand side of the normalized system in free coordinates, `z ↦ h(z)`:
+`ẏ = f(y) − (1ᵀf(y))·y` for the quantities (2N−1 free coordinates) and, in
+the cross-dual system (`p` with `β`), `q̇ − mean(q̇)` for the log prices
+(N−1). Its zeros are the balanced-growth rays of `f` (with constant relative
+prices, in the cross-dual system).
 """
-function sistema_normalizado(p; t = 0.0)
+function normalized_system(p; t = 0.0)
     f = _rhs(p, t)
     nq = 2 * length(p.e)
     return function (z)
-        X = _do_livre(z, p)
-        h = _projetar(f(X), X, p)
-        _cruzado(p) || return h[1:nq-1]
+        X = _from_free(z, p)
+        h = _project(f(X), X, p)
+        _is_cross_dual(p) || return h[1:nq-1]
         return [h[1:nq-1]; h[nq+1:end-1]]
     end
 end
 
-"""Lado direito normalizado no estado completo, para integração."""
-function _rhs_normalizado!(dX, X, p, t)
+"""Normalized right-hand side on the full state, for integration."""
+function _rhs_normalized!(dX, X, p, t)
     fX = similar(X)
-    _sistema_de(p)(fX, X, p, t)
-    dX .= _projetar(fX, X, p)
+    _system_of(p)(fX, X, p, t)
+    dX .= _project(fX, X, p)
 end
 
 """
-    simular_normalizado(p, X0; T=500.0)
+    simulate_normalized(p, X0; T=500.0)
 
-Integra o sistema normalizado a partir de `X0` (normalizado internamente:
-quantidades no simplex, log-preços com média zero) — sem o crescimento
-exponencial dos níveis, que transborda em horizontes longos.
+Integrates the normalized system from `X0` (normalized internally: quantities
+on the simplex, mean-zero log prices), without the exponential growth of the
+levels, which overflows over long horizons.
 """
-function simular_normalizado(p, X0; T = 500.0, saveat = 1.0)
-    prob = ODEProblem(_rhs_normalizado!, _do_livre(_para_livre(X0, p), p), (0.0, T), p)
+function simulate_normalized(p, X0; T = 500.0, saveat = 1.0)
+    prob = ODEProblem(_rhs_normalized!, _from_free(_to_free(X0, p), p), (0.0, T), p)
     return solve(prob, Tsit5(), saveat = saveat, abstol = 1e-10, reltol = 1e-8)
 end
 
 """
-    indicadores_crescimento(p, X)
+    growth_indicators(p, X)
 
-Indicadores num estado `X` (normalizado ou não): taxa de crescimento `g`
-(`1ᵀf/1ᵀ(C+V)`, a taxa comum de crescimento equilibrado num ponto fixo),
-taxas de lucro `r` (a preços de produção de Sraffa no sistema acoplado; a
-preços de mercado no cruzado), composições orgânicas `k = C/V`, quotas
-`quota_C`, `quota_V`, parcela salarial agregada `ω = ΣV/(ΣV+ΣS)`, taxa de
-lucro agregada `r_agregada = ΣS/Σ(C+V)` e `dispersão_r`. No sistema
-cruzado, também os preços de mercado `P` e o excesso de procura relativo.
+Indicators at a state `X` (normalized or not): growth rate `g`
+(`1ᵀf/1ᵀ(C+V)`, the common balanced-growth rate at a fixed point), profit
+rates `r` (at Sraffian production prices in the coupled system; at market
+prices in the cross-dual one), organic compositions `k = C/V`, shares
+`share_C`, `share_V`, aggregate wage share `ω = ΣV/(ΣV+ΣS)`, aggregate
+profit rate `r_aggregate = ΣS/Σ(C+V)` and `r_dispersion`. In the cross-dual
+system, also the market prices `P` and the relative excess demand.
 """
-function indicadores_crescimento(p, X)
+function growth_indicators(p, X)
     N = length(p.e)
     C, V = X[1:N], X[N+1:2N]
     S = p.e .* V
     fX = _rhs(p)(X)
     g = sum(fX[1:2N]) / sum(X[1:2N])
-    base = (g = g, k = C ./ V, quota_C = C ./ sum(C), quota_V = V ./ sum(V),
-            ω = sum(V) / (sum(V) + sum(S)), r_agregada = sum(S) / sum(C .+ V))
-    if _cruzado(p)
-        ec = estado_cruzado(C, V, X[2N+1:3N], p)
-        return merge(base, (r = ec.r, dispersão_r = std(ec.r), P = ec.P, excesso = ec.excesso))
+    base = (g = g, k = C ./ V, share_C = C ./ sum(C), share_V = V ./ sum(V),
+            ω = sum(V) / (sum(V) + sum(S)), r_aggregate = sum(S) / sum(C .+ V))
+    if _is_cross_dual(p)
+        ec = cross_dual_state(C, V, X[2N+1:3N], p)
+        return merge(base, (r = ec.r, r_dispersion = std(ec.r), P = ec.P, excess = ec.excess))
     end
-    r = haskey(p, :μ) ? _taxas_lucro_io(C, V, S, p) : S ./ (C .+ V)
-    return merge(base, (r = r, dispersão_r = std(r)))
+    r = haskey(p, :μ) ? _io_profit_rates(C, V, S, p) : S ./ (C .+ V)
+    return merge(base, (r = r, r_dispersion = std(r)))
 end
 
 """
-    crescimento_equilibrado(p, X0; T_aquecimento=400.0, tol=1e-12, max_iter=50)
+    balanced_growth(p, X0; T_warmup=400.0, tol=1e-12, max_iter=50)
 
-Raio de crescimento equilibrado `X★` (`f(X★) = g★X★`) a partir de `X0`:
-integra o sistema normalizado durante `T_aquecimento` e afina por Newton
-nas coordenadas livres, com jacobiana exata (ForwardDiff). Devolve os
-`indicadores_crescimento` no ponto fixo, mais `X` (estado completo
-normalizado), `z` (coordenadas livres), `J` (jacobiana de `sistema_normalizado`), `valores_próprios`, `estável`
-(todas as partes reais < 0), `resíduo` e `convergiu`.
+Balanced-growth ray `X★` (`f(X★) = g★X★`) starting from `X0`: integrates the
+normalized system for `T_warmup` and refines by Newton in the free
+coordinates, with the exact Jacobian (ForwardDiff). Returns the
+`growth_indicators` at the fixed point, plus `X` (normalized full state),
+`z` (free coordinates), `J` (Jacobian of `normalized_system`),
+`eigenvalues`, `stable` (all real parts < 0), `residual` and `converged`.
 
-Os valores próprios de `J` são os das perturbações das proporções; o modo
-radial (escala) foi removido pela normalização, logo `estável` significa
-que o raio atrai trajetórias próximas em proporções.
+The eigenvalues of `J` are those of perturbations of the proportions; the
+radial (scale) mode is removed by the normalization, so `stable` means that
+the ray attracts nearby trajectories in proportions.
 """
-function crescimento_equilibrado(p, X0; T_aquecimento = 400.0, tol = 1e-12, max_iter = 50)
-    X = T_aquecimento > 0 ?
-        simular_normalizado(p, X0; T = T_aquecimento, saveat = T_aquecimento).u[end] : X0
-    z = _para_livre(X, p)
-    h = sistema_normalizado(p)
+function balanced_growth(p, X0; T_warmup = 400.0, tol = 1e-12, max_iter = 50)
+    X = T_warmup > 0 ?
+        simulate_normalized(p, X0; T = T_warmup, saveat = T_warmup).u[end] : X0
+    z = _to_free(X, p)
+    h = normalized_system(p)
     nq = 2 * length(p.e)
-    convergiu = false
+    converged = false
     for _ in 1:max_iter
         hz = h(z)
-        maximum(abs.(hz)) < tol && (convergiu = true; break)
+        maximum(abs.(hz)) < tol && (converged = true; break)
         F = lu(ForwardDiff.jacobian(h, z); check = false)
-        issuccess(F) || break   # jacobiana singular: devolve convergiu = false em vez de falhar
+        issuccess(F) || break   # singular Jacobian: return converged = false instead of failing
         Δ = F \ hz
-        # passo amortecido: quantidades estritamente positivas
+        # damped step: strictly positive quantities
         α = 1.0
-        while α > 1e-8 && any(_do_livre(z .- α .* Δ, p)[1:nq] .<= 0)
+        while α > 1e-8 && any(_from_free(z .- α .* Δ, p)[1:nq] .<= 0)
             α /= 2
         end
         z = z .- α .* Δ
     end
     J = ForwardDiff.jacobian(h, z)
     λs = eigvals(J)
-    X = _do_livre(z, p)
-    return merge(indicadores_crescimento(p, X),
-                 (X = X, z = z, J = J, valores_próprios = λs,
-                  estável = maximum(real.(λs)) < 0, resíduo = maximum(abs.(h(z))),
-                  convergiu = convergiu))
+    X = _from_free(z, p)
+    return merge(growth_indicators(p, X),
+                 (X = X, z = z, J = J, eigenvalues = λs,
+                  stable = maximum(real.(λs)) < 0, residual = maximum(abs.(h(z))),
+                  converged = converged))
 end
 
 """
-    com_parâmetro(p, parâmetro, θ; e_ref=p.e)
+    with_parameter(p, parameter, θ; e_ref=p.e)
 
-`p` com o parâmetro de bifurcação fixado em `θ`:
+`p` with the bifurcation parameter set to `θ`:
 
-- `:μ`, `:μ_v` — coeficientes de mobilidade do capital constante / variável;
-- `:ω` — parcela salarial uniforme: `eᵢ = (1−θ)/θ` em todos os setores;
-- `:escala_e` — exploração proporcional: `eᵢ = θ·e_ref,ᵢ` (preserva a
-  heterogeneidade entre setores; a parcela salarial agregada resultante é
-  reportada por `indicadores_crescimento`).
+- `:μ`, `:μ_v`: mobility coefficients of constant / variable capital;
+- `:ω`: uniform wage share, `eᵢ = (1−θ)/θ` in every sector;
+- `:e_scale`: proportional exploitation, `eᵢ = θ·e_ref,ᵢ` (keeps the
+  heterogeneity across sectors; the resulting aggregate wage share is
+  reported by `growth_indicators`).
 """
-function com_parâmetro(p, parâmetro::Symbol, θ; e_ref = p.e)
-    parâmetro === :μ && return merge(p, (μ = θ,))
-    parâmetro === :μ_v && return merge(p, (μ_v = θ,))
-    parâmetro === :ω && return merge(p, (e = fill((1 - θ) / θ, length(p.e)),))
-    parâmetro === :escala_e && return merge(p, (e = θ .* e_ref,))
-    error("parâmetro desconhecido: $parâmetro (use :μ, :μ_v, :ω ou :escala_e)")
+function with_parameter(p, parameter::Symbol, θ; e_ref = p.e)
+    parameter === :μ && return merge(p, (μ = θ,))
+    parameter === :μ_v && return merge(p, (μ_v = θ,))
+    parameter === :ω && return merge(p, (e = fill((1 - θ) / θ, length(p.e)),))
+    parameter === :e_scale && return merge(p, (e = θ .* e_ref,))
+    error("unknown parameter: $parameter (use :μ, :μ_v, :ω or :e_scale)")
 end
 
 """
-    varrimento_salarial(p, X0; variante=:uniforme, valores=nothing)
+    wage_sweep(p, X0; variant=:uniform, values=nothing)
 
-Crescimento equilibrado em função da distribuição, por continuação natural
-(cada ponto parte do anterior, Newton com jacobiana exata):
+Balanced growth as a function of distribution, by natural continuation (each
+point starts from the previous one, Newton with the exact Jacobian):
 
-- `variante = :uniforme` — parcela salarial uniforme `ω` (`com_parâmetro`
-  `:ω`, `eᵢ = (1−ω)/ω`), `valores` por omissão `0.15:0.01:0.70`;
-- `variante = :proporcional` — exploração escalada `eᵢ = θ·eᵢ⁰`
-  (`:escala_e`, mantém a heterogeneidade setorial), `valores` por omissão
+- `variant = :uniform`: uniform wage share `ω` (`with_parameter` `:ω`,
+  `eᵢ = (1−ω)/ω`), `values` defaulting to `0.15:0.01:0.70`;
+- `variant = :proportional`: scaled exploitation `eᵢ = θ·eᵢ⁰`
+  (`:e_scale`, keeps the sectoral heterogeneity), `values` defaulting to
   `0.2:0.05:3.0`.
 
-Devolve, por ponto: `θ`, a parcela salarial efetiva `ω`, a taxa de
-crescimento `g`, a taxa de lucro agregada `r`, a composição orgânica
-agregada `k = ΣC/ΣV`, `dispersão_r`, `parte_real_máx` e `oscilatório`
-(o valor próprio dominante é complexo: aproximação ao equilíbrio em
-ciclos amortecidos), `estável`, `quota_mín` e `convergiu`.
+Returns, per point: `θ`, the effective wage share `ω`, the growth rate `g`,
+the aggregate profit rate `r`, the aggregate organic composition
+`k = ΣC/ΣV`, `r_dispersion`, `max_real_part` and `oscillatory` (the dominant
+eigenvalue is complex: equilibrium is approached in damped cycles),
+`stable`, `min_share` and `converged`.
 """
-function varrimento_salarial(p, X0; variante = :uniforme, valores = nothing)
-    parâmetro = variante === :uniforme ? :ω : variante === :proporcional ? :escala_e :
-                error("variante desconhecida: $variante (use :uniforme ou :proporcional)")
-    θs = collect(something(valores, variante === :uniforme ? (0.15:0.01:0.70) : (0.2:0.05:3.0)))
+function wage_sweep(p, X0; variant = :uniform, values = nothing)
+    parameter = variant === :uniform ? :ω : variant === :proportional ? :e_scale :
+                error("unknown variant: $variant (use :uniform or :proportional)")
+    θs = collect(something(values, variant === :uniform ? (0.15:0.01:0.70) : (0.2:0.05:3.0)))
     nq = 2 * length(p.e)
     X = X0
-    linhas = map(enumerate(θs)) do (k, θ)
-        pθ = com_parâmetro(p, parâmetro, θ)
-        eq = crescimento_equilibrado(pθ, X; T_aquecimento = k == 1 ? 400.0 : 0.0)
-        eq.convergiu || (eq = crescimento_equilibrado(pθ, X0))   # recomeço com aquecimento
-        eq.convergiu && (X = eq.X)
-        dominante = eq.valores_próprios[argmax(real.(eq.valores_próprios))]
-        (θ = θ, ω = eq.ω, g = eq.g, r = eq.r_agregada, k = sum(eq.X[1:nq÷2]) / sum(eq.X[nq÷2+1:nq]),
-         dispersão_r = eq.dispersão_r, parte_real_máx = real(dominante),
-         oscilatório = abs(imag(dominante)) > 1e-8, estável = eq.estável,
-         quota_mín = minimum(eq.X[1:nq]), convergiu = eq.convergiu)
+    records = map(enumerate(θs)) do (k, θ)
+        pθ = with_parameter(p, parameter, θ)
+        eq = balanced_growth(pθ, X; T_warmup = k == 1 ? 400.0 : 0.0)
+        eq.converged || (eq = balanced_growth(pθ, X0))   # restart with warm-up
+        eq.converged && (X = eq.X)
+        dominant = eq.eigenvalues[argmax(real.(eq.eigenvalues))]
+        (θ = θ, ω = eq.ω, g = eq.g, r = eq.r_aggregate, k = sum(eq.X[1:nq÷2]) / sum(eq.X[nq÷2+1:nq]),
+         r_dispersion = eq.r_dispersion, max_real_part = real(dominant),
+         oscillatory = abs(imag(dominant)) > 1e-8, stable = eq.stable,
+         min_share = minimum(eq.X[1:nq]), converged = eq.converged)
     end
-    return (variante = variante, (c => getproperty.(linhas, c) for c in keys(linhas[1]))...)
+    return (variant = variant, (c => getproperty.(records, c) for c in keys(records[1]))...)
 end

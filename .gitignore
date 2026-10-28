@@ -7,7 +7,7 @@ Manifest.toml
 .julia/
 
 # Dados descarregados (podem ser grandes; não versionar)
-/dados_ameco/
+/ameco_data/
 data/*.txt
 data/*.csv
 data/*.xlsx

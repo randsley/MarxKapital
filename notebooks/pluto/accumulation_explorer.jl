@@ -41,44 +41,44 @@ md"""
 
 Departments `N`: $(@bind N Slider(2:10, default = 6, show_value = true))
 
-Seed: $(@bind semente Slider(1:50, default = 42, show_value = true))
+Seed: $(@bind seed Slider(1:50, default = 42, show_value = true))
 
 Horizon `T`: $(@bind T Slider(20:10:200, default = 100, show_value = true))
 
-Rate of surplus value × $(@bind fator_e Slider(0.5:0.05:2.0, default = 1.0, show_value = true))
+Rate of surplus value × $(@bind e_factor Slider(0.5:0.05:2.0, default = 1.0, show_value = true))
 """
 
 # ╔═╡ b2f480dc-d316-11f1-bb24-55fc22dca5f2
 md"""
 ## Coupling
 
-Mechanism: $(@bind modo Select(["independent" => "independent sectors", "mobility" => "capital mobility", "realization" => "mobility + aggregate realization", "rationing" => "mobility + per-sector rationing"], default = "mobility"))
+Mechanism: $(@bind mode Select(["independent" => "independent sectors", "mobility" => "capital mobility", "realization" => "mobility + aggregate realization", "rationing" => "mobility + per-sector rationing"], default = "mobility"))
 
 Capital mobility `μ`: $(@bind μ Slider(0.0:0.05:1.0, default = 0.3, show_value = true))
 """
 
 # ╔═╡ b2f480e6-d316-11f1-ac98-017de605df89
 begin
-	Random.seed!(semente)   # criar_departamentos uses the global random number generator
-	base = criar_departamentos(N)
-	depts = [Departamento(d.nome, c = d.c, v = d.v, e = fator_e * d.e, σ_c = d.σ_c,
+	Random.seed!(seed)   # create_departments uses the global random number generator
+	base = create_departments(N)
+	depts = [Department(d.name, c = d.c, v = d.v, e = e_factor * d.e, σ_c = d.σ_c,
 	                      σ_v = d.σ_v, δ = d.δ) for d in base]
-	opções = Dict("independent" => (;), "mobility" => (acoplado = true,),
-	              "realization" => (acoplado = true, realização = true),
-	              "rationing" => (acoplado = true, racionamento = true))[modo]
-	sol, _, p = simular_Ndept_customizado(depts; T = Float64(T), seed = semente, μ = μ, opções...)
+	options = Dict("independent" => (;), "mobility" => (coupled = true,),
+	              "realization" => (coupled = true, realization = true),
+	              "rationing" => (coupled = true, rationing = true))[mode]
+	sol, _, p = simulate_Ndept_custom(depts; T = Float64(T), seed = seed, μ = μ, options...)
 end;
 
 # ╔═╡ b2f480f0-d316-11f1-8784-ff3314a7cb5d
 let
-	k = calcular_composicoes_organicas(sol)
-	r = haskey(p, :R_max) ? calcular_taxas_lucro_precos(sol, p) : calcular_taxas_lucro(sol, p.e)
-	quota = reduce(hcat, [u[1:N] ./ sum(u[1:N]) for u in sol.u])'
+	k = compute_organic_compositions(sol)
+	r = haskey(p, :R_max) ? compute_price_profit_rates(sol, p) : compute_profit_rates(sol, p.e)
+	share = reduce(hcat, [u[1:N] ./ sum(u[1:N]) for u in sol.u])'
 	plot(plot(sol.t, k', title = "organic composition kᵢ", legend = false),
 	     plot(sol.t, r', title = "rates of profit rᵢ", legend = false),
-	     plot(sol.t, calcular_taxa_media_lucro(sol, p.e), title = "aggregate rate of profit",
+	     plot(sol.t, compute_average_profit_rate(sol, p.e), title = "aggregate rate of profit",
 	          legend = false, lw = 2, color = :black),
-	     plot(sol.t, quota, title = "share of total constant capital", legend = false),
+	     plot(sol.t, share, title = "share of total constant capital", legend = false),
 	     layout = (2, 2), size = (900, 560), xlabel = "t")
 end
 
@@ -92,25 +92,25 @@ Wages × (1 + Δw), with surplus value unchanged in the short run (independent s
 """
 
 # ╔═╡ b2f48104-d316-11f1-b046-8ba84e2bca70
-choque = redirect_stdout(devnull) do   # the library prints a report; keep the notebook quiet
-	simular_choque_salarial(depts, Δw; T = Float64(T), plotar = false, seed = semente)
+shock = redirect_stdout(devnull) do   # the library prints a report; keep the notebook quiet
+	simulate_wage_shock(depts, Δw; T = Float64(T), show_plot = false, seed = seed)
 end;
 
 # ╔═╡ b2f48118-d316-11f1-ba37-a9d63f2d40ec
 md"""
-Mean rate of profit at `T`: **$(round(100choque.r_base_final, digits = 2))%** without the shock, **$(round(100choque.r_choque_final, digits = 2))%** with it ($(round(choque.impacto_r_final, digits = 2)) percentage points).
+Mean rate of profit at `T`: **$(round(100shock.r_base_final, digits = 2))%** without the shock, **$(round(100shock.r_shock_final, digits = 2))%** with it ($(round(shock.final_r_impact, digits = 2)) percentage points).
 """
 
 # ╔═╡ b2f48122-d316-11f1-bb53-7507e5c235af
 let
-	grelha = collect(-0.3:0.05:0.5)
+	grid_pts = collect(-0.3:0.05:0.5)
 	r_final = redirect_stdout(devnull) do
-		[simular_choque_salarial(depts, x; T = Float64(T), plotar = false,
-		                         seed = semente).r_choque_final for x in grelha]
+		[simulate_wage_shock(depts, x; T = Float64(T), show_plot = false,
+		                         seed = seed).r_shock_final for x in grid_pts]
 	end
-	plot(grelha, 100 .* r_final, lw = 2, legend = false, xlabel = "wage shock Δw",
+	plot(grid_pts, 100 .* r_final, lw = 2, legend = false, xlabel = "wage shock Δw",
 	     ylabel = "mean rate of profit at T (%)", title = "Profit rate after a wage shock")
-	scatter!([Δw], [100choque.r_choque_final], markersize = 7)
+	scatter!([Δw], [100shock.r_shock_final], markersize = 7)
 end
 
 # ╔═╡ Cell order:

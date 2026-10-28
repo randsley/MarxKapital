@@ -1,63 +1,63 @@
 # ============================================================================
-# Teste de fumo dos notebooks (notebooks/): corre as células de código de cada
-# notebook Jupyter e cada notebook Pluto, offline, num módulo novo cada um.
-# Precisa de PlutoUI e JSON (`julia install_deps.jl --notebooks`).
+# Smoke test of the notebooks (notebooks/): runs the code cells of every
+# Jupyter notebook and every Pluto notebook, offline, each in a fresh module.
+# Needs PlutoUI and JSON (`julia install_deps.jl --notebooks`).
 #
-#     julia test/notebooks.jl          # sem as células marcadas "slow" (CI)
-#     julia test/notebooks.jl --all    # todas as células
+#     julia test/notebooks.jl          # without the cells tagged "slow" (CI)
+#     julia test/notebooks.jl --all    # every cell
 # ============================================================================
 
 using Test, JSON
 import REPL
 
-const RAIZ = dirname(@__DIR__)
-const TODAS = "--all" in ARGS
+const ROOT = dirname(@__DIR__)
+const RUN_ALL = "--all" in ARGS
 ENV["GKSwstype"] = "100"
 
-"""Módulo isolado com `include`/`eval` próprios, como o Main de uma sessão."""
-function módulo_novo()
+"""Isolated module with its own `include`/`eval`, like the Main of a session."""
+function new_module()
     m = Module(gensym("notebook"))
     Core.eval(m, :(include(p) = Base.include($m, p)))
     Core.eval(m, :(eval(x) = Core.eval($m, x)))
     return m
 end
 
-"""Exercita a renderização de um resultado que seria mostrado (p. ex. um gráfico)."""
-function renderizar(x)
+"""Exercises the rendering of a result that would be displayed (e.g. a plot)."""
+function render(x)
     showable(MIME("image/png"), x) && show(IOBuffer(), MIME("image/png"), x)
     return nothing
 end
 
-"""Corre as células de código de um `.ipynb` por ordem, com o âmbito suave do IJulia."""
-function correr_ipynb(caminho)
-    nb = JSON.parsefile(caminho)
-    m = módulo_novo()
-    cd(dirname(caminho)) do
+"""Runs the code cells of an `.ipynb` in order, with IJulia's soft scope."""
+function run_ipynb(path)
+    nb = JSON.parsefile(path)
+    m = new_module()
+    cd(dirname(path)) do
         for (k, c) in enumerate(nb["cells"])
             c["cell_type"] == "code" || continue
-            etiquetas = get(get(c, "metadata", Dict()), "tags", String[])
-            ("slow" in etiquetas && !TODAS) && continue
-            # como no IJulia, os `include` relativos partem da pasta do notebook
-            r = task_local_storage(:SOURCE_PATH, caminho) do
-                Base.include_string(REPL.softscope, m, join(c["source"]), "$caminho[$k]")
+            tags = get(get(c, "metadata", Dict()), "tags", String[])
+            ("slow" in tags && !RUN_ALL) && continue
+            # as in IJulia, relative `include`s start from the notebook's folder
+            r = task_local_storage(:SOURCE_PATH, path) do
+                Base.include_string(REPL.softscope, m, join(c["source"]), "$path[$k]")
             end
-            renderizar(r)
+            render(r)
         end
     end
 end
 
-"""Corre um notebook Pluto como script: as células estão gravadas por ordem
-topológica, e o `@bind` de recurso do ficheiro dá a cada controlo o seu valor
-inicial."""
-correr_pluto(caminho) = cd(() -> Base.include(módulo_novo(), caminho), dirname(caminho))
+"""Runs a Pluto notebook as a script: the cells are saved in topological
+order, and the file's fallback `@bind` gives each control its initial
+value."""
+run_pluto(path) = cd(() -> Base.include(new_module(), path), dirname(path))
 
 @testset "Notebooks" begin
-    for (pasta, correr) in (("jupyter", correr_ipynb), ("pluto", correr_pluto))
-        dir = joinpath(RAIZ, "notebooks", pasta)
-        for f in sort(filter(f -> endswith(f, pasta == "jupyter" ? ".ipynb" : ".jl"), readdir(dir)))
-            @testset "$pasta/$f" begin
-                t = @elapsed correr(joinpath(dir, f))
-                println("  ✓ $pasta/$f ($(round(t, digits = 1)) s)")
+    for (folder, run_case) in (("jupyter", run_ipynb), ("pluto", run_pluto))
+        dir = joinpath(ROOT, "notebooks", folder)
+        for f in sort(filter(f -> endswith(f, folder == "jupyter" ? ".ipynb" : ".jl"), readdir(dir)))
+            @testset "$folder/$f" begin
+                t = @elapsed run_case(joinpath(dir, f))
+                println("  ✓ $folder/$f ($(round(t, digits = 1)) s)")
                 @test true
             end
         end

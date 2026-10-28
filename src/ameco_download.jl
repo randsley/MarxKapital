@@ -1,236 +1,237 @@
 # ============================================================================
-# DOWNLOAD AUTOMÁTICO AMECO (LEGADO) E PARSER DO FICHEIRO TXT
+# AUTOMATIC AMECO DOWNLOAD (LEGACY) AND TXT FILE PARSER
 # ============================================================================
-# LEGADO: a Comissão Europeia retirou a distribuição do ficheiro TXT estático
-# que este ficheiro descarregava — as URLs abaixo já não devolvem dados reais
-# (confirmado 2026-07: 404 ou redireccionamento para a página HTML do portal).
-# O caminho automático por omissão passou a ser a API SDMX oficial, em
-# `src/ameco_sdmx.jl` (ver `obter_dados_ameco`, métodos `:auto`/`:sdmx`).
-# `ler_ficheiro_ameco_txt`/`processar_csv_ameco` mantêm-se aqui como fluxo
-# manual para quem já tenha um ficheiro TXT/CSV descarregado por outra via.
-# Ver docs/LIMITACOES.md (item 3).
+# LEGACY: the European Commission withdrew the static TXT file that this file
+# used to download; the URLs below no longer return real data (confirmed
+# 2026-07: 404 or a redirect to the portal's HTML page). The default
+# automatic path is now the official SDMX API, in `src/ameco_sdmx.jl` (see
+# `fetch_ameco_data`, methods `:auto`/`:sdmx`). `read_ameco_txt_file`/
+# `parse_ameco_csv` stay here as a manual workflow for anyone who already
+# has a TXT/CSV file downloaded some other way.
+# See docs/LIMITATIONS.md (item 3).
 # ============================================================================
 
-"""URLs candidatas para o ficheiro TXT completo da AMECO — LEGADO, conhecidas como não
-funcionais desde 2026-07 (a Comissão descontinuou esta distribuição). Mantidas apenas
-como referência histórica/ponto de partida para quem procure um download manual."""
-const URLS_AMECO_TENTAR = [
+"""Candidate URLs for AMECO's full TXT file. LEGACY, known not to work since
+2026-07 (the Commission discontinued this distribution). Kept only as a
+historical reference/starting point for anyone looking for a manual download."""
+const AMECO_URLS_TO_TRY = [
     "https://ec.europa.eu/economy_finance/db_indicators/ameco/documents/ameco0.txt",
     "https://economy-finance.ec.europa.eu/system/files/2024-05/ameco0.txt",
     "https://economy-finance.ec.europa.eu/system/files/2023-11/ameco0.txt",
 ]
 
-"""Página oficial da AMECO (ponto de partida para download manual)."""
-const URL_AMECO_PORTAL =
+"""AMECO's official page (starting point for a manual download)."""
+const AMECO_PORTAL_URL =
     "https://economy-finance.ec.europa.eu/economic-research-and-databases/economic-databases/ameco-database_en"
 
 """
-    descarregar_ameco_automatico(; força_redownload=false, diretório="./dados_ameco")
+    download_ameco_auto(; force_redownload=false, directory="./ameco_data")
 
-Tenta descarregar automaticamente o ficheiro TXT completo da AMECO. Se todas
-as URLs falharem, lança erro com instruções para download manual.
+Tries to download AMECO's full TXT file automatically. If every URL fails, it
+throws an error with instructions for a manual download.
 """
-function descarregar_ameco_automatico(; força_redownload = false,
-                                      diretório = "./dados_ameco")
+function download_ameco_auto(; force_redownload = false,
+                                      directory = "./ameco_data")
     println("\n" * "="^70)
-    println("DOWNLOAD AUTOMÁTICO — BASE AMECO")
+    println("AUTOMATIC DOWNLOAD — AMECO DATABASE")
     println("="^70)
-    mkpath(diretório)
-    destino = joinpath(diretório, "ameco_completo.txt")
+    mkpath(directory)
+    destination = joinpath(directory, "ameco_full.txt")
 
-    if isfile(destino) && !força_redownload
-        println("✓ Já existe: $destino (força_redownload=true para renovar)")
-        return destino
+    if isfile(destination) && !force_redownload
+        println("✓ Already present: $destination (force_redownload=true to refresh)")
+        return destination
     end
 
-    for (i, url) in enumerate(URLS_AMECO_TENTAR)
-        println("\n  Tentativa $i: $url")
+    for (i, url) in enumerate(AMECO_URLS_TO_TRY)
+        println("\n  Attempt $i: $url")
         try
             resp = HTTP.get(url, redirect = true, retry = true, readtimeout = 60)
             if resp.status == 200 && length(resp.body) > 1000
-                open(destino, "w") do f; write(f, resp.body); end
-                mb = round(filesize(destino) / 1024 / 1024, digits = 2)
-                println("  ✓ Sucesso! ($mb MB)")
-                _registar_download(diretório, destino)
-                return destino
+                open(destination, "w") do f; write(f, resp.body); end
+                mb = round(filesize(destination) / 1024 / 1024, digits = 2)
+                println("  ✓ Success! ($mb MB)")
+                _log_download(directory, destination)
+                return destination
             else
-                println("  ✗ Resposta inesperada (status $(resp.status), $(length(resp.body)) bytes)")
+                println("  ✗ Unexpected response (status $(resp.status), $(length(resp.body)) bytes)")
             end
         catch e
-            println("  ✗ Falhou: $(sprint(showerror, e))")
+            println("  ✗ Failed: $(sprint(showerror, e))")
         end
     end
 
-    println("\n⚠️  DOWNLOAD AUTOMÁTICO FALHOU")
-    println("Descarregue manualmente em: $URL_AMECO_PORTAL")
-    println("Guarde o TXT em: $diretório e use ler_ficheiro_ameco_txt(...)")
-    error("Download automático falhou — ver instruções acima.")
+    println("\n⚠️  AUTOMATIC DOWNLOAD FAILED")
+    println("Download it manually from: $AMECO_PORTAL_URL")
+    println("Save the TXT in: $directory and use read_ameco_txt_file(...)")
+    error("Automatic download failed; see the instructions above.")
 end
 
-"""Regista a data do último download num ficheiro info."""
-function _registar_download(diretório, ficheiro)
-    open(joinpath(diretório, "info_download.txt"), "w") do f
-        write(f, "Data: $(today())\nFicheiro: $ficheiro\n")
+"""Records the date of the last download in an info file."""
+function _log_download(directory, file)
+    open(joinpath(directory, "info_download.txt"), "w") do f
+        write(f, "Date: $(today())\nFile: $file\n")
     end
 end
 
 """
-    ler_ficheiro_ameco_txt(ficheiro, código_país)
+    read_ameco_txt_file(file, country_code)
 
-Lê o ficheiro TXT (largura fixa) da AMECO e extrai as séries do país indicado.
+Reads AMECO's (fixed-width) TXT file and extracts the series for the given
+country.
 
-FORMATO ASSUMIDO (heurístico — validar contra o ficheiro real):
-- pos 1-2   código do país
-- pos 4-8   código da variável
-- pos 10-19 sub-categoria
-- pos 21+   valores anuais, 15 caracteres cada, a começar em 1960
+ASSUMED FORMAT (heuristic; check it against the real file):
+- pos 1-2   country code
+- pos 4-8   variable code
+- pos 10-19 sub-category
+- pos 21+   annual values, 15 characters each, starting in 1960
 """
-function ler_ficheiro_ameco_txt(ficheiro::String, código_país::String;
-                                ano_inicial = 1960, largura_campo = 15, pos_dados = 21)
-    println("\n📂 Lendo AMECO TXT: $ficheiro (país $código_país)")
-    isfile(ficheiro) || error("Ficheiro não encontrado: $ficheiro")
+function read_ameco_txt_file(file::String, country_code::String;
+                                start_year = 1960, field_width = 15, data_pos = 21)
+    println("\n📂 Reading AMECO TXT: $file (country $country_code)")
+    isfile(file) || error("File not found: $file")
 
-    dados = Dict{String, Dict{Int, Float64}}()
-    anos_disp = Set{Int}()
-    código_para_nome = Dict(v => k for (k, v) in CÓDIGOS_AMECO_VARIÁVEIS)
+    data = Dict{String, Dict{Int, Float64}}()
+    years_avail = Set{Int}()
+    code_to_name = Dict(v => k for (k, v) in AMECO_VARIABLE_CODES)
 
-    linhas, linhas_país = 0, 0
-    open(ficheiro, "r") do f
-        for linha in eachline(f)
-            linhas += 1
-            length(linha) < 20 && continue
-            strip(linha[1:2]) == código_país || continue
-            linhas_país += 1
-            código_var = strip(linha[4:min(8, length(linha))])
-            haskey(código_para_nome, código_var) || continue
-            nome_var = código_para_nome[código_var]
-            get!(dados, nome_var, Dict{Int, Float64}())
+    records, country_rows = 0, 0
+    open(file, "r") do f
+        for record in eachline(f)
+            records += 1
+            length(record) < 20 && continue
+            strip(record[1:2]) == country_code || continue
+            country_rows += 1
+            var_code = strip(record[4:min(8, length(record))])
+            haskey(code_to_name, var_code) || continue
+            var_name = code_to_name[var_code]
+            get!(data, var_name, Dict{Int, Float64}())
 
-            pos = pos_dados
-            while pos <= length(linha)
-                pfim = min(pos + largura_campo - 1, length(linha))
-                s = strip(linha[pos:pfim])
+            pos = data_pos
+            while pos <= length(record)
+                pos_end = min(pos + field_width - 1, length(record))
+                s = strip(record[pos:pos_end])
                 if !isempty(s) && s != ":" && s != "."
                     v = tryparse(Float64, replace(s, "," => "."))
                     if !isnothing(v)
-                        ano = ano_inicial + (pos - pos_dados) ÷ largura_campo
-                        dados[nome_var][ano] = v
-                        push!(anos_disp, ano)
+                        year = start_year + (pos - data_pos) ÷ field_width
+                        data[var_name][year] = v
+                        push!(years_avail, year)
                     end
                 end
-                pos += largura_campo
+                pos += field_width
             end
         end
     end
 
-    isempty(anos_disp) && error("Nenhum dado extraído para $código_país (verificar formato/código).")
+    isempty(years_avail) && error("No data extracted for $country_code (check the format/code).")
 
-    anos = sort(collect(anos_disp))
-    println("  ✓ $linhas linhas | $linhas_país do país | $(length(dados)) variáveis | anos $(anos[1])-$(anos[end])")
+    years = sort(collect(years_avail))
+    println("  ✓ $records rows | $country_rows for the country | $(length(data)) variables | years $(years[1])-$(years[end])")
 
-    série(nome) = [get(get(dados, nome, Dict{Int,Float64}()), a, NaN) for a in anos]
+    series(name) = [get(get(data, name, Dict{Int,Float64}()), a, NaN) for a in years]
 
-    nome_país = something(findfirst(==(código_país), CÓDIGOS_PAÍSES_AMECO), código_país)
-    return DadosAMECO(nome_país, código_país, anos,
-        série("PIB_corrente"), série("PIB_constante"), série("consumo_privado"),
-        série("consumo_público"), série("FBCF"), série("exportações"), série("importações"),
-        série("emprego_total"), série("emprego_assalariado"), série("taxa_desemprego"),
-        série("população_ativa"), série("remunerações"), série("produtividade_trabalho"),
-        série("custos_unit_trabalho"), série("deflator_PIB"), série("deflator_FBCF"), série("IPC"),
-        série("CCF"),
-        série("receitas_governo"), série("despesas_governo"), série("saldo_orçamental"),
-        série("dívida_pública"), série("balança_corrente"), série("balança_comercial"),
-        série("stock_capital_líquido"),
-        "AMECO TXT: $(basename(ficheiro))", now(),
-        Dict("linhas" => string(linhas), "linhas_país" => string(linhas_país)))
+    country_name = something(findfirst(==(country_code), AMECO_COUNTRY_CODES), country_code)
+    return AMECOData(country_name, country_code, years,
+        series("GDP_current"), series("GDP_constant"), series("private_consumption"),
+        series("public_consumption"), series("GFCF"), series("exports"), series("imports"),
+        series("employment_total"), series("employees"), series("unemployment_rate"),
+        series("labor_force"), series("compensation"), series("labor_productivity"),
+        series("unit_labor_costs"), series("GDP_deflator"), series("GFCF_deflator"), series("CPI"),
+        series("CFC"),
+        series("government_revenue"), series("government_expenditure"), series("budget_balance"),
+        series("public_debt"), series("current_account"), series("trade_balance"),
+        series("net_capital_stock"),
+        "AMECO TXT: $(basename(file))", now(),
+        Dict("rows" => string(records), "country_rows" => string(country_rows)))
 end
 
 """
-    processar_csv_ameco(ficheiro, código_país, anos)
+    parse_ameco_csv(file, country_code, years)
 
-Processa um CSV da AMECO (colunas Code/Country/Y<ano>). Formato pode variar
-consoante a exportação; ajustar nomes de colunas se necessário.
+Processes an AMECO CSV (columns Code/Country/Y<year>). The format may vary
+with the export; adjust the column names if needed.
 """
-function processar_csv_ameco(ficheiro::String, código_país::String, anos)
-    println("\n📂 Processando CSV AMECO: $ficheiro")
-    isfile(ficheiro) || error("Ficheiro não encontrado: $ficheiro")
-    df = CSV.read(ficheiro, DataFrame)
+function parse_ameco_csv(file::String, country_code::String, years)
+    println("\n📂 Processing AMECO CSV: $file")
+    isfile(file) || error("File not found: $file")
+    df = CSV.read(file, DataFrame)
 
     cols = names(df)
     col_country = "Country" in cols ? "Country" : first(filter(c -> occursin("ountry", c), cols))
     col_code = "Code" in cols ? "Code" : first(filter(c -> occursin("ode", c), cols))
 
-    df_país = filter(row -> string(row[col_country]) == código_país, df)
-    nrow(df_país) == 0 && error("Sem dados para $código_país em $ficheiro")
+    df_country = filter(row -> string(row[col_country]) == country_code, df)
+    nrow(df_country) == 0 && error("No data for $country_code in $file")
 
-    anos_vec = collect(anos)
-    extraídos = Dict{String, Vector{Float64}}()
-    for (nome, cod) in CÓDIGOS_AMECO_VARIÁVEIS
-        linha = findfirst(r -> string(r[col_code]) == cod, eachrow(df_país))
-        if !isnothing(linha)
+    years_vec = collect(years)
+    extracted = Dict{String, Vector{Float64}}()
+    for (name, code) in AMECO_VARIABLE_CODES
+        record = findfirst(r -> string(r[col_code]) == code, eachrow(df_country))
+        if !isnothing(record)
             vals = Float64[]
-            for a in anos_vec
+            for a in years_vec
                 cn = "Y$a"
-                push!(vals, cn in cols && !ismissing(df_país[linha, cn]) ?
-                            Float64(df_país[linha, cn]) : NaN)
+                push!(vals, cn in cols && !ismissing(df_country[record, cn]) ?
+                            Float64(df_country[record, cn]) : NaN)
             end
-            extraídos[nome] = vals
+            extracted[name] = vals
         end
     end
-    return construir_dados_ameco(código_país, anos_vec, extraídos, "CSV: $(basename(ficheiro))")
+    return build_ameco_data(country_code, years_vec, extracted, "CSV: $(basename(file))")
 end
 
 """
-    obter_dados_ameco(país; anos=1995:2023, método=:auto, diretório="./dados_ameco")
+    fetch_ameco_data(country; years=1995:2023, method=:auto, directory="./ameco_data")
 
-Ponto de entrada unificado. `método`:
-- `:auto`      — tenta a API SDMX oficial; senão ficheiro local recente; senão sintético
-- `:sdmx`      — força a obtenção via API SDMX oficial (ver `src/ameco_sdmx.jl`)
-- `:download`  — alias de `:sdmx` (o download automático do TXT está descontinuado — a
-                 Comissão retirou essa distribuição; ver docs/LIMITACOES.md item 3)
-- `:local`     — exige ficheiro TXT local (fluxo legado, para quem já tem um ficheiro)
-- `:csv`       — processa CSV (requer `ficheiro`; fluxo legado)
-- `:sintético` — gera dados sintéticos
-- `:manual`    — mostra instruções e devolve dados sintéticos
+Unified entry point. `method`:
+- `:auto`      — tries the official SDMX API; then a recent local file; then synthetic data
+- `:sdmx`      — forces fetching through the official SDMX API (see `src/ameco_sdmx.jl`)
+- `:download`  — alias of `:sdmx` (the automatic TXT download is discontinued: the
+                 Commission withdrew that distribution; see docs/LIMITATIONS.md item 3)
+- `:local`     — requires a local TXT file (legacy workflow, for anyone who already has one)
+- `:csv`       — processes a CSV (requires `file`; legacy workflow)
+- `:synthetic` — generates synthetic data
+- `:manual`    — shows instructions and returns synthetic data
 """
-function obter_dados_ameco(país::String; anos = 1995:2023, método = :auto,
-                           diretório = "./dados_ameco", ficheiro = nothing)
-    código = _resolver_código_país(país)
-    código_sdmx = get(CÓDIGOS_PAÍSES_AMECO_SDMX, país, código)
+function fetch_ameco_data(country::String; years = 1995:2023, method = :auto,
+                           directory = "./ameco_data", file = nothing)
+    code = _resolve_country_code(country)
+    sdmx_code = get(AMECO_SDMX_COUNTRY_CODES, country, code)
 
-    if método == :sintético
-        return gerar_dados_sintéticos_ameco(código, collect(anos))
-    elseif método == :manual
-        println("\n📋 Download manual: $URL_AMECO_PORTAL")
-        println("Guarde o TXT em $diretório e use método=:local.")
-        return gerar_dados_sintéticos_ameco(código, collect(anos))
-    elseif método == :csv
-        isnothing(ficheiro) && error("Método :csv requer o argumento ficheiro=...")
-        return processar_csv_ameco(ficheiro, código, anos)
-    elseif método in (:sdmx, :download)
-        return construir_dados_ameco(código, collect(anos),
-            descarregar_ameco_sdmx(código_sdmx, anos), "AMECO SDMX (oficial)")
+    if method == :synthetic
+        return generate_synthetic_ameco_data(code, collect(years))
+    elseif method == :manual
+        println("\n📋 Manual download: $AMECO_PORTAL_URL")
+        println("Save the TXT in $directory and use method=:local.")
+        return generate_synthetic_ameco_data(code, collect(years))
+    elseif method == :csv
+        isnothing(file) && error("Method :csv requires the file=... argument")
+        return parse_ameco_csv(file, code, years)
+    elseif method in (:sdmx, :download)
+        return build_ameco_data(code, collect(years),
+            download_ameco_sdmx(sdmx_code, years), "AMECO SDMX (official)")
     end
 
-    local_txt = joinpath(diretório, "ameco_completo.txt")
+    local_txt = joinpath(directory, "ameco_full.txt")
 
-    if método == :local
-        isfile(local_txt) || error("Sem ficheiro local: $local_txt (use método=:sdmx)")
-        return ler_ficheiro_ameco_txt(local_txt, código)
+    if method == :local
+        isfile(local_txt) || error("No local file: $local_txt (use method=:sdmx)")
+        return read_ameco_txt_file(local_txt, code)
     end
 
-    # :auto — API SDMX oficial primeiro; depois ficheiro local recente; depois sintético
+    # :auto: official SDMX API first; then a recent local file; then synthetic data
     try
-        return construir_dados_ameco(código, collect(anos),
-            descarregar_ameco_sdmx(código_sdmx, anos), "AMECO SDMX (oficial)")
+        return build_ameco_data(code, collect(years),
+            download_ameco_sdmx(sdmx_code, years), "AMECO SDMX (official)")
     catch e
-        @warn "API SDMX da AMECO falhou: $(sprint(showerror, e))"
+        @warn "AMECO SDMX API failed: $(sprint(showerror, e))"
         if isfile(local_txt)
-            idade = (now() - unix2datetime(mtime(local_txt))) / Day(1)
-            println("📂 A usar ficheiro local ($(round(idade)) dias) como recurso.")
-            return ler_ficheiro_ameco_txt(local_txt, código)
+            age = (now() - unix2datetime(mtime(local_txt))) / Day(1)
+            println("📂 Using the local file ($(round(age)) days old) as a fallback.")
+            return read_ameco_txt_file(local_txt, code)
         end
-        @warn "A usar dados SINTÉTICOS como último recurso."
-        return gerar_dados_sintéticos_ameco(código, collect(anos))
+        @warn "Using SYNTHETIC data as a last resort."
+        return generate_synthetic_ameco_data(code, collect(years))
     end
 end

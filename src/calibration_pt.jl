@@ -1,221 +1,222 @@
 # ============================================================================
-# CALIBRAÇÃO COM DADOS PORTUGUESES (INE)
+# CALIBRATION WITH PORTUGUESE DATA (INE)
 # ============================================================================
-# Gera dados sintéticos com a estrutura setorial (CAE Rev.3) da economia
-# portuguesa e calibra o modelo. Os valores são aproximações para
-# demonstração — NÃO usar em análise oficial. Ver `obter_dados_portugal_eurostat`
-# para o caminho com dados reais (opt-in, `fonte_dados=:eurostat`).
+# Generates synthetic data with the sectoral structure (CAE Rev.3) of the
+# Portuguese economy and calibrates the model. The values are approximations
+# for demonstration; do NOT use them for official analysis. See
+# `fetch_portugal_eurostat_data` for the real-data path (opt-in,
+# `data_source=:eurostat`).
 # ============================================================================
 
-"""19 setores CAE Rev.3 (código, nome), usados tanto no caminho sintético como no real."""
-const SETORES_CAE_PT = [
-    ("A", "Agricultura, produção animal, caça, floresta e pesca"),
-    ("B", "Indústrias extrativas"),
-    ("C", "Indústrias transformadoras"),
-    ("D", "Eletricidade, gás, vapor"),
-    ("E", "Captação, tratamento e distribuição de água"),
-    ("F", "Construção"),
-    ("G", "Comércio por grosso e a retalho"),
-    ("H", "Transportes e armazenagem"),
-    ("I", "Alojamento, restauração"),
-    ("J", "Atividades de informação e comunicação"),
-    ("K", "Atividades financeiras e de seguros"),
-    ("L", "Atividades imobiliárias"),
-    ("M", "Atividades de consultoria, científicas"),
-    ("N", "Atividades administrativas"),
-    ("O", "Administração Pública"),
-    ("P", "Educação"),
-    ("Q", "Saúde humana e apoio social"),
-    ("R", "Atividades artísticas"),
-    ("S", "Outras atividades"),
+"""The 19 CAE Rev.3 / NACE Rev.2 sections (code, name), used by both the synthetic and the real path."""
+const PT_SECTORS = [
+    ("A", "Agriculture, forestry and fishing"),
+    ("B", "Mining and quarrying"),
+    ("C", "Manufacturing"),
+    ("D", "Electricity, gas, steam"),
+    ("E", "Water supply, sewerage, waste"),
+    ("F", "Construction"),
+    ("G", "Wholesale and retail trade"),
+    ("H", "Transportation and storage"),
+    ("I", "Accommodation and food service"),
+    ("J", "Information and communication"),
+    ("K", "Financial and insurance activities"),
+    ("L", "Real estate activities"),
+    ("M", "Professional, scientific and technical"),
+    ("N", "Administrative and support"),
+    ("O", "Public administration"),
+    ("P", "Education"),
+    ("Q", "Human health and social work"),
+    ("R", "Arts, entertainment and recreation"),
+    ("S", "Other service activities"),
 ]
 
-"""Gera dados sintéticos baseados na estrutura setorial portuguesa (19 setores CAE)."""
-function gerar_dados_sintéticos_portugal(ano::Int)
-    println("\n🔬 Gerando dados sintéticos para Portugal ($ano)...")
+"""Generates synthetic data based on the Portuguese sectoral structure (19 NACE sections)."""
+function generate_synthetic_portugal_data(year::Int)
+    println("\n🔬 Generating synthetic data for Portugal ($year)...")
 
-    setores = SETORES_CAE_PT
-    N = length(setores)
-    códigos = [s[1] for s in setores]
-    nomes = [s[2] for s in setores]
+    sectors = PT_SECTORS
+    N = length(sectors)
+    codes = [s[1] for s in sectors]
+    name_list = [s[2] for s in sectors]
 
-    VAB = Float64[2_800, 800, 18_500, 3_200, 1_200, 8_500, 19_000, 7_800,
+    GVA = Float64[2_800, 800, 18_500, 3_200, 1_200, 8_500, 19_000, 7_800,
                   7_200, 8_500, 11_500, 19_000, 12_000, 9_500, 17_000,
                   13_500, 15_000, 2_200, 3_800]
 
-    pct_remunerações = [0.35, 0.40, 0.52, 0.35, 0.45, 0.60, 0.48, 0.50,
+    pct_compensation = [0.35, 0.40, 0.52, 0.35, 0.45, 0.60, 0.48, 0.50,
                         0.58, 0.55, 0.38, 0.15, 0.62, 0.65, 0.72, 0.75,
                         0.70, 0.60, 0.55]
-    remunerações = VAB .* pct_remunerações
-    EBE = VAB .- remunerações
+    compensation = GVA .* pct_compensation
+    GOS = GVA .- compensation
 
-    pct_depreciação = [0.08, 0.12, 0.10, 0.15, 0.10, 0.06, 0.08, 0.12,
+    pct_depreciation = [0.08, 0.12, 0.10, 0.15, 0.10, 0.06, 0.08, 0.12,
                        0.08, 0.15, 0.05, 0.02, 0.10, 0.08, 0.06, 0.05,
                        0.08, 0.10, 0.08]
-    CCF = VAB .* pct_depreciação
-    rendimento_empresarial = EBE .- CCF
+    CFC = GVA .* pct_depreciation
+    business_income = GOS .- CFC
 
-    emprego = Float64[180, 15, 650, 35, 45, 380, 850, 240, 380, 150,
+    employment = Float64[180, 15, 650, 35, 45, 380, 850, 240, 380, 150,
                       110, 35, 320, 420, 680, 430, 520, 85, 180]
 
-    pct_investimento = [0.18, 0.25, 0.20, 0.30, 0.22, 0.15, 0.18, 0.22,
+    pct_investment = [0.18, 0.25, 0.20, 0.30, 0.22, 0.15, 0.18, 0.22,
                         0.16, 0.25, 0.12, 0.35, 0.20, 0.18, 0.15, 0.12,
                         0.18, 0.20, 0.18]
-    FBCF = VAB .* pct_investimento
+    GFCF = GVA .* pct_investment
 
-    múltiplo_capital = [2.5, 5.0, 1.8, 8.0, 6.0, 1.5, 1.2, 3.5, 1.8, 2.0,
+    capital_multiple = [2.5, 5.0, 1.8, 8.0, 6.0, 1.5, 1.2, 3.5, 1.8, 2.0,
                         1.5, 15.0, 1.0, 1.2, 2.5, 2.0, 2.5, 2.0, 1.5]
-    stock_capital = VAB .* múltiplo_capital
+    capital_stock = GVA .* capital_multiple
 
-    df = DataFrame(código_cae = códigos, setor = nomes, VAB = VAB,
-                   remunerações = remunerações, EBE = EBE, CCF = CCF,
-                   rendimento_empresarial = rendimento_empresarial,
-                   emprego = emprego, FBCF = FBCF, stock_capital = stock_capital)
+    df = DataFrame(nace_code = codes, sector = name_list, GVA = GVA,
+                   compensation = compensation, GOS = GOS, CFC = CFC,
+                   business_income = business_income,
+                   employment = employment, GFCF = GFCF, capital_stock = capital_stock)
 
-    metadados = Dict{String, Any}(
-        "fonte" => "Dados sintéticos (estrutura baseada em INE)",
-        "ano" => ano, "PIB_total" => sum(VAB), "emprego_total" => sum(emprego))
+    metadata = Dict{String, Any}(
+        "source" => "Synthetic data (structure based on INE)",
+        "year" => year, "GDP_total" => sum(GVA), "employment_total" => sum(employment))
 
-    return DadosINE(ano, df, df, df, df, metadados)
+    return INEData(year, df, df, df, df, metadata)
 end
 
 """
-Recalcula o stock de capital por secção pelo método do inventário perpétuo
-(`calcular_stock_capital_pim`, `src/eurostat_sdmx.jl`), em vez de usar
-diretamente o valor reportado pelo Eurostat para `ano`. Faz fallback por
-secção (não globalmente) para o valor reportado, se a secção não tiver
-histórico de FBCF suficiente para a recursão chegar a `ano`, ou se `δ`
-estimado não for válido — nunca falha por completo, tal como o resto dos
-caminhos de dados reais deste ficheiro.
+Recomputes the capital stock per section by the perpetual inventory method
+(`compute_pim_capital_stock`, `src/eurostat_sdmx.jl`) instead of using the
+value Eurostat reports for `year` directly. Falls back per section (not
+globally) to the reported value if the section does not have enough GFCF
+history for the recursion to reach `year`, or if the estimated `δ` is not
+valid. It never fails outright, like the other real-data paths in this file.
 """
-function _stock_capital_pim_por_secção(código_área::String, ano::Int, códigos::Vector{String},
-                                       stock_reportado::Dict{String, Float64})
-    fbcf_série = obter_série_fbcf_setorial_eurostat(código_área)
-    stock_série = obter_série_stock_capital_setorial_eurostat(código_área)
-    ccf_série = obter_série_ccf_setorial_eurostat(código_área)
+function _pim_capital_stock_by_section(area_code::String, year::Int, codes::Vector{String},
+                                       stock_reported::Dict{String, Float64})
+    gfcf_series = fetch_eurostat_sector_gfcf_series(area_code)
+    stock_series = fetch_eurostat_sector_capital_stock_series(area_code)
+    cfc_series = fetch_eurostat_sector_cfc_series(area_code)
 
-    resultado = Dict{String, Float64}()
-    for c in códigos
-        (haskey(fbcf_série, c) && haskey(stock_série, c) && haskey(ccf_série, c)) || continue
-        anos_possíveis = [k for k in keys(stock_série[c]) if haskey(fbcf_série[c], k)]
-        isempty(anos_possíveis) && continue
-        benchmark_ano = minimum(anos_possíveis)
-        benchmark_valor = stock_série[c][benchmark_ano]
-        δ = get(ccf_série[c], benchmark_ano, 0.0) / benchmark_valor
+    result = Dict{String, Float64}()
+    for c in codes
+        (haskey(gfcf_series, c) && haskey(stock_series, c) && haskey(cfc_series, c)) || continue
+        possible_years = [k for k in keys(stock_series[c]) if haskey(gfcf_series[c], k)]
+        isempty(possible_years) && continue
+        benchmark_year = minimum(possible_years)
+        benchmark_value = stock_series[c][benchmark_year]
+        δ = get(cfc_series[c], benchmark_year, 0.0) / benchmark_value
         (isfinite(δ) && δ > 0) || continue
-        K = calcular_stock_capital_pim(fbcf_série[c], δ, benchmark_ano, benchmark_valor,
-                                       collect(benchmark_ano:ano))
-        haskey(K, ano) && (resultado[c] = K[ano])
+        K = compute_pim_capital_stock(gfcf_series[c], δ, benchmark_year, benchmark_value,
+                                       collect(benchmark_year:year))
+        haskey(K, year) && (result[c] = K[year])
     end
-    for c in códigos
-        haskey(resultado, c) || (resultado[c] = stock_reportado[c])
+    for c in codes
+        haskey(result, c) || (result[c] = stock_reported[c])
     end
-    return resultado
+    return result
 end
 
 """
-    obter_dados_portugal_eurostat(ano; inventário_perpétuo=false)
+    fetch_portugal_eurostat_data(year; perpetual_inventory=false)
 
-Constrói o mesmo formato de `DadosINE` que `gerar_dados_sintéticos_portugal`,
-mas com dados setoriais reais do Eurostat (`src/eurostat_sdmx.jl`): VAB,
-remunerações e consumo de capital fixo (NAMA_10_A64), emprego
-(NAMA_10_A64_E), FBCF (NAMA_10_A64_P5) e stock de capital líquido
-(NAMA_10_NFA_ST), para as 19 secções NACE. Usa apenas as secções com dados
-completos nas 6 séries; lança erro se restarem poucas (menos de 10 de 19) —
-sinal de falha de rede ou indisponibilidade, não um caso normal a degradar
-silenciosamente.
+Builds the same `INEData` format as `generate_synthetic_portugal_data`, but
+with real sectoral data from Eurostat (`src/eurostat_sdmx.jl`): GVA,
+compensation of employees and consumption of fixed capital (NAMA_10_A64),
+employment (NAMA_10_A64_E), GFCF (NAMA_10_A64_P5) and the net capital stock
+(NAMA_10_NFA_ST), for the 19 NACE sections. Only the sections with complete
+data in all 6 series are used; it throws an error if too few remain (fewer
+than 10 of 19), which signals a network failure or unavailability, not a
+normal case to degrade silently.
 
-`inventário_perpétuo=true` substitui o stock líquido reportado diretamente
-pelo Eurostat por uma série própria calculada pelo método do inventário
-perpétuo (`_stock_capital_pim_por_secção`) — ver `docs/LIMITACOES.md` item 7.
+`perpetual_inventory=true` replaces the net stock reported directly by
+Eurostat with an own series computed by the perpetual inventory method
+(`_pim_capital_stock_by_section`); see `docs/LIMITATIONS.md` item 7.
 """
-function obter_dados_portugal_eurostat(ano::Int; inventário_perpétuo::Bool = false)
-    println("\n🌐 A obter dados setoriais reais (Eurostat) para Portugal ($ano)...")
+function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = false)
+    println("\n🌐 Fetching real sectoral data (Eurostat) for Portugal ($year)...")
 
-    vab, remun, ccf = obter_vab_remuneracoes_ccf_eurostat("PT", ano)
-    emprego = obter_emprego_setorial_eurostat("PT", ano)
-    fbcf = obter_fbcf_setorial_eurostat("PT", ano)
-    stock = obter_stock_capital_setorial_eurostat("PT", ano)
+    gva, comp, cfc = fetch_eurostat_gva_compensation_cfc("PT", year)
+    employment = fetch_eurostat_sector_employment("PT", year)
+    gfcf = fetch_eurostat_sector_gfcf("PT", year)
+    stock = fetch_eurostat_sector_capital_stock("PT", year)
 
-    secções_completas = filter(s -> haskey(vab, s) && haskey(remun, s) && haskey(ccf, s) &&
-                                    haskey(emprego, s) && haskey(fbcf, s) && haskey(stock, s),
-                               [s[1] for s in SETORES_CAE_PT])
-    length(secções_completas) < 10 &&
-        error("Dados Eurostat incompletos para Portugal/$ano: só $(length(secções_completas))/19 " *
-              "secções com as 6 séries completas.")
+    complete_sections = filter(s -> haskey(gva, s) && haskey(comp, s) && haskey(cfc, s) &&
+                                    haskey(employment, s) && haskey(gfcf, s) && haskey(stock, s),
+                               [s[1] for s in PT_SECTORS])
+    length(complete_sections) < 10 &&
+        error("Incomplete Eurostat data for Portugal/$year: only $(length(complete_sections))/19 " *
+              "sections have all 6 series.")
 
-    nomes_por_código = Dict(s[1] => s[2] for s in SETORES_CAE_PT)
-    códigos = secções_completas
-    nomes = [nomes_por_código[c] for c in códigos]
+    names_by_code = Dict(s[1] => s[2] for s in PT_SECTORS)
+    codes = complete_sections
+    name_list = [names_by_code[c] for c in codes]
 
-    if inventário_perpétuo
-        stock = _stock_capital_pim_por_secção("PT", ano, códigos, stock)
-        println("  ✓ stock de capital recalculado por inventário perpétuo.")
+    if perpetual_inventory
+        stock = _pim_capital_stock_by_section("PT", year, codes, stock)
+        println("  ✓ capital stock recomputed by perpetual inventory.")
     end
 
-    VAB = [vab[c] for c in códigos]
-    remunerações = [remun[c] for c in códigos]
-    CCF = [ccf[c] for c in códigos]
-    EBE = VAB .- remunerações
-    rendimento_empresarial = EBE .- CCF
-    emprego_v = [emprego[c] for c in códigos]
-    FBCF = [fbcf[c] for c in códigos]
-    stock_capital = [stock[c] for c in códigos]
+    GVA = [gva[c] for c in codes]
+    compensation = [comp[c] for c in codes]
+    CFC = [cfc[c] for c in codes]
+    GOS = GVA .- compensation
+    business_income = GOS .- CFC
+    employment_v = [employment[c] for c in codes]
+    GFCF = [gfcf[c] for c in codes]
+    capital_stock = [stock[c] for c in codes]
 
-    df = DataFrame(código_cae = códigos, setor = nomes, VAB = VAB,
-                   remunerações = remunerações, EBE = EBE, CCF = CCF,
-                   rendimento_empresarial = rendimento_empresarial,
-                   emprego = emprego_v, FBCF = FBCF, stock_capital = stock_capital)
+    df = DataFrame(nace_code = codes, sector = name_list, GVA = GVA,
+                   compensation = compensation, GOS = GOS, CFC = CFC,
+                   business_income = business_income,
+                   employment = employment_v, GFCF = GFCF, capital_stock = capital_stock)
 
-    println("  ✓ $(length(códigos))/19 secções com dados reais completos.")
+    println("  ✓ $(length(codes))/19 sections with complete real data.")
 
-    metadados = Dict{String, Any}(
-        "fonte" => "Eurostat (dados reais)",
-        "ano" => ano, "PIB_total" => sum(VAB), "emprego_total" => sum(emprego_v))
+    metadata = Dict{String, Any}(
+        "source" => "Eurostat (real data)",
+        "year" => year, "GDP_total" => sum(GVA), "employment_total" => sum(employment_v))
 
-    return DadosINE(ano, df, df, df, df, metadados)
+    return INEData(year, df, df, df, df, metadata)
 end
 
-"""Processa os Quadros de Recursos e Empregos, adicionando indicadores marxianos."""
-function processar_qre(dados::DadosINE)
-    println("\n🔄 Processando QRE...")
-    df = dados.qre
-    df.salário_médio        = df.remunerações ./ df.emprego
-    df.produtividade        = df.VAB ./ df.emprego
-    df.intensidade_capital  = df.stock_capital ./ df.emprego
-    df.taxa_mais_valia      = df.rendimento_empresarial ./ df.remunerações
-    df.composição_orgânica  = df.stock_capital ./ df.remunerações
-    df.taxa_lucro           = df.rendimento_empresarial ./ (df.stock_capital .+ df.remunerações)
+"""Processes the supply and use tables, adding Marxian indicators."""
+function process_supply_use(data::INEData)
+    println("\n🔄 Processing supply and use tables...")
+    df = data.supply_use
+    df.mean_wage        = df.compensation ./ df.employment
+    df.productivity        = df.GVA ./ df.employment
+    df.capital_intensity  = df.capital_stock ./ df.employment
+    df.surplus_value_rate      = df.business_income ./ df.compensation
+    df.organic_composition  = df.capital_stock ./ df.compensation
+    df.profit_rate           = df.business_income ./ (df.capital_stock .+ df.compensation)
     return df
 end
 
 """
-Estima os parâmetros marxianos por setor a partir do QRE processado.
+Estimates the Marxian parameters per sector from the processed supply and use
+table.
 
-`e` impõe um piso de 0.1: setores cujo rendimento empresarial (após CCF)
-é próximo de zero ou negativo relativamente às remunerações (tipicamente
-por margens finas ou custos de depreciação elevados face ao excedente
-bruto) produziriam `e` nulo ou negativo, o que o modelo não aceita
-(`Departamento` exige `e>0`). Este piso é um valor imposto, não uma
-observação empírica pura — reportado explicitamente abaixo."""
-function estimar_parametros_setoriais(df::DataFrame, A::Matrix{Float64})
-    println("\n📐 Estimando parâmetros...")
+`e` has a floor of 0.1: sectors whose business income (after CFC) is close to
+zero or negative relative to compensation (typically because of thin margins
+or high depreciation relative to the gross surplus) would produce a zero or
+negative `e`, which the model does not accept (`Department` requires
+`e>0`). The floor is an imposed value, not a pure empirical observation, and
+it is reported explicitly below."""
+function estimate_sector_parameters(df::DataFrame, A::Matrix{Float64})
+    println("\n📐 Estimating parameters...")
     N = nrow(df)
-    C = df.stock_capital
-    V = df.remunerações
-    e = max.(0.1, df.taxa_mais_valia)
-    n_saturados = count(df.taxa_mais_valia .< 0.1)
-    n_saturados > 0 && println("  ⚠ e saturado no piso 0.1 em $n_saturados/$N setores " *
-                                "(taxa_mais_valia < 0.1 antes do piso)")
+    C = df.capital_stock
+    V = df.compensation
+    e = max.(0.1, df.surplus_value_rate)
+    n_saturated = count(df.surplus_value_rate .< 0.1)
+    n_saturated > 0 && println("  ⚠ e saturated at the 0.1 floor in $n_saturated/$N sectors " *
+                                "(surplus_value_rate < 0.1 before the floor)")
     k = C ./ V
     r = e ./ (k .+ 1)
 
-    l = df.emprego ./ df.VAB .* 1800
+    l = df.employment ./ df.GVA .* 1800
     l = l ./ maximum(l)
 
-    σ_c = clamp.(df.FBCF ./ df.rendimento_empresarial, 0.1, 0.7)
+    σ_c = clamp.(df.GFCF ./ df.business_income, 0.1, 0.7)
     σ_v = fill(0.15, N)
-    δ = df.CCF ./ df.stock_capital
+    δ = df.CFC ./ df.capital_stock
 
     γ = 1.0 .- σ_c .- σ_v
     for i in 1:N
@@ -224,110 +225,113 @@ function estimar_parametros_setoriais(df::DataFrame, A::Matrix{Float64})
         end
     end
 
-    println("  ✓ e médio: $(round(mean(e), digits=2)) | k médio: $(round(mean(k), digits=2)) | r médio: $(round(mean(r)*100, digits=1))%")
+    println("  ✓ mean e: $(round(mean(e), digits=2)) | mean k: $(round(mean(k), digits=2)) | mean r: $(round(mean(r)*100, digits=1))%")
     return (C = C, V = V, e = e, k = k, r = r, l = l, σ_c = σ_c, σ_v = σ_v, δ = δ)
 end
 
-"""Nomes em português para os 10 grupos de `GRUPOS_MEDIO_NACE` (mesma ordem)."""
-const NOMES_GRUPOS_MEDIO = [
-    "Agricultura, floresta e pesca", "Indústria (incl. energia)", "Construção",
-    "Comércio, transportes, alojamento e restauração", "Informação e comunicação",
-    "Atividades financeiras e de seguros", "Atividades imobiliárias",
-    "Atividades profissionais, científicas e administrativas",
-    "Administração pública, educação e saúde", "Atividades artísticas e outros serviços",
+"""Names of the 10 groups of `NACE_MEDIUM_GROUPS` (same order)."""
+const MEDIUM_GROUP_NAMES = [
+    "Agriculture, forestry and fishing", "Industry (incl. energy)", "Construction",
+    "Trade, transport, accommodation and food service", "Information and communication",
+    "Financial and insurance activities", "Real estate activities",
+    "Professional, scientific and administrative activities",
+    "Public administration, education and health", "Arts and other services",
 ]
-const CÓDIGOS_GRUPOS_MEDIO = ["A", "BCDE", "F", "GHI", "J", "K", "L", "MN", "OPQ", "RS"]
+const MEDIUM_GROUP_CODES = ["A", "BCDE", "F", "GHI", "J", "K", "L", "MN", "OPQ", "RS"]
 
 """
-    agregar_setores(df, A, grupos, códigos_grupos, nomes_grupos)
+    aggregate_sectors(df, A, groups, group_codes, group_names)
 
-Agrega um DataFrame de setores (colunas `código_cae, setor, VAB,
-remunerações, EBE, CCF, rendimento_empresarial, emprego, FBCF,
-stock_capital` — o formato produzido por `gerar_dados_sintéticos_portugal`/
-`obter_dados_portugal_eurostat`) e a matriz técnica `A` correspondente para
-um número menor de grupos (cada elemento de `grupos` é uma lista de
-`código_cae` de 1 letra a juntar). Devolve `(df_agregado, A_agregada)`.
+Aggregates a DataFrame of sectors (columns `nace_code, sector, GVA,
+compensation, GOS, CFC, business_income, employment, GFCF, capital_stock`,
+the format produced by `generate_synthetic_portugal_data`/
+`fetch_portugal_eurostat_data`) and the matching technical matrix `A` into a
+smaller number of groups (each element of `groups` is a list of 1-letter
+`nace_code`s to merge). Returns `(df_aggregated, A_aggregated)`.
 
-Funciona tanto com `A` real (`construir_matriz_io_eurostat`) como aleatória
-(`criar_matriz_tecnica`) — reusa `agregar_matriz_io` (`src/eurostat_sdmx.jl`),
-que só assume `A ≥ 0` e pesos (VAB) `≥ 0`, sem depender da origem dos dados.
+Works with both a real `A` (`build_eurostat_io_matrix`) and a random one
+(`create_technical_matrix`): it reuses `aggregate_io_matrix`
+(`src/eurostat_sdmx.jl`), which only assumes `A ≥ 0` and weights (GVA) `≥ 0`,
+whatever the origin of the data.
 """
-function agregar_setores(df::DataFrame, A::Matrix{Float64}, grupos::Vector{Vector{String}},
-                         códigos_grupos::Vector{String}, nomes_grupos::Vector{String})
-    vab_por_secção = Dict(zip(df.código_cae, df.VAB))
-    A_agregada = agregar_matriz_io(A, df.código_cae, grupos, vab_por_secção)
+function aggregate_sectors(df::DataFrame, A::Matrix{Float64}, groups::Vector{Vector{String}},
+                         group_codes::Vector{String}, group_names::Vector{String})
+    gva_by_section = Dict(zip(df.nace_code, df.GVA))
+    A_aggregated = aggregate_io_matrix(A, df.nace_code, groups, gva_by_section)
 
-    soma(col) = [sum(df[in.(df.código_cae, Ref(secções)), col]) for secções in grupos]
+    total_sum(col) = [sum(df[in.(df.nace_code, Ref(sections)), col]) for sections in groups]
 
-    df_agregado = DataFrame(
-        código_cae = códigos_grupos, setor = nomes_grupos,
-        VAB = soma(:VAB), remunerações = soma(:remunerações), EBE = soma(:EBE),
-        CCF = soma(:CCF), rendimento_empresarial = soma(:rendimento_empresarial),
-        emprego = soma(:emprego), FBCF = soma(:FBCF), stock_capital = soma(:stock_capital))
+    df_aggregated = DataFrame(
+        nace_code = group_codes, sector = group_names,
+        GVA = total_sum(:GVA), compensation = total_sum(:compensation), GOS = total_sum(:GOS),
+        CFC = total_sum(:CFC), business_income = total_sum(:business_income),
+        employment = total_sum(:employment), GFCF = total_sum(:GFCF), capital_stock = total_sum(:capital_stock))
 
-    return df_agregado, A_agregada
+    return df_aggregated, A_aggregated
 end
 
 """
-    calibrar_modelo_portugal(; ano=2022, agregação=:detalhada, fonte_dados=:sintético)
+    calibrate_portugal_model(; year=2022, aggregation=:detailed, data_source=:synthetic)
 
-Pipeline de calibração com dados INE. `agregação`:
-- `:detalhada` (omissão) — 19 setores CAE, sem agregação.
-- `:macro` — 3 setores (Primário/Secundário/Terciário, `GRUPOS_MACRO_NACE`,
-  `src/eurostat_sdmx.jl`), mesma agregação usada no caminho AMECO.
-- `:média` — 10 setores (nível padrão NACE Rev.2 "A10", `GRUPOS_MEDIO_NACE`).
+Calibration pipeline with INE data. `aggregation`:
+- `:detailed` (default): 19 NACE sections, no aggregation.
+- `:macro`: 3 sectors (Primary/Secondary/Tertiary, `NACE_MACRO_GROUPS`,
+  `src/eurostat_sdmx.jl`), the same aggregation used in the AMECO path.
+- `:medium`: 10 sectors (the standard NACE Rev.2 "A10" level,
+  `NACE_MEDIUM_GROUPS`).
 
-Em ambos os modos agregados, a matriz técnica `A` é agregada pela fórmula de
-Leontief (`agregar_matriz_io`) — funciona com `A` sintética (aleatória) ou
-real (`fonte_dados=:eurostat`), sem distinção de código entre os dois casos.
+In both aggregated modes the technical matrix `A` is aggregated by the
+Leontief formula (`aggregate_io_matrix`), which works with a synthetic
+(random) or real (`data_source=:eurostat`) `A`, with no difference in code
+between the two cases.
 
-`fonte_dados`:
-- `:sintético` (omissão) — estrutura sintética, `A` aleatória (comportamento
-  histórico, inalterado).
-- `:eurostat` — dados setoriais reais (`obter_dados_portugal_eurostat`) e
-  matriz técnica `A` real, construída a partir do IOT simétrico do Eurostat
-  (`construir_matriz_io_eurostat`). Requer rede; lança erro se indisponível
-  (sem fallback silencioso — pedido explícito de dados reais).
-  `inventário_perpétuo=true` (só tem efeito com `fonte_dados=:eurostat`)
-  substitui o stock líquido reportado pelo Eurostat por uma série própria
-  calculada pelo método do inventário perpétuo — ver
-  `obter_dados_portugal_eurostat` e `docs/LIMITACOES.md` item 7.
+`data_source`:
+- `:synthetic` (default): synthetic structure, random `A` (the historical
+  behavior, unchanged).
+- `:eurostat`: real sectoral data (`fetch_portugal_eurostat_data`) and a real
+  technical matrix `A`, built from Eurostat's symmetric IOT
+  (`build_eurostat_io_matrix`). Needs the network; throws an error if it is
+  unavailable (no silent fallback, since real data were explicitly
+  requested). `perpetual_inventory=true` (only has an effect with
+  `data_source=:eurostat`) replaces the net stock reported by Eurostat with an
+  own series computed by the perpetual inventory method; see
+  `fetch_portugal_eurostat_data` and `docs/LIMITATIONS.md` item 7.
 """
-function calibrar_modelo_portugal(; ano = 2022, agregação = :detalhada,
-                                  fonte_dados = :sintético, inventário_perpétuo = false)
+function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
+                                  data_source = :synthetic, perpetual_inventory = false)
     println("\n" * "="^70)
-    println("CALIBRAÇÃO PARA PORTUGAL (INE)  |  Ano: $ano  |  Agregação: $agregação  |  Fonte: $fonte_dados")
+    println("CALIBRATION FOR PORTUGAL (INE)  |  Year: $year  |  Aggregation: $aggregation  |  Source: $data_source")
     println("="^70)
 
-    dados = fonte_dados == :eurostat ?
-        obter_dados_portugal_eurostat(ano; inventário_perpétuo = inventário_perpétuo) :
-        gerar_dados_sintéticos_portugal(ano)
-    df19 = processar_qre(dados)
+    data = data_source == :eurostat ?
+        fetch_portugal_eurostat_data(year; perpetual_inventory = perpetual_inventory) :
+        generate_synthetic_portugal_data(year)
+    df19 = process_supply_use(data)
     N19 = nrow(df19)
-    A19 = fonte_dados == :eurostat ?
-        construir_matriz_io_eurostat("PT", ano, [[c] for c in df19.código_cae],
-                                     Dict(zip(df19.código_cae, df19.VAB))) :
-        criar_matriz_tecnica(N19, densidade = 0.4)
+    A19 = data_source == :eurostat ?
+        build_eurostat_io_matrix("PT", year, [[c] for c in df19.nace_code],
+                                     Dict(zip(df19.nace_code, df19.GVA))) :
+        create_technical_matrix(N19, density = 0.4)
 
-    df, A = if agregação == :detalhada
+    df, A = if aggregation == :detailed
         df19, A19
-    elseif agregação == :macro
-        agregar_setores(df19, A19, GRUPOS_MACRO_NACE, ["PRIM", "SEC", "TER"],
-                        ["Primário", "Secundário", "Terciário"])
-    elseif agregação == :média
-        agregar_setores(df19, A19, GRUPOS_MEDIO_NACE, CÓDIGOS_GRUPOS_MEDIO, NOMES_GRUPOS_MEDIO)
+    elseif aggregation == :macro
+        aggregate_sectors(df19, A19, NACE_MACRO_GROUPS, ["PRIM", "SEC", "TER"],
+                        ["Primary", "Secondary", "Tertiary"])
+    elseif aggregation == :medium
+        aggregate_sectors(df19, A19, NACE_MEDIUM_GROUPS, MEDIUM_GROUP_CODES, MEDIUM_GROUP_NAMES)
     else
-        error("agregação '$agregação' desconhecida (use :detalhada, :macro ou :média)")
+        error("unknown aggregation '$aggregation' (use :detailed, :macro or :medium)")
     end
-    agregação == :detalhada || (df = processar_qre(DadosINE(dados.ano, df, df, df, df, dados.metadados)))
+    aggregation == :detailed || (df = process_supply_use(INEData(data.year, df, df, df, df, data.metadata)))
     N = nrow(df)
-    p = estimar_parametros_setoriais(df, A)
+    p = estimate_sector_parameters(df, A)
 
-    fonte = fonte_dados == :eurostat ? "INE/Eurostat (dados reais)" : "INE (sintético)"
-    resultado = ParâmetrosCalibrados(N, df.setor, df.código_cae,
-        p.C, p.V, df.VAB, p.e, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
-        fonte, ano, now(), 0.85)
+    source = data_source == :eurostat ? "INE/Eurostat (real data)" : "INE (synthetic)"
+    result = CalibratedParameters(N, df.sector, df.nace_code,
+        p.C, p.V, df.GVA, p.e, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
+        source, year, now(), 0.85)
 
-    println("\n✅ CALIBRAÇÃO CONCLUÍDA — $N setores | PIB: $(round(sum(df.VAB)/1000, digits=1)) mil M€")
-    return resultado
+    println("\n✅ CALIBRATION COMPLETE — $N sectors | GDP: €$(round(sum(df.GVA)/1000, digits=1)) bn")
+    return result
 end

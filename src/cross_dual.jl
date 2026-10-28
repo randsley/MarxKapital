@@ -1,36 +1,37 @@
 # ============================================================================
-# DINÂMICA CRUZADA (CROSS-DUAL): PREÇOS DE MERCADO E MOBILIDADE DE CAPITAL
+# CROSS-DUAL DYNAMICS: MARKET PRICES AND CAPITAL MOBILITY
 # ----------------------------------------------------------------------------
-# Extensão opcional (`preços_mercado=true`) em que os preços de mercado
-# respondem ao excesso de procura setorial e o capital responde aos
-# diferenciais de lucro calculados a esses preços (Flaschel & Semmler). Sem
-# ela, a taxa de lucro de um setor não depende da sua dimensão relativa e o
-# capital concentra-se num só setor: não há crescimento equilibrado interior
-# (ver `src/crescimento.jl`). Com ela, um setor que se expande para além da
-# procura vê o seu preço cair, o seu lucro descer e o capital sair.
+# Optional extension (`market_prices=true`) in which market prices respond to
+# sectoral excess demand and capital responds to the profit differentials
+# computed at those prices (Flaschel & Semmler). Without it, a sector's profit
+# rate does not depend on its relative size and capital concentrates in a
+# single sector: there is no interior balanced growth (see `src/growth.jl`).
+# With it, a sector that expands beyond demand sees its price fall, its profit
+# drop and capital leave.
 #
-# Estado: X = [C; V; q], com q = log dos preços de mercado (3N).
+# State: X = [C; V; q], with q = log of market prices (3N).
 # ============================================================================
 
 """
-    estado_cruzado(C, V, q, p)
+    cross_dual_state(C, V, q, p)
 
-Grandezas do sistema cruzado num estado `(C, V, q)`:
+Quantities of the cross-dual system at a state `(C, V, q)`:
 
-- `x`: output bruto (unidades de valor-base), `xⱼ = Wⱼ/(1 − Σᵢ A[i,j])`;
-- `P`: preços de mercado `exp(q)` normalizados para que o lucro total iguale
-  a mais-valia total (`ΣΠ = ΣS`); a `P = 1`, `Π = S`;
-- `Π`: lucros a preços de mercado, `(P − AᵀP)ᵢxᵢ − Vᵢ − δᵢCᵢ`;
-- `r`: taxas de lucro `Π/(C + V)`;
-- `investimento`: despesa bruta de investimento por setor comprador
+- `x`: gross output (base-value units), `xⱼ = Wⱼ/(1 − Σᵢ A[i,j])`;
+- `P`: market prices `exp(q)`, normalized so that total profit equals total
+  surplus value (`ΣΠ = ΣS`); at `P = 1`, `Π = S`;
+- `Π`: profits at market prices, `(P − AᵀP)ᵢxᵢ − Vᵢ − δᵢCᵢ`;
+- `r`: profit rates `Π/(C + V)`;
+- `investment`: gross investment spending per buying sector
   (`σ_cΠ + δC + μ(r − r̄)C`);
-- `procura`: procura em quantidade, intermédia `Ax` + investimento + consumo;
-  bens de capital comprados na composição das colunas de A, consumo
-  (salários, `σ_vΠ` e consumo capitalista `γΠ`) no cabaz `p.cesto`.
+- `demand`: demand in quantities, intermediate `Ax` + investment +
+  consumption; capital goods are bought in the composition of A's columns,
+  consumption (wages, `σ_vΠ` and capitalist consumption `γΠ`) in the basket
+  `p.basket`.
 
-Lei de Walras: `Σ Pᵢ·procuraᵢ = Σ Pᵢ·xᵢ` identicamente.
+Walras's law: `Σ Pᵢ·demandᵢ = Σ Pᵢ·xᵢ` identically.
 """
-function estado_cruzado(C, V, q, p)
+function cross_dual_state(C, V, q, p)
     N = length(C)
     S = p.e .* V
     colsum = vec(sum(p.A, dims = 1))
@@ -41,55 +42,55 @@ function estado_cruzado(C, V, q, p)
     Π = (P .- p.A' * P) .* x .- V .- p.δ .* C
     r = Π ./ (C .+ V)
     r̄ = sum(r .* C) / sum(C)
-    mobilidade_C = p.μ .* (r .- r̄) .* C
-    investimento = p.σ_c .* Π .+ p.δ .* C .+ mobilidade_C
+    mobility_C = p.μ .* (r .- r̄) .* C
+    investment = p.σ_c .* Π .+ p.δ .* C .+ mobility_C
     γ = 1 .- p.σ_c .- p.σ_v
-    consumo = sum(V) + sum((p.σ_v .+ γ) .* Π)
-    # bens de capital: composição da coluna j de A (normalizada); colunas sem
-    # inputs compram no cabaz de consumo
-    composição = [colsum[j] > 0 ? p.A[i, j] / colsum[j] : p.cesto[i] for i in 1:N, j in 1:N]
-    procura = p.A * x .+ (composição * investimento .+ p.cesto .* consumo) ./ P
-    return (x = x, P = P, Π = Π, r = r, r̄ = r̄, mobilidade_C = mobilidade_C,
-            investimento = investimento, procura = procura,
-            excesso = (procura .- x) ./ x)
+    consumption = sum(V) + sum((p.σ_v .+ γ) .* Π)
+    # capital goods: composition of column j of A (normalized); columns with
+    # no inputs buy in the consumption basket
+    composition = [colsum[j] > 0 ? p.A[i, j] / colsum[j] : p.basket[i] for i in 1:N, j in 1:N]
+    demand = p.A * x .+ (composition * investment .+ p.basket .* consumption) ./ P
+    return (x = x, P = P, Π = Π, r = r, r̄ = r̄, mobility_C = mobility_C,
+            investment = investment, demand = demand,
+            excess = (demand .- x) ./ x)
 end
 
 """
-    sistema_cruzado!(dX, X, p, t)
+    cross_dual_system!(dX, X, p, t)
 
-Dinâmica cruzada (`preços_mercado=true`), estado `X = [C; V; q]`:
+Cross-dual dynamics (`market_prices=true`), state `X = [C; V; q]`:
 
     dCᵢ/dt = σ_c,ᵢ·Πᵢ − δᵢCᵢ + μ(rᵢ − r̄)Cᵢ
     dVᵢ/dt = σ_v,ᵢ·Πᵢ + μ_v(rᵢ − r̄_V)Vᵢ
-    dqᵢ/dt = β·(procuraᵢ − xᵢ)/xᵢ
+    dqᵢ/dt = β·(demandᵢ − xᵢ)/xᵢ
 
-com lucros e taxas de lucro a preços de mercado (`estado_cruzado`). As
-equações de acumulação são as de `sistema_Ndept_io!` com `Π` no lugar de
-`S`. O lado direito é homogéneo de grau 1 em `(C, V)` e invariante a somar
-uma constante a `q` (só os preços relativos importam).
+with profits and profit rates at market prices (`cross_dual_state`). The
+accumulation equations are those of `system_Ndept_io!` with `Π` in place of
+`S`. The right-hand side is homogeneous of degree 1 in `(C, V)` and
+invariant to adding a constant to `q` (only relative prices matter).
 """
-function sistema_cruzado!(dX, X, p, t)
+function cross_dual_system!(dX, X, p, t)
     N = length(p.e)
     C, V, q = X[1:N], X[N+1:2N], X[2N+1:3N]
-    ec = estado_cruzado(C, V, q, p)
-    dX[1:N] = p.σ_c .* ec.Π .- p.δ .* C .+ ec.mobilidade_C
+    ec = cross_dual_state(C, V, q, p)
+    dX[1:N] = p.σ_c .* ec.Π .- p.δ .* C .+ ec.mobility_C
     μ_v = get(p, :μ_v, 0.0)
     dX[N+1:2N] = iszero(μ_v) ? p.σ_v .* ec.Π :
                  p.σ_v .* ec.Π .+ μ_v .* (ec.r .- sum(ec.r .* V) / sum(V)) .* V
-    dX[2N+1:3N] = p.β .* ec.excesso
+    dX[2N+1:3N] = p.β .* ec.excess
 end
 
 """
-    cesto_inicial(A, X0, p)
+    basket_initial(A, X0, p)
 
-Cabaz de consumo por omissão: quotas do output líquido inicial
-`((I − A)x₀)⁺`, normalizadas. É uma hipótese (não há dados de procura final
-por setor de origem no pipeline — `docs/LIMITACOES.md`).
+Default consumption basket: shares of initial net output `((I − A)x₀)⁺`,
+normalized. This is an assumption (the pipeline has no final-demand data by
+sector of origin; see `docs/LIMITATIONS.md`).
 """
-function cesto_inicial(A, X0, p)
+function basket_initial(A, X0, p)
     N = size(A, 1)
     C, V = X0[1:N], X0[N+1:2N]
     x = (p.δ .* C .+ V .+ p.e .* V) ./ (1 .- vec(sum(A, dims = 1)))
-    líquido = max.(x .- A * x, 1e-6 * sum(x))
-    return líquido ./ sum(líquido)
+    net = max.(x .- A * x, 1e-6 * sum(x))
+    return net ./ sum(net)
 end

@@ -1,6 +1,6 @@
 # Changelog
 
-*[🇵🇹 Ler em português](CHANGELOG.md)*
+*[🇵🇹 Ler em português](CHANGELOG.pt.md)*
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705369.svg)](https://doi.org/10.5281/zenodo.21705369)
 
@@ -19,22 +19,59 @@ Format based on Keep a Changelog. Semantic versioning.
 - `test/notebooks.jl`: smoke test that runs every notebook offline (except
   cells tagged `slow`), in CI after the main suite. `install_deps.jl
   --notebooks` installs IJulia, Pluto, PlutoUI and JSON;
-  `notebooks/limpar_saidas.jl` keeps only the PNG of each plot in the
+  `notebooks/strip_outputs.jl` keeps only the PNG of each plot in the
   committed outputs.
 
+### Changed (breaking)
+- **The code is now in English.** Every function, type, struct field,
+  constant, keyword argument, symbol value, returned field and DataFrame
+  column, source file, comment, docstring and console message was
+  translated (US spelling). It is a clean break with no aliases: code
+  written for v0.8.x must be updated. `docs/GLOSSARY.md` maps every old
+  name to its new one. Examples: `simular_Ndept(…; acoplado = true,
+  racionamento = true)` → `simulate_Ndept(…; coupled = true,
+  rationing = true)`; `calibrar_modelo_portugal(ano = 2022,
+  fonte_dados = :eurostat)` → `calibrate_portugal_model(year = 2022,
+  data_source = :eurostat)`; `Departamento` → `Department`;
+  `ParâmetrosCalibrados` → `CalibratedParameters`; `:sintético` →
+  `:synthetic`.
+- Source files renamed: `estruturas.jl` → `types.jl`, `nucleo.jl` →
+  `core.jl`, `analise.jl` → `analysis.jl`, `distributiva.jl` →
+  `distribution.jl`, `choques.jl` → `shocks.jl`, `diferenciacao.jl` →
+  `differentiation.jl`, `cruzado.jl` → `cross_dual.jl`, `crescimento.jl` →
+  `growth.jl`, `bifurcacao.jl` → `bifurcation.jl`, `calibracao_pt.jl` →
+  `calibration_pt.jl`, `visualizacao.jl` → `plotting.jl`, `exemplos.jl` →
+  `examples.jl`; paper scripts `gerar_resultados.jl` →
+  `generate_results.jl`, `jacobiana_bifurcacao.jl` →
+  `jacobian_bifurcation.jl`, `acumulacao_bifurcacao.jl` →
+  `accumulation_bifurcation.jl` (and `figures/acumulacao_stats.tex` →
+  `figures/accumulation_stats.tex`).
+- Data strings are English: AMECO country names (`"Alemanha"` →
+  `"Germany"`), the keys of `AMECO_VARIABLE_CODES`, the NACE section
+  titles and the macro sectors (`"Primary"`, `"Secondary"`, `"Tertiary"`).
+  Metadata keys are `"source"`/`"year"`. The default AMECO download folder
+  is `./ameco_data` (file `ameco_full.txt`).
+- The medium INE aggregation is `:medium` (was `:média`); national-accounts
+  acronyms use the English forms (VAB → GVA, FBCF → GFCF, CCF → CFC,
+  PIB → GDP, IPC → CPI).
+- Docs are English-primary: `CHANGELOG.md`, `docs/LIMITATIONS.md` (was
+  `LIMITACOES`) and `docs/PROJECT_STATUS.md` (was `ESTADO_DO_PROJETO`),
+  each with a `.pt.md` Portuguese version. Entries below this one keep the
+  Portuguese names they were written with.
+
 ### Fixed
-- **AMECO calibration with fixed weights** (`calibrar_com_dados_ameco`,
-  `dados_setoriais=:fixo`, the default path): it deducted 10% of the capital
-  stock as depreciation instead of AMECO's real CCF, and split the stock by
+- **AMECO calibration with fixed weights** (`calibrate_with_ameco_data`,
+  `sector_data=:fixed`, the default path): it deducted 10% of the capital
+  stock as depreciation instead of AMECO's real CFC, and split the stock by
   `[0.10, 0.35, 0.55]`, which gave negative profit rates in the Primary
   sector (and in the Secondary with synthetic data), with `e` at the 0.1
   floor. It now uses the `UKCT` series, split like value added, and
   Eurostat capital-stock shares (`[0.02, 0.16, 0.82]`); `r = e/(k+1)` from
   the floored `e`, and sectors at the floor are reported. See
-  `docs/LIMITACOES.en.md` item 4.
-- `comparar_países_ameco`: the `PIB` and `Quota_Salarial` columns measured
+  `docs/LIMITATIONS.md` item 4.
+- `compare_ameco_countries`: the `GDP` and `Wage_Share` columns measured
   capital advanced `Σ(C+V)` and `ΣV/Σ(C+V)`; they now measure value added
-  and `ΣV/ΣVAB`.
+  and `ΣV/ΣGVA`.
 
 ## [0.8.0] — 2026-10-28
 
@@ -148,7 +185,7 @@ DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/
   `IMP`/`TOTAL`, unlike the earlier one). Verified: zero negative cells,
   exact reconciliation against `P1` (gross output) published by the
   table itself, ρ(A)≈0.52-0.60, `R_max`≈68-91%. See
-  `docs/LIMITACOES.md` item 4-bis, `paper/matrix_audit.jl`.
+  `docs/LIMITATIONS.md` item 4-bis, `paper/matrix_audit.jl`.
 - **The dynamical model's gross output (`sistema_Ndept_io!`) omitted
   circulating intermediate consumption.** The `realização`/`racionamento`
   mechanisms used `O=W=δC+V+S` (a value-added-type flow) as supply, not
@@ -239,7 +276,7 @@ DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/
   couples the technical matrix A to the N-department dynamics through a
   capital-mobility term `μ·(rᵢ − r̄)·Cᵢ`, with `rᵢ` computed on capital
   valued at Sraffian prices of production. `sistema_Ndept!` remains the
-  "independent sectors" version by default. See `docs/LIMITACOES.md`
+  "independent sectors" version by default. See `docs/LIMITATIONS.md`
   item 1.
 - `calcular_taxas_lucro_precos(sol, p)` in `src/analise.jl`, to
   reproduce outside the ODE the price-weighted profit rates used by the
@@ -252,7 +289,7 @@ DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/
   `verificar_sdmx_ameco()` performs a manual sanity check. The
   `:auto`/`:download` methods now use the SDMX API as the automatic
   path; the `:local`/`:csv` flows (an already-downloaded TXT/CSV file)
-  remain available. See `docs/LIMITACOES.md` item 3.
+  remain available. See `docs/LIMITATIONS.md` item 3.
 - `src/eurostat_sdmx.jl`: real sectoral data via the Eurostat SDMX API
   (VAB, compensation, consumption of fixed capital, employment, GFCF,
   net capital stock — dataflows `NAMA_10_A64`, `NAMA_10_A64_E`,
@@ -324,7 +361,7 @@ DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/
 - `simular_choque_salarial`: the reported `R_max` now uses the
   simulation's real technical matrix and labor coefficients (`p_base.A`,
   `l ∝ V`), instead of an auxiliary matrix `A_ref` and `l = ones(N)`. See
-  `docs/LIMITACOES.md` item 2.
+  `docs/LIMITATIONS.md` item 2.
 
 ## [0.3.0]
 
@@ -337,7 +374,7 @@ DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/
 - International comparison (`comparar_países_ameco`) and time series (`analisar_série_temporal_ameco`).
 - Reorganization of the code into a modular repository (src/, test/, examples/, docs/).
 - Test suite (`test/runtests.jl`) and demo (`examples/demo.jl`).
-- `docs/LIMITACOES.md` documenting known limitations.
+- `docs/LIMITATIONS.md` documenting known limitations.
 
 ### Fixed
 - `Statistics` explicitly imported (mean/std/median/var/cor/quantile).
@@ -347,7 +384,7 @@ DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/
 - Fixed the undefined-`match_obj` bug in the AMECO update flow (the update function was removed/rewritten).
 - Optional, shared `seed` across simulations for reproducibility and base-vs-shock comparability.
 
-### Known (see docs/LIMITACOES.md)
+### Known (see docs/LIMITATIONS.md)
 - The technical matrix A did not feed back into the N-department dynamics.
 - `R_max` in the wage shock was illustrative (an auxiliary matrix).
 - The AMECO parser's URLs and format were heuristic.

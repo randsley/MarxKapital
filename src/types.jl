@@ -1,39 +1,39 @@
 # ============================================================================
-# ESTRUTURAS DE DADOS E CONSTANTES
+# DATA STRUCTURES AND CONSTANTS
 # ============================================================================
-# Carregado em primeiro lugar: define os tipos e os dicionários de
-# constantes usados por todos os restantes ficheiros do pacote.
+# Loaded first: defines the types and the constant dictionaries used by all
+# the other files of the package.
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-# Departamento produtivo
+# Department produtivo
 # ----------------------------------------------------------------------------
 
 """
-    Departamento
+    Department
 
-Representa um departamento produtivo na economia marxiana.
+A productive department of the Marxian economy.
 
-# Campos Básicos
-- `nome::String`: Identificador do departamento
-- `c::Float64`: Capital constante (meios de produção)
-- `v::Float64`: Capital variável (força de trabalho / salários)
-- `e::Float64`: Taxa de exploração / mais-valia (s/v)
-- `k::Float64`: Composição orgânica do capital (c/v)
+# Basic fields
+- `name::String`: department identifier
+- `c::Float64`: constant capital (means of production)
+- `v::Float64`: variable capital (labor power / wages)
+- `e::Float64`: rate of exploitation / surplus value (s/v)
+- `k::Float64`: organic composition of capital (c/v)
 
-# Parâmetros Comportamentais
-- `σ_c::Float64`: Fração da mais-valia reinvestida em capital constante
-- `σ_v::Float64`: Fração da mais-valia reinvestida em capital variável
-- `γ::Float64`: Fração da mais-valia consumida pelos capitalistas
-- `δ::Float64`: Taxa de depreciação do capital constante
+# Behavioral parameters
+- `σ_c::Float64`: share of surplus value reinvested in constant capital
+- `σ_v::Float64`: share of surplus value reinvested in variable capital
+- `γ::Float64`: share of surplus value consumed by capitalists
+- `δ::Float64`: depreciation rate of constant capital
 
 # Invariantes
-- σ_c + σ_v + γ = 1.0 (toda a mais-valia é alocada)
-- e > 0 (exploração positiva)
-- k = c/v (consistência)
+- σ_c + σ_v + γ = 1.0 (all surplus value is allocated)
+- e > 0 (positive exploitation)
+- k = c/v (consistency)
 """
-struct Departamento
-    nome::String
+struct Department
+    name::String
     c::Float64
     v::Float64
     e::Float64
@@ -43,77 +43,77 @@ struct Departamento
     γ::Float64
     δ::Float64
 
-    function Departamento(nome, c, v, e, k, σ_c, σ_v, γ, δ)
-        @assert c > 0 "Capital constante deve ser positivo"
-        @assert v > 0 "Capital variável deve ser positivo"
-        @assert e > 0 "Taxa de exploração deve ser positiva"
-        @assert 0 ≤ σ_c ≤ 1 "σ_c deve estar em [0,1]"
-        @assert 0 ≤ σ_v ≤ 1 "σ_v deve estar em [0,1]"
-        @assert 0 ≤ γ ≤ 1 "γ deve estar em [0,1]"
-        @assert abs(σ_c + σ_v + γ - 1.0) < 1e-6 "σ_c + σ_v + γ deve somar 1"
-        @assert abs(k - c / v) < 1e-6 "k deve ser igual a c/v"
-        @assert δ ≥ 0 "Taxa de depreciação não pode ser negativa"
-        new(nome, c, v, e, k, σ_c, σ_v, γ, δ)
+    function Department(name, c, v, e, k, σ_c, σ_v, γ, δ)
+        @assert c > 0 "Constant capital must be positive"
+        @assert v > 0 "Variable capital must be positive"
+        @assert e > 0 "Rate of exploitation must be positive"
+        @assert 0 ≤ σ_c ≤ 1 "σ_c must be in [0,1]"
+        @assert 0 ≤ σ_v ≤ 1 "σ_v must be in [0,1]"
+        @assert 0 ≤ γ ≤ 1 "γ must be in [0,1]"
+        @assert abs(σ_c + σ_v + γ - 1.0) < 1e-6 "σ_c + σ_v + γ must sum to 1"
+        @assert abs(k - c / v) < 1e-6 "k must equal c/v"
+        @assert δ ≥ 0 "Depreciation rate cannot be negative"
+        new(name, c, v, e, k, σ_c, σ_v, γ, δ)
     end
 end
 
-"""Constructor externo simplificado com valores por omissão."""
-function Departamento(nome::String; c = 100.0, v = 50.0, e = 1.5,
+"""Simplified outer constructor with default values."""
+function Department(name::String; c = 100.0, v = 50.0, e = 1.5,
                       σ_c = 0.5, σ_v = 0.2, δ = 0.05)
     γ = 1.0 - σ_c - σ_v
     k = c / v
-    return Departamento(nome, c, v, e, k, σ_c, σ_v, γ, δ)
+    return Department(name, c, v, e, k, σ_c, σ_v, γ, δ)
 end
 
-# Métodos auxiliares
-"""Taxa de lucro r = e/(k+1)."""
-taxa_lucro(d::Departamento) = d.e / (d.k + 1)
+# Helper methods
+"""Profit rate r = e/(k+1)."""
+profit_rate(d::Department) = d.e / (d.k + 1)
 
-"""Mais-valia s = e·v."""
-mais_valia(d::Departamento) = d.e * d.v
+"""Surplus value s = e·v."""
+surplus_value(d::Department) = d.e * d.v
 
-"""Capital total (avançado) K = c + v. `d.c` é o stock de capital constante
-avançado (usado na acumulação e na composição orgânica k=c/v), não o valor
-transferido/consumido num período."""
-capital_total(d::Departamento) = d.c + d.v
+"""Total (advanced) capital K = c + v. `d.c` is the advanced stock of constant
+capital (used in accumulation and in the organic composition k=c/v), not the
+value transferred/used up in one period."""
+total_capital(d::Department) = d.c + d.v
 
-"""Capital constante transferido/consumido num período, c_transferido = δ·c
-(depreciação do stock avançado). Distinto de `d.c` (stock avançado): esta é
-a magnitude correta a somar com fluxos anuais (v, s) para obter o valor do
-produto de um período — ver `valor_produto`."""
-capital_transferido(d::Departamento) = d.δ * d.c
+"""Constant capital transferred/used up in one period, c_transferred = δ·c
+(depreciation of the advanced stock). Distinct from `d.c` (advanced stock):
+this is the right magnitude to add to annual flows (v, s) to get the value of
+one period's product; see `product_value`."""
+transferred_capital(d::Department) = d.δ * d.c
 
-"""Valor do produto de um período, W = c_transferido + v + s (não c + v + s:
-`d.c` é um stock, `v` e `s` são fluxos anuais; somá-los diretamente
-misturaria magnitudes de dimensões temporais diferentes)."""
-valor_produto(d::Departamento) = capital_transferido(d) + d.v + mais_valia(d)
+"""Value of one period's product, W = c_transferred + v + s (not c + v + s:
+`d.c` is a stock while `v` and `s` are annual flows, so adding them directly
+would mix magnitudes of different time dimensions)."""
+product_value(d::Department) = transferred_capital(d) + d.v + surplus_value(d)
 
-function Base.show(io::IO, d::Departamento)
-    print(io, "Departamento(\"$(d.nome)\": ")
-    print(io, "K=$(round(capital_total(d), digits=1)), ")
+function Base.show(io::IO, d::Department)
+    print(io, "Department(\"$(d.name)\": ")
+    print(io, "K=$(round(total_capital(d), digits=1)), ")
     print(io, "k=$(round(d.k, digits=2)), ")
     print(io, "e=$(round(d.e, digits=2)), ")
-    print(io, "r=$(round(taxa_lucro(d), digits=3)))")
+    print(io, "r=$(round(profit_rate(d), digits=3)))")
 end
 
 # ----------------------------------------------------------------------------
-# Parâmetros calibrados
+# Calibrated parameters
 # ----------------------------------------------------------------------------
 
 """
-    ParâmetrosCalibrados
+    CalibratedParameters
 
-Armazena o resultado de uma calibração (INE ou AMECO) pronto a alimentar
-uma simulação.
+Holds the result of a calibration (INE or AMECO), ready to feed a
+simulation.
 """
-struct ParâmetrosCalibrados
+struct CalibratedParameters
     N::Int
-    nomes_setores::Vector{String}
-    códigos_cae::Vector{String}
+    sector_names::Vector{String}
+    nace_codes::Vector{String}
 
     C::Vector{Float64}
     V::Vector{Float64}
-    VAB::Vector{Float64}  # valor acrescentado bruto real (fonte de dados), não C+V+e·V
+    GVA::Vector{Float64}  # actual gross value added (from the data source), not C+V+e·V
 
     e::Vector{Float64}
     k::Vector{Float64}
@@ -126,151 +126,151 @@ struct ParâmetrosCalibrados
     σ_v::Vector{Float64}
     δ::Vector{Float64}
 
-    fonte::String
-    ano_base::Int
-    data_calibração::DateTime
-    qualidade_ajuste::Float64
+    source::String
+    base_year::Int
+    calibration_date::DateTime
+    fit_quality::Float64
 end
 
 # ----------------------------------------------------------------------------
-# Dados do INE (fonte nacional portuguesa)
+# INE data (Portuguese national source)
 # ----------------------------------------------------------------------------
 
 """
-    DadosINE
+    INEData
 
-Contentor para dados do Instituto Nacional de Estatística.
+Container for data from Statistics Portugal (Instituto Nacional de Estatística).
 """
-struct DadosINE
-    ano::Int
-    qre::DataFrame
-    contas_setor::DataFrame
-    emprego::DataFrame
-    fbcf::DataFrame
-    metadados::Dict{String, Any}
+struct INEData
+    year::Int
+    supply_use::DataFrame
+    sector_accounts::DataFrame
+    employment::DataFrame
+    gfcf::DataFrame
+    metadata::Dict{String, Any}
 end
 
 # ----------------------------------------------------------------------------
-# Dados da AMECO (Comissão Europeia)
+# AMECO data (European Commission)
 # ----------------------------------------------------------------------------
 
 """
-    DadosAMECO
+    AMECOData
 
-Séries temporais macroeconómicas de um país, provenientes da base AMECO
-(Annual Macro-Economic Database) da Comissão Europeia.
+Macroeconomic time series for one country from the European Commission's
+AMECO database (Annual Macro-Economic Database).
 """
-struct DadosAMECO
-    país::String
-    código_país::String
-    anos::Vector{Int}
+struct AMECOData
+    country::String
+    country_code::String
+    years::Vector{Int}
 
-    # Contas Nacionais
-    PIB::Vector{Float64}
-    PIB_real::Vector{Float64}
-    consumo_privado::Vector{Float64}
-    consumo_público::Vector{Float64}
-    FBCF::Vector{Float64}
-    exportações::Vector{Float64}
-    importações::Vector{Float64}
+    # National accounts
+    GDP::Vector{Float64}
+    real_GDP::Vector{Float64}
+    private_consumption::Vector{Float64}
+    public_consumption::Vector{Float64}
+    GFCF::Vector{Float64}
+    exports::Vector{Float64}
+    imports::Vector{Float64}
 
-    # Mercado de Trabalho
-    emprego::Vector{Float64}
-    emprego_assalariado::Vector{Float64}
-    desemprego::Vector{Float64}
-    população_ativa::Vector{Float64}
+    # Labor market
+    employment::Vector{Float64}
+    employees::Vector{Float64}
+    unemployment::Vector{Float64}
+    labor_force::Vector{Float64}
 
-    # Remunerações e Produtividade
-    remunerações::Vector{Float64}
-    produtividade::Vector{Float64}
-    custos_unitários_trabalho::Vector{Float64}
+    # Compensation and productivity
+    compensation::Vector{Float64}
+    productivity::Vector{Float64}
+    unit_labor_costs::Vector{Float64}
 
-    # Preços
-    deflator_PIB::Vector{Float64}
-    deflator_FBCF::Vector{Float64}
-    IPC::Vector{Float64}
-    CCF::Vector{Float64}  # consumo de capital fixo, preços correntes (item UKCT)
+    # Prices
+    GDP_deflator::Vector{Float64}
+    GFCF_deflator::Vector{Float64}
+    CPI::Vector{Float64}
+    CFC::Vector{Float64}  # consumption of fixed capital, current prices (item UKCT)
 
-    # Finanças Públicas
-    receitas_governo::Vector{Float64}
-    despesas_governo::Vector{Float64}
-    saldo_orçamental::Vector{Float64}
-    dívida_pública::Vector{Float64}
+    # Public finances
+    government_revenue::Vector{Float64}
+    government_expenditure::Vector{Float64}
+    budget_balance::Vector{Float64}
+    public_debt::Vector{Float64}
 
-    # Setor Externo
-    balança_corrente::Vector{Float64}
-    balança_comercial::Vector{Float64}
+    # External sector
+    current_account::Vector{Float64}
+    trade_balance::Vector{Float64}
 
-    # Stock de Capital
-    stock_capital_total::Vector{Float64}
+    # Capital stock
+    total_capital_stock::Vector{Float64}
 
     # Metadados
-    fonte::String
-    data_download::DateTime
-    notas::Dict{String, String}
+    source::String
+    download_date::DateTime
+    notes::Dict{String, String}
 end
 
 # ----------------------------------------------------------------------------
-# Códigos de países AMECO
+# AMECO country codes
 # ----------------------------------------------------------------------------
 
-const CÓDIGOS_PAÍSES_AMECO = Dict(
-    "Áustria" => "AT", "Bélgica" => "BE", "Bulgária" => "BG",
-    "Croácia" => "HR", "Chipre" => "CY", "República Checa" => "CZ",
-    "Dinamarca" => "DK", "Estónia" => "EE", "Finlândia" => "FI",
-    "França" => "FR", "Alemanha" => "DE", "Grécia" => "EL",
-    "Hungria" => "HU", "Irlanda" => "IE", "Itália" => "IT",
-    "Letónia" => "LV", "Lituânia" => "LT", "Luxemburgo" => "LU",
-    "Malta" => "MT", "Países Baixos" => "NL", "Polónia" => "PL",
-    "Portugal" => "PT", "Roménia" => "RO", "Eslováquia" => "SK",
-    "Eslovénia" => "SI", "Espanha" => "ES", "Suécia" => "SE",
-    "Área do Euro" => "EA", "Área do Euro (19)" => "EA19",
-    "Reino Unido" => "UK", "Noruega" => "NO", "Suíça" => "CH",
-    "Islândia" => "IS", "Turquia" => "TR",
-    "União Europeia (27)" => "EU27", "União Europeia (28)" => "EU28",
-    "Estados Unidos" => "US", "Japão" => "JP",
+const AMECO_COUNTRY_CODES = Dict(
+    "Austria" => "AT", "Belgium" => "BE", "Bulgaria" => "BG",
+    "Croatia" => "HR", "Cyprus" => "CY", "Czechia" => "CZ",
+    "Denmark" => "DK", "Estonia" => "EE", "Finland" => "FI",
+    "France" => "FR", "Germany" => "DE", "Greece" => "EL",
+    "Hungary" => "HU", "Ireland" => "IE", "Italy" => "IT",
+    "Latvia" => "LV", "Lithuania" => "LT", "Luxembourg" => "LU",
+    "Malta" => "MT", "Netherlands" => "NL", "Poland" => "PL",
+    "Portugal" => "PT", "Romania" => "RO", "Slovakia" => "SK",
+    "Slovenia" => "SI", "Spain" => "ES", "Sweden" => "SE",
+    "Euro Area" => "EA", "Euro Area (19)" => "EA19",
+    "United Kingdom" => "UK", "Norway" => "NO", "Switzerland" => "CH",
+    "Iceland" => "IS", "Turkey" => "TR",
+    "European Union (27)" => "EU27", "European Union (28)" => "EU28",
+    "United States" => "US", "Japan" => "JP",
 )
 
 # ----------------------------------------------------------------------------
-# Códigos de variáveis AMECO
+# AMECO variable codes
 # ----------------------------------------------------------------------------
-# NOTA: usados apenas pelo parser TXT legado (`ler_ficheiro_ameco_txt`,
-# `src/ameco_download.jl`), hoje sem caminho automático (ver
-# docs/LIMITACOES.md item 3). Corrigidos contra a API SDMX real onde foi
-# possível verificar (`receitas_governo`/`despesas_governo` estavam
-# trocados; `consumo_privado`/`exportações`/`importações`/
-# `custos_unit_trabalho`/`produtividade_trabalho` usavam mnemónicos que já
-# não existem, ou nunca existiram, na API). `deflator_PIB` e
-# `stock_capital_bruto` continuam por confirmar — não têm equivalente direto
-# na API SDMX (o deflator calcula-se, o stock bruto não é publicado; ver
-# `docs/LIMITACOES.md` item 3) — mantidos como estavam, sem correção
-# fabricada. Para a fonte de verdade atual (API SDMX), ver `MAPA_AMECO_SDMX`
-# em `src/ameco_sdmx.jl`.
+# NOTE: used only by the legacy TXT parser (`read_ameco_txt_file`,
+# `src/ameco_download.jl`), which no longer has an automatic download path
+# (see docs/LIMITATIONS.md item 3). Corrected against the real SDMX API where
+# that could be checked (`government_revenue`/`government_expenditure` were
+# swapped; `private_consumption`/`exports`/`imports`/
+# `unit_labor_costs`/`labor_productivity` used mnemonics that no longer
+# exist, or never existed, in the API). `GDP_deflator` and
+# `gross_capital_stock` remain unconfirmed: they have no direct equivalent
+# in the SDMX API (the deflator is computed, the gross stock is not
+# published; see `docs/LIMITATIONS.md` item 3) and are kept as they were,
+# with no invented correction. For the current source of truth (SDMX API),
+# see `AMECO_SDMX_MAP` in `src/ameco_sdmx.jl`.
 
-const CÓDIGOS_AMECO_VARIÁVEIS = Dict(
-    "PIB_corrente" => "UVGD",
-    "PIB_constante" => "OVGD",
-    "consumo_privado" => "UCPH",
-    "consumo_público" => "UCTG",
-    "FBCF" => "UIGT",
-    "exportações" => "UXGS",
-    "importações" => "UMGS",
-    "emprego_total" => "NETD",
-    "emprego_assalariado" => "NWTD",
-    "taxa_desemprego" => "ZUTN",
-    "população_ativa" => "NLTN",
-    "remunerações" => "UWCD",
-    "remunerações_por_assalariado" => "HWCDW",
-    "produtividade_trabalho" => "ZVGDE",
-    "custos_unit_trabalho" => "PLCD",
-    "deflator_PIB" => "PVGD",
-    "IPC" => "ZCPIH",
-    "receitas_governo" => "URTG",
-    "despesas_governo" => "UUTG",
-    "saldo_orçamental" => "UBLG",
-    "dívida_pública" => "UDGGL",
-    "balança_corrente" => "UBCA",
-    "balança_comercial" => "UBTB",
-    "stock_capital_líquido" => "OKND",
-    "stock_capital_bruto" => "OKCD",
+const AMECO_VARIABLE_CODES = Dict(
+    "GDP_current" => "UVGD",
+    "GDP_constant" => "OVGD",
+    "private_consumption" => "UCPH",
+    "public_consumption" => "UCTG",
+    "GFCF" => "UIGT",
+    "exports" => "UXGS",
+    "imports" => "UMGS",
+    "employment_total" => "NETD",
+    "employees" => "NWTD",
+    "unemployment_rate" => "ZUTN",
+    "labor_force" => "NLTN",
+    "compensation" => "UWCD",
+    "compensation_per_employee" => "HWCDW",
+    "labor_productivity" => "ZVGDE",
+    "unit_labor_costs" => "PLCD",
+    "GDP_deflator" => "PVGD",
+    "CPI" => "ZCPIH",
+    "government_revenue" => "URTG",
+    "government_expenditure" => "UUTG",
+    "budget_balance" => "UBLG",
+    "public_debt" => "UDGGL",
+    "current_account" => "UBCA",
+    "trade_balance" => "UBTB",
+    "net_capital_stock" => "OKND",
+    "gross_capital_stock" => "OKCD",
 )

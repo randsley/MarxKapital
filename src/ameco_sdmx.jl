@@ -1,127 +1,126 @@
 # ============================================================================
-# API SDMX OFICIAL DA AMECO
+# OFFICIAL AMECO SDMX API
 # ============================================================================
-# A Comissão Europeia retirou a distribuição do ficheiro TXT estático usado
-# por `ameco_download.jl` (URLs em URLS_AMECO_TENTAR devolvem 404 ou
-# redirecionam para a página HTML do portal, não para dados). Em alternativa,
-# a AMECO passou a expor uma API REST SDMX oficial, na mesma plataforma da
-# nova ferramenta de dados do Eurostat:
+# The European Commission withdrew the static TXT file used by
+# `ameco_download.jl` (the URLs in AMECO_URLS_TO_TRY return 404 or redirect
+# to the portal's HTML page, not to data). Instead, AMECO now exposes an
+# official SDMX REST API, on the same platform as Eurostat's new data tool:
 #
 #     https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1
 #
-# Cada grupo de variáveis da AMECO vive num "capítulo" (dataflow) próprio
-# (ex.: AMECO_CHAPTER06-01 = "Gross domestic product"); não existe um único
-# dataflow monolítico. Os mnemónicos já usados em CÓDIGOS_AMECO_VARIÁVEIS
-# (estruturas.jl) continuam válidos como código ITEM nesta API — não foi
-# necessário remapeá-los. Os códigos de país são maioritariamente ISO3, mas
-# com irregularidades reais (GRC em vez de EL, GBR em vez de UK, ROM em vez
-# de ROU) e códigos agregados próprios (EU27, EA21, D_W); por isso não são
-# compatíveis com CÓDIGOS_PAÍSES_AMECO (códigos do antigo ficheiro TXT) e
-# precisam de um mapeamento próprio.
+# Each AMECO variable group lives in its own "chapter" (dataflow) (e.g.
+# AMECO_CHAPTER06-01 = "Gross domestic product"); there is no single
+# monolithic dataflow. The mnemonics already used in AMECO_VARIABLE_CODES
+# (types.jl) remain valid as ITEM codes in this API, so they did not need
+# remapping. Country codes are mostly ISO3, but with real irregularities
+# (GRC instead of EL, GBR instead of UK, ROM instead of ROU) and their own
+# aggregate codes (EU27, EA21, D_W), so they are not compatible with
+# AMECO_COUNTRY_CODES (codes from the old TXT file) and need a mapping of
+# their own.
 # ============================================================================
 
-const URL_BASE_SDMX_AMECO =
+const AMECO_SDMX_BASE_URL =
     "https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1"
 
 """
-País (nome em português, mesmas chaves de `CÓDIGOS_PAÍSES_AMECO`) → código
-REF_AREA usado pela API SDMX da AMECO. Construído a partir do codelist
-`CL_AMECO_AREA` (verificado em julho de 2026). "União Europeia (28)" não tem
-equivalente na base atual (código retirado após o Brexit) e foi omitido —
-resolver esse país cai no código antigo de 2 letras, que a API SDMX
-simplesmente não reconhece (devolve série vazia, sem erro).
+Country (English name, same keys as `AMECO_COUNTRY_CODES`) → REF_AREA code
+used by the AMECO SDMX API. Built from the `CL_AMECO_AREA` codelist (checked
+in July 2026). "European Union (28)" has no equivalent in the current
+database (code withdrawn after Brexit) and is left out: resolving that
+country falls back to the old 2-letter code, which the SDMX API simply does
+not recognize (it returns an empty series, with no error).
 """
-const CÓDIGOS_PAÍSES_AMECO_SDMX = Dict(
-    "Áustria" => "AUT", "Bélgica" => "BEL", "Bulgária" => "BGR",
-    "Croácia" => "HRV", "Chipre" => "CYP", "República Checa" => "CZE",
-    "Dinamarca" => "DNK", "Estónia" => "EST", "Finlândia" => "FIN",
-    "França" => "FRA", "Alemanha" => "DEU", "Grécia" => "GRC",
-    "Hungria" => "HUN", "Irlanda" => "IRL", "Itália" => "ITA",
-    "Letónia" => "LVA", "Lituânia" => "LTU", "Luxemburgo" => "LUX",
-    "Malta" => "MLT", "Países Baixos" => "NLD", "Polónia" => "POL",
-    "Portugal" => "PRT", "Roménia" => "ROM", "Eslováquia" => "SVK",
-    "Eslovénia" => "SVN", "Espanha" => "ESP", "Suécia" => "SWE",
-    "Área do Euro" => "EA21", "Área do Euro (19)" => "EA19",
-    "Reino Unido" => "GBR", "Noruega" => "NOR", "Suíça" => "CHE",
-    "Islândia" => "ISL", "Turquia" => "TUR",
-    "União Europeia (27)" => "EU27",
-    "Estados Unidos" => "USA", "Japão" => "JPN",
+const AMECO_SDMX_COUNTRY_CODES = Dict(
+    "Austria" => "AUT", "Belgium" => "BEL", "Bulgaria" => "BGR",
+    "Croatia" => "HRV", "Cyprus" => "CYP", "Czechia" => "CZE",
+    "Denmark" => "DNK", "Estonia" => "EST", "Finland" => "FIN",
+    "France" => "FRA", "Germany" => "DEU", "Greece" => "GRC",
+    "Hungary" => "HUN", "Ireland" => "IRL", "Italy" => "ITA",
+    "Latvia" => "LVA", "Lithuania" => "LTU", "Luxembourg" => "LUX",
+    "Malta" => "MLT", "Netherlands" => "NLD", "Poland" => "POL",
+    "Portugal" => "PRT", "Romania" => "ROM", "Slovakia" => "SVK",
+    "Slovenia" => "SVN", "Spain" => "ESP", "Sweden" => "SWE",
+    "Euro Area" => "EA21", "Euro Area (19)" => "EA19",
+    "United Kingdom" => "GBR", "Norway" => "NOR", "Switzerland" => "CHE",
+    "Iceland" => "ISL", "Turkey" => "TUR",
+    "European Union (27)" => "EU27",
+    "United States" => "USA", "Japan" => "JPN",
 )
 
 """
-Nome interno da variável (mesmas chaves de `CÓDIGOS_AMECO_VARIÁVEIS`) →
-`(dataflow do capítulo, código ITEM, fator de escala, TRANSFORMATION)` na
-API SDMX. Todas as entradas foram confirmadas com uma chamada real durante o
-desenvolvimento (2026-07). Note-se que vários mnemónicos aqui **diferem**
-dos que estavam (nunca verificados) em `CÓDIGOS_AMECO_VARIÁVEIS`
-(`estruturas.jl`) — por exemplo `receitas_governo`/`despesas_governo`
-tinham os códigos trocados (`UUTG` era a despesa, não a receita), e
-`consumo_privado`/`exportações`/`importações` usavam mnemónicos que já não
-existem na API atual (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`).
+Internal variable name (same keys as `AMECO_VARIABLE_CODES`) →
+`(chapter dataflow, ITEM code, scale factor, TRANSFORMATION)` in the SDMX
+API. Every entry was confirmed with a real call during development
+(2026-07). Note that several mnemonics here **differ** from the ones that
+were (never checked) in `AMECO_VARIABLE_CODES` (`types.jl`): for example,
+`government_revenue`/`government_expenditure` had their codes swapped
+(`UUTG` was expenditure, not revenue), and
+`private_consumption`/`exports`/`imports` used mnemonics that no longer
+exist in the current API (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`).
 
-`deflator_PIB` e `balança_comercial` não têm entrada aqui: são calculadas em
-`descarregar_ameco_sdmx` a partir de séries já mapeadas (`PIB_corrente` /
-`PIB_constante`, e exportações/importações de bens do capítulo 11-01 — este
-último não é o mesmo item que `exportações`/`importações` acima, que cobrem
-bens e serviços; comércio de bens usa `UNIT=99`, não o `UNIT=0` por omissão
-de `_obter_série_sdmx`). `stock_capital_bruto` foi confirmado **indisponível**
-nesta API — só o capítulo de stock líquido (`AMECO_CHAPTER08-01`) existe,
-sem equivalente bruto; não fica pendente, fica documentado como não
-publicado (ver `docs/LIMITACOES.md` item 3).
+`GDP_deflator` and `trade_balance` have no entry here: they are computed in
+`download_ameco_sdmx` from series already mapped (`GDP_current` /
+`GDP_constant`, and goods exports/imports from chapter 11-01; the latter is
+not the same item as `exports`/`imports` above, which cover goods and
+services, and goods trade uses `UNIT=99`, not the default `UNIT=0` of
+`_fetch_sdmx_series`). `gross_capital_stock` was confirmed **unavailable**
+in this API: only the net stock chapter (`AMECO_CHAPTER08-01`) exists, with
+no gross equivalent. It is not pending; it is documented as not published
+(see `docs/LIMITATIONS.md` item 3).
 
-O fator de escala converte a unidade devolvida pela API (confirmada via a
-coluna COMMENT/UNIT_MULT de cada resposta) para a convenção já usada no resto
-do código (dados sintéticos, `calibrar_com_dados_ameco`): milhões de euros
-para variáveis monetárias, milhares de pessoas para emprego, sem escala para
-índices/percentagens/valores per capita. As variáveis monetárias verificadas
-vêm em "Mrd EURO" (mil milhões) — escala 1000 para milhões (incluindo as do
-capítulo 16, rotuladas "National currency" mas na mesma ordem de grandeza —
-confirmado pela magnitude: ~107 bate com receita/despesa pública de ~44% de
-um PIB de ~244 mil M€, não com 107% do PIB).
+The scale factor converts the unit the API returns (confirmed through the
+COMMENT/UNIT_MULT column of each response) to the convention already used
+in the rest of the code (synthetic data, `calibrate_with_ameco_data`):
+million euros for monetary variables, thousand persons for employment, no
+scaling for indices/percentages/per-capita values. The monetary variables
+checked come in "Mrd EURO" (billions), hence a scale of 1000 to millions
+(including those in chapter 16, labeled "National currency" but of the same
+order of magnitude, as confirmed by the size: ~107 matches public
+revenue/expenditure of ~44% of a GDP of ~€244 bn, not 107% of GDP).
 """
-const MAPA_AMECO_SDMX = Dict(
-    "PIB_corrente"                 => ("AMECO_CHAPTER06-01", "UVGD",  1000.0, 1),
-    "PIB_constante"                => ("AMECO_CHAPTER06-01", "OVGD",  1000.0, 1),
-    "emprego_total"                => ("AMECO_CHAPTER01-04", "NETD",  1.0,    1),
-    "remunerações"                 => ("AMECO_CHAPTER07-01", "UWCD",  1000.0, 1),
-    "FBCF"                         => ("AMECO_CHAPTER03-01", "UIGT",  1000.0, 1),
-    "stock_capital_líquido"        => ("AMECO_CHAPTER08-01", "OKND",  1000.0, 1),
-    "consumo_privado"              => ("AMECO_CHAPTER02-01", "UCPH",  1000.0, 1),
-    "consumo_público"              => ("AMECO_CHAPTER02-05", "UCTG",  1000.0, 1),
-    "exportações"                  => ("AMECO_CHAPTER09-01", "UXGS",  1000.0, 1),
-    "importações"                  => ("AMECO_CHAPTER09-02", "UMGS",  1000.0, 1),
-    "emprego_assalariado"          => ("AMECO_CHAPTER01-07", "NWTD",  1.0,    1),
-    "taxa_desemprego"              => ("AMECO_CHAPTER01-03", "ZUTN",  1.0,    1),
-    "população_ativa"              => ("AMECO_CHAPTER01-02", "NLTN",  1.0,    1),
-    "remunerações_por_assalariado" => ("AMECO_CHAPTER07-04", "HWCDW", 1.0,    1),
-    "produtividade_trabalho"       => ("AMECO_CHAPTER08-02", "ZVGDE", 1.0,    3),
-    "IPC"                          => ("AMECO_CHAPTER02-04", "ZCPIH", 1.0,    1),
-    "receitas_governo"             => ("AMECO_CHAPTER16-01", "URTG",  1000.0, 1),
-    "despesas_governo"             => ("AMECO_CHAPTER16-02", "UUTG",  1000.0, 1),
-    "saldo_orçamental"             => ("AMECO_CHAPTER16-03", "UBLG",  1000.0, 1),
-    "balança_corrente"             => ("AMECO_CHAPTER10-01", "UBCA",  1000.0, 1),
-    "custos_unit_trabalho"         => ("AMECO_CHAPTER07-07", "PLCD",  1.0,    3),
-    "dívida_pública"               => ("AMECO_CHAPTER18-02", "UDGGL", 1000.0, 1),
-    "deflator_FBCF"                => ("AMECO_CHAPTER03-01", "PIGT",  1.0,    3),
-    "CCF"                          => ("AMECO_CHAPTER03-05", "UKCT",  1000.0, 1),
+const AMECO_SDMX_MAP = Dict(
+    "GDP_current"                 => ("AMECO_CHAPTER06-01", "UVGD",  1000.0, 1),
+    "GDP_constant"                => ("AMECO_CHAPTER06-01", "OVGD",  1000.0, 1),
+    "employment_total"                => ("AMECO_CHAPTER01-04", "NETD",  1.0,    1),
+    "compensation"                 => ("AMECO_CHAPTER07-01", "UWCD",  1000.0, 1),
+    "GFCF"                         => ("AMECO_CHAPTER03-01", "UIGT",  1000.0, 1),
+    "net_capital_stock"        => ("AMECO_CHAPTER08-01", "OKND",  1000.0, 1),
+    "private_consumption"              => ("AMECO_CHAPTER02-01", "UCPH",  1000.0, 1),
+    "public_consumption"              => ("AMECO_CHAPTER02-05", "UCTG",  1000.0, 1),
+    "exports"                  => ("AMECO_CHAPTER09-01", "UXGS",  1000.0, 1),
+    "imports"                  => ("AMECO_CHAPTER09-02", "UMGS",  1000.0, 1),
+    "employees"          => ("AMECO_CHAPTER01-07", "NWTD",  1.0,    1),
+    "unemployment_rate"              => ("AMECO_CHAPTER01-03", "ZUTN",  1.0,    1),
+    "labor_force"              => ("AMECO_CHAPTER01-02", "NLTN",  1.0,    1),
+    "compensation_per_employee" => ("AMECO_CHAPTER07-04", "HWCDW", 1.0,    1),
+    "labor_productivity"       => ("AMECO_CHAPTER08-02", "ZVGDE", 1.0,    3),
+    "CPI"                          => ("AMECO_CHAPTER02-04", "ZCPIH", 1.0,    1),
+    "government_revenue"             => ("AMECO_CHAPTER16-01", "URTG",  1000.0, 1),
+    "government_expenditure"             => ("AMECO_CHAPTER16-02", "UUTG",  1000.0, 1),
+    "budget_balance"             => ("AMECO_CHAPTER16-03", "UBLG",  1000.0, 1),
+    "current_account"             => ("AMECO_CHAPTER10-01", "UBCA",  1000.0, 1),
+    "unit_labor_costs"         => ("AMECO_CHAPTER07-07", "PLCD",  1.0,    3),
+    "public_debt"               => ("AMECO_CHAPTER18-02", "UDGGL", 1000.0, 1),
+    "GFCF_deflator"                => ("AMECO_CHAPTER03-01", "PIGT",  1.0,    3),
+    "CFC"                          => ("AMECO_CHAPTER03-05", "UKCT",  1000.0, 1),
 )
 
 """
-Chama a API SDMX para um (dataflow, item, área) e devolve Dict{Int,Float64}
-ano→valor. A chave SDMX fixa TRANSFORMATION (1 por omissão), UNIT (0 por
-omissão) e REFERENCE=0 e deixa AGG_METHOD por preencher (`.`): sem isto, a
-API devolve várias séries por ano para o mesmo item (ex.: UVGD sem UNIT fixo
-devolve preços correntes, PPS e ECU/EUR em simultâneo) e o dicionário
-ano→valor ficaria dependente da ordem de chegada das linhas. A maioria dos
-capítulos usa TRANSFORMATION=1 e UNIT=0; alguns precisam de outros valores
-(ex. capítulo 07-07/08-02 usam TRANSFORMATION=3; capítulo 11-01, comércio
-externo, usa UNIT=99) — passar explicitamente quando necessário (confirmado
-por tentativa: a API devolve "número de filtros incorreto"/vazio se o valor
-errado for wildcardeado em vez de fixo).
+Calls the SDMX API for one (dataflow, item, area) and returns a
+Dict{Int,Float64} year→value. The SDMX key fixes TRANSFORMATION (1 by
+default), UNIT (0 by default) and REFERENCE=0 and leaves AGG_METHOD blank
+(`.`): without this, the API returns several series per year for the same
+item (e.g. UVGD without a fixed UNIT returns current prices, PPS and ECU/EUR
+at once) and the year→value dictionary would depend on the order in which
+the rows arrive. Most chapters use TRANSFORMATION=1 and UNIT=0; some need
+other values (e.g. chapters 07-07/08-02 use TRANSFORMATION=3; chapter 11-01,
+external trade, uses UNIT=99), so pass them explicitly when needed
+(confirmed by trial: the API returns "incorrect number of filters"/empty if
+the wrong value is wildcarded instead of fixed).
 """
-function _obter_série_sdmx(dataflow::String, código_área::String, item::String;
-                           transformação::Int = 1, unidade::Int = 0)
-    url = "$URL_BASE_SDMX_AMECO/data/ECFIN,$dataflow,1.0/A.$código_área.$transformação..$unidade.0.$item" *
+function _fetch_sdmx_series(dataflow::String, area_code::String, item::String;
+                           transformation::Int = 1, unit::Int = 0)
+    url = "$AMECO_SDMX_BASE_URL/data/ECFIN,$dataflow,1.0/A.$area_code.$transformation..$unit.0.$item" *
           "?format=SDMX-CSV"
     try
         resp = HTTP.get(url, retry = true, readtimeout = 30, status_exception = false)
@@ -136,77 +135,76 @@ function _obter_série_sdmx(dataflow::String, código_área::String, item::Strin
 end
 
 """
-    descarregar_ameco_sdmx(código_área, anos)
+    download_ameco_sdmx(area_code, years)
 
-Descarrega, via a API SDMX oficial da AMECO, as séries mapeadas em
-`MAPA_AMECO_SDMX` para o código de área dado (ver `CÓDIGOS_PAÍSES_AMECO_SDMX`
-para resolver a partir do nome do país), devolvendo um
-`Dict{String,Vector{Float64}}` pronto para `construir_dados_ameco`
-(`src/ameco.jl`). Variáveis sem mapeamento, ou cuja chamada falhe, ficam
-simplesmente ausentes do dicionário — `construir_dados_ameco` preenche por
-omissão (0.0 ou NaN), pelo que uma falha parcial nunca lança erro.
+Downloads, through AMECO's official SDMX API, the series mapped in
+`AMECO_SDMX_MAP` for the given area code (see `AMECO_SDMX_COUNTRY_CODES` to
+resolve it from the country name), returning a `Dict{String,Vector{Float64}}`
+ready for `build_ameco_data` (`src/ameco.jl`). Variables with no mapping, or
+whose call fails, are simply missing from the dictionary; `build_ameco_data`
+fills in defaults (0.0 or NaN), so a partial failure never throws.
 
-Duas séries adicionais são calculadas (não vêm de `MAPA_AMECO_SDMX`):
-`deflator_PIB` = `PIB_corrente/PIB_constante × 100` (a partir de séries já
-obtidas, sem chamada extra); `balança_comercial` = exportações menos
-importações de bens (`AMECO_CHAPTER11-01`, itens `DXGT`/`DMGT`, `UNIT=99` —
-note-se que este é o comércio só de bens, distinto de
-`exportações`/`importações` acima, que cobrem bens e serviços).
+Two extra series are computed (they do not come from `AMECO_SDMX_MAP`):
+`GDP_deflator` = `GDP_current/GDP_constant × 100` (from series already
+fetched, with no extra call); `trade_balance` = goods exports minus goods
+imports (`AMECO_CHAPTER11-01`, items `DXGT`/`DMGT`, `UNIT=99`; note that this
+is goods trade only, unlike `exports`/`imports` above, which cover goods and
+services).
 """
-function descarregar_ameco_sdmx(código_área::String, anos)
-    println("\n🌐 A obter dados AMECO via API SDMX oficial ($código_área)...")
-    anos_vec = collect(anos)
-    resultado = Dict{String, Vector{Float64}}()
-    for (nome, (dataflow, item, escala, transformação)) in MAPA_AMECO_SDMX
-        série = _obter_série_sdmx(dataflow, código_área, item; transformação = transformação)
-        if isempty(série)
-            @warn "Sem dados AMECO SDMX para '$nome' ($dataflow, $item, $código_área)."
+function download_ameco_sdmx(area_code::String, years)
+    println("\n🌐 Fetching AMECO data through the official SDMX API ($area_code)...")
+    years_vec = collect(years)
+    result = Dict{String, Vector{Float64}}()
+    for (name, (dataflow, item, scale, transformation)) in AMECO_SDMX_MAP
+        series = _fetch_sdmx_series(dataflow, area_code, item; transformation = transformation)
+        if isempty(series)
+            @warn "No AMECO SDMX data for '$name' ($dataflow, $item, $area_code)."
             continue
         end
-        resultado[nome] = [get(série, a, NaN) * escala for a in anos_vec]
+        result[name] = [get(series, a, NaN) * scale for a in years_vec]
     end
 
-    if haskey(resultado, "PIB_corrente") && haskey(resultado, "PIB_constante")
-        resultado["deflator_PIB"] = resultado["PIB_corrente"] ./ resultado["PIB_constante"] .* 100
+    if haskey(result, "GDP_current") && haskey(result, "GDP_constant")
+        result["GDP_deflator"] = result["GDP_current"] ./ result["GDP_constant"] .* 100
     end
 
-    dxgt = _obter_série_sdmx("AMECO_CHAPTER11-01", código_área, "DXGT"; unidade = 99)
-    dmgt = _obter_série_sdmx("AMECO_CHAPTER11-01", código_área, "DMGT"; unidade = 99)
+    dxgt = _fetch_sdmx_series("AMECO_CHAPTER11-01", area_code, "DXGT"; unit = 99)
+    dmgt = _fetch_sdmx_series("AMECO_CHAPTER11-01", area_code, "DMGT"; unit = 99)
     if !isempty(dxgt) && !isempty(dmgt)
-        resultado["balança_comercial"] = [(get(dxgt, a, NaN) - get(dmgt, a, NaN)) * 1000.0 for a in anos_vec]
+        result["trade_balance"] = [(get(dxgt, a, NaN) - get(dmgt, a, NaN)) * 1000.0 for a in years_vec]
     else
-        @warn "Sem dados AMECO SDMX para 'balança_comercial' (AMECO_CHAPTER11-01, $código_área)."
+        @warn "No AMECO SDMX data for 'trade_balance' (AMECO_CHAPTER11-01, $area_code)."
     end
 
-    isempty(resultado) && error("Nenhuma série obtida da API SDMX para '$código_área'.")
-    println("  ✓ $(length(resultado))/$(length(MAPA_AMECO_SDMX) + 2) séries obtidas.")
-    return resultado
+    isempty(result) && error("No series fetched from the SDMX API for '$area_code'.")
+    println("  ✓ $(length(result))/$(length(AMECO_SDMX_MAP) + 2) series fetched.")
+    return result
 end
 
 """
-    verificar_sdmx_ameco()
+    check_ameco_sdmx()
 
-Verificação manual (não corre nos testes automáticos — ver
-`docs/LIMITACOES.md` item 3): confirma que a API SDMX está acessível e que o
-PIB de Portugal vem numa ordem de grandeza plausível para um ano recente.
-Não compara um valor exato porque a AMECO revê os dados periodicamente.
-Corra com:  `include("src/MarxKapital.jl"); verificar_sdmx_ameco()`
+Manual check (not run by the automated tests; see `docs/LIMITATIONS.md`
+item 3): confirms that the SDMX API is reachable and that Portugal's GDP
+comes in a plausible order of magnitude for a recent year. It does not
+compare an exact value, because AMECO revises the data periodically.
+Run with:  `include("src/MarxKapital.jl"); check_ameco_sdmx()`
 """
-function verificar_sdmx_ameco()
+function check_ameco_sdmx()
     println("\n" * "="^70)
-    println("VERIFICAÇÃO MANUAL — API SDMX DA AMECO")
+    println("MANUAL CHECK — AMECO SDMX API")
     println("="^70)
-    série = _obter_série_sdmx("AMECO_CHAPTER06-01", "PRT", "UVGD")
-    if isempty(série)
-        println("✗ FALHOU: sem resposta da API para o PIB de Portugal.")
+    series = _fetch_sdmx_series("AMECO_CHAPTER06-01", "PRT", "UVGD")
+    if isempty(series)
+        println("✗ FAILED: no API response for Portugal's GDP.")
         return false
     end
-    ano_recente = maximum(k for k in keys(série) if !isnan(série[k]))
-    valor = série[ano_recente]
-    plausível = 50.0 < valor < 500.0
-    println(plausível ? "✓" : "✗", " PIB de Portugal ($ano_recente): ",
-            round(valor, digits = 1), " mil M€ ",
-            plausível ? "(plausível)" : "(fora do intervalo esperado 50-500)")
+    recent_year = maximum(k for k in keys(series) if !isnan(series[k]))
+    amount = series[recent_year]
+    plausible = 50.0 < amount < 500.0
+    println(plausible ? "✓" : "✗", " Portugal's GDP ($recent_year): €",
+            round(amount, digits = 1), " bn ",
+            plausible ? "(plausible)" : "(outside the expected range 50-500)")
     println("="^70 * "\n")
-    return plausível
+    return plausible
 end
