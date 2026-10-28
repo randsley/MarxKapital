@@ -8,6 +8,8 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 
 ## [0.8.0] — 2026-10-28
 
+DOI desta versão (Zenodo): [10.5281/zenodo.23735182](https://doi.org/10.5281/zenodo.23735182). Para citar todas as versões, use o DOI conceptual acima.
+
 ### Adicionado
 - `expoentes_lyapunov` (`src/bifurcacao.jl`): maiores expoentes de
   Lyapunov do sistema normalizado (método de Benettin, jacobiana exata),

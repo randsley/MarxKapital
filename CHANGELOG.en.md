@@ -8,6 +8,8 @@ Format based on Keep a Changelog. Semantic versioning.
 
 ## [0.8.0] — 2026-10-28
 
+DOI of this version (Zenodo): [10.5281/zenodo.23735182](https://doi.org/10.5281/zenodo.23735182). To cite all versions, use the concept DOI above.
+
 ### Added
 - `expoentes_lyapunov` (`src/bifurcacao.jl`): largest Lyapunov exponents of
   the normalized system (Benettin's method, exact Jacobian), and
