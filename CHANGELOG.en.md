@@ -6,6 +6,22 @@
 
 Format based on Keep a Changelog. Semantic versioning.
 
+## [Unreleased]
+
+### Added
+- **Notebooks** (`notebooks/`, in English, offline): six Jupyter notebooks
+  committed with their outputs (accumulation basics; values, prices and the
+  wage–profit frontier; calibration and wage shocks; coupled sectors and
+  automatic differentiation; TSSI valuation; balanced growth, cycles and
+  chaos) and three interactive Pluto notebooks (wage–profit frontier,
+  accumulation with coupling and a wage shock, accumulation cycles in the
+  cross-dual model). Guide in `notebooks/README.md`.
+- `test/notebooks.jl`: smoke test that runs every notebook offline (except
+  cells tagged `slow`), in CI after the main suite. `install_deps.jl
+  --notebooks` installs IJulia, Pluto, PlutoUI and JSON;
+  `notebooks/limpar_saidas.jl` keeps only the PNG of each plot in the
+  committed outputs.
+
 ## [0.8.0] — 2026-10-28
 
 DOI of this version (Zenodo): [10.5281/zenodo.23735182](https://doi.org/10.5281/zenodo.23735182). To cite all versions, use the concept DOI above.

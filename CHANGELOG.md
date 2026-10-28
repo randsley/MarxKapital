@@ -6,6 +6,22 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [Por lançar]
+
+### Adicionado
+- **Notebooks** (`notebooks/`, em inglês, offline): seis notebooks Jupyter
+  gravados com as saídas (fundamentos da acumulação; valores, preços e
+  fronteira salário-lucro; calibração e choques salariais; setores
+  acoplados e diferenciação automática; valorização TSSI; crescimento
+  equilibrado, ciclos e caos) e três notebooks Pluto interativos (fronteira
+  salário-lucro, acumulação com acoplamento e choque salarial, ciclos de
+  acumulação no modelo cruzado). Guia em `notebooks/README.md`.
+- `test/notebooks.jl`: teste de fumo que corre todos os notebooks offline
+  (sem as células marcadas `slow`), em CI depois da suite principal.
+  `install_deps.jl --notebooks` instala IJulia, Pluto, PlutoUI e JSON;
+  `notebooks/limpar_saidas.jl` deixa só o PNG de cada gráfico nas saídas
+  gravadas.
+
 ## [0.8.0] — 2026-10-28
 
 DOI desta versão (Zenodo): [10.5281/zenodo.23735182](https://doi.org/10.5281/zenodo.23735182). Para citar todas as versões, use o DOI conceptual acima.

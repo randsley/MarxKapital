@@ -26,3 +26,9 @@ jobs:
         run: julia test/runtests.jl
         env:
           GKSwstype: "100"
+      - name: Dependências dos notebooks
+        run: julia -e 'using Pkg; Pkg.add(["PlutoUI", "JSON"])'
+      - name: Correr notebooks
+        run: julia test/notebooks.jl
+        env:
+          GKSwstype: "100"

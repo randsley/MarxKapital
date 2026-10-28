@@ -78,6 +78,24 @@ throughout the codebase (`simular_Ndept`, `acoplado`, `racionamento`,
 `fonte_dados`, etc.) — this README explains what each call does, but the
 API itself is not translated.*
 
+## Notebooks
+
+[`notebooks/`](notebooks/README.md) has worked examples, in English, that
+run offline:
+
+- six Jupyter notebooks, committed with their outputs so they can be read on
+  GitHub: accumulation basics, values and prices, calibration and wage
+  shocks, coupled sectors and automatic differentiation, TSSI valuation,
+  and balanced growth, cycles and chaos;
+- three interactive Pluto notebooks with sliders: the wage–profit frontier,
+  accumulation with coupling and wage shocks, and accumulation cycles in
+  the cross-dual model.
+
+```bash
+julia install_deps.jl --notebooks     # adds IJulia, Pluto, PlutoUI, JSON
+julia -e 'using Pluto; Pluto.run()'   # then open a file in notebooks/pluto/
+```
+
 ## AMECO data
 
 `obter_dados_ameco("Portugal", método = ...)` accepts:
@@ -243,8 +261,13 @@ marxkapital/
 │   ├── eurostat_sdmx.jl    # Eurostat SDMX API: real sectoral data + IOT
 │   ├── visualizacao.jl     # plots
 │   └── exemplos.jl         # ready-made examples + help + testar_modelo
-├── test/runtests.jl
+├── test/
+│   ├── runtests.jl         # test suite
+│   └── notebooks.jl        # smoke test: runs every notebook offline
 ├── examples/demo.jl
+├── notebooks/              # worked examples (see notebooks/README.md)
+│   ├── jupyter/            # six narrative notebooks, with outputs
+│   └── pluto/              # three interactive notebooks
 ├── docs/LIMITACOES.md      # required reading (docs/LIMITACOES.en.md for English)
 ├── paper/                  # academic paper (LaTeX), reproducible from real data
 │   ├── main.tex            # methodology + empirical application (Portugal)
@@ -278,8 +301,9 @@ derived from the spectral radius of `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-168 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
-every push to `main` — see `.github/workflows/test.yml`. The suite covers
+207 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
+every push to `main` — see `.github/workflows/test.yml`. CI then runs every
+notebook (`julia test/notebooks.jl`, see `notebooks/README.md`). The suite covers
 the default synthetic/opt-in paths and runs fully offline; the real-data
 paths (`método=:sdmx`, `fonte_dados=:eurostat`, `dados_setoriais=:eurostat`)
 require network access and are not in CI — check them manually with

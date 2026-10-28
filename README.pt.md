@@ -71,6 +71,24 @@ Ou corra a demonstração completa:
 julia --project=. examples/demo.jl
 ```
 
+## Notebooks
+
+[`notebooks/`](notebooks/README.md) tem exemplos resolvidos, em inglês, que
+correm offline:
+
+- seis notebooks Jupyter, gravados com as saídas para se lerem no GitHub:
+  fundamentos da acumulação, valores e preços, calibração e choques
+  salariais, setores acoplados e diferenciação automática, valorização
+  TSSI, e crescimento equilibrado, ciclos e caos;
+- três notebooks Pluto interativos, com sliders: a fronteira
+  salário-lucro, a acumulação com acoplamento e choques salariais, e os
+  ciclos de acumulação no modelo cruzado.
+
+```bash
+julia install_deps.jl --notebooks     # acrescenta IJulia, Pluto, PlutoUI, JSON
+julia -e 'using Pluto; Pluto.run()'   # depois abra um ficheiro em notebooks/pluto/
+```
+
 ## Dados AMECO
 
 `obter_dados_ameco("Portugal", método = ...)` aceita:
@@ -234,8 +252,13 @@ marxkapital/
 │   ├── eurostat_sdmx.jl    # API SDMX do Eurostat: dados setoriais reais + IOT
 │   ├── visualizacao.jl     # gráficos
 │   └── exemplos.jl         # exemplos prontos + ajuda + testar_modelo
-├── test/runtests.jl
+├── test/
+│   ├── runtests.jl         # suite de testes
+│   └── notebooks.jl        # teste de fumo: corre todos os notebooks offline
 ├── examples/demo.jl
+├── notebooks/              # exemplos resolvidos (ver notebooks/README.md)
+│   ├── jupyter/            # seis notebooks narrativos, com saídas
+│   └── pluto/              # três notebooks interativos
 ├── docs/LIMITACOES.md      # leitura obrigatória (+ .en.md em inglês)
 ├── paper/                  # artigo académico (LaTeX), reproduzível a partir de dados reais
 │   ├── main.tex            # metodologia + aplicação empírica (Portugal)
@@ -269,8 +292,9 @@ raio espectral de `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-168 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
-em cada push a `main` — ver `.github/workflows/test.yml`. A suite cobre os
+207 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
+em cada push a `main` — ver `.github/workflows/test.yml`. A CI corre depois
+todos os notebooks (`julia test/notebooks.jl`, ver `notebooks/README.md`). A suite cobre os
 caminhos sintéticos/opt-in por omissão e corre totalmente offline; os
 caminhos de dados reais (`método=:sdmx`, `fonte_dados=:eurostat`,
 `dados_setoriais=:eurostat`) exigem rede e não estão em CI — verifique-os

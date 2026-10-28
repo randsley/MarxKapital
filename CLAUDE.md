@@ -18,6 +18,9 @@ julia --project=. paper/matrix_audit.jl       # audit of real matrix A (needs ne
 julia --project=. paper/jacobiana_bifurcacao.jl  # Jacobian/bifurcation/TSSI figures + figures/jacobian_stats.tex (offline)
 julia --project=. paper/acumulacao_bifurcacao.jl # balanced growth/Hopf/cycles/chaos figures + figures/acumulacao_stats.tex (offline, ~30 min)
 latexmk -pdf paper/main.tex                   # build the paper
+julia install_deps.jl --notebooks             # also IJulia, Pluto, PlutoUI, JSON (for notebooks/)
+julia test/notebooks.jl                       # smoke-run every notebook offline (--all: include "slow" cells)
+julia notebooks/limpar_saidas.jl              # after re-executing Jupyter notebooks: keep only PNG plot outputs
 ```
 
 Set `GKSwstype=100` when running headless (CI does; the paper scripts set it themselves).
@@ -29,7 +32,7 @@ using Test; include("src/MarxKapital.jl")
 # paste the @testset from test/runtests.jl
 ```
 
-CI (`.github/workflows/test.yml`) runs `julia install_deps.jl` then `julia test/runtests.jl` on Julia 1.10 and 1, on push/PR to `main`.
+CI (`.github/workflows/test.yml`) runs `julia install_deps.jl` then `julia test/runtests.jl` on Julia 1.10 and 1, on push/PR to `main`, then installs PlutoUI and JSON and runs `julia test/notebooks.jl`.
 
 ## Loading model (important)
 
@@ -55,6 +58,7 @@ This is **not** a registered package and is not loaded with `using MarxKapital`.
 - `crescimento.jl`: the RHS is homogeneous of degree 1, so steady states are balanced-growth rays. They are fixed points of `sistema_normalizado` in free simplex coordinates (`_do_livre`/`_para_livre`; prices mean-zero). Also `crescimento_equilibrado` (warm-up + Newton), `com_parâmetro` (`:μ`, `:μ_v`, `:ω`, `:escala_e`) and `varrimento_salarial`.
 - `tssi.jl`: TSSI valuation layer (fixed lag τ) over trajectories; does not change the dynamics. `bifurcacao.jl`: BifurcationKit continuation of fixed points of *maps* (rationing step, TSSI price map), with fold/flip/Neimark–Sacker classified from multipliers (BK's own detectors assume ODEs and miss flips). `bifurcacao_acumulação` continues balanced growth of the cross-dual ODE (BK's own Hopf detection; `dsmax` ≤ 0.01 or close Hopf pairs are missed). It seeds limit-cycle collocation from the Hopf normal-form predictor (`BK.predictor`), because BK's automatic branch switching hits a singular Jacobian here. Check cycles with `ciclo_simulado`. `expoentes_lyapunov` (Benettin method, exact Jacobian; ≈100 s at N=6) classifies irregular motion, and `histerese_simulada` detects coexisting attractors with up/down sweeps. BifurcationKit is imported as `BK` (prefixed) to avoid name clashes; in 0.8.8 the collocation type is `BK.Collocation`.
 - `exemplos.jl` holds the ready-made examples, `ajuda_modelo()`, and `testar_modelo()` (internal battery, also called from the tests). `visualizacao.jl` holds the plots.
+- `notebooks/` (English prose only, not bilingual): `jupyter/*.ipynb` are committed **executed**, with PNG-only plot outputs, and load the model with a relative `include` from their own folder. `pluto/*.jl` activate the repo environment in their first cell (which disables Pluto's package manager) and must `using` every package they call directly, because Pluto doesn't see packages loaded inside the `include`. Edit Pluto notebooks in Pluto, so the file format and cell order stay valid. When the API changes, `test/notebooks.jl` catches broken notebooks; re-execute and strip the Jupyter ones.
 
 ## Data and testing invariants
 
