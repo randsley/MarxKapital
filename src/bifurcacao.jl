@@ -357,3 +357,104 @@ function curva_hopf(p, X0; ω_valores = 0.2:0.05:0.65, intervalo_μv = (0.0, 4.0
     end
     return (; (c => getproperty.(linhas, c) for c in keys(linhas[1]))...)
 end
+
+"""
+    expoentes_lyapunov(p, parâmetro, θ, X0; k=3, T_transiente=3000.0, T=30000.0,
+                       Δ=1.0, tol=1e-11, z0=nothing)
+
+Os `k` maiores expoentes de Lyapunov do sistema normalizado em `θ`
+(método de Benettin: equações variacionais com a jacobiana exata,
+ForwardDiff, e re-ortonormalização QR a cada `Δ`), depois de um transiente
+`T_transiente`, a partir de `X0` (ou das coordenadas livres `z0`).
+
+Classificação do atrator: equilíbrio `(−, −, …)`; ciclo-limite
+`(0, −, …)`; toro `(0, 0, −, …)`; caos `(+, 0, …)`; hipercaos com dois
+expoentes positivos. Um dos expoentes é sempre ≈ 0 (direção do fluxo)
+fora de um equilíbrio. São estimativas de tempo finito: o erro é da ordem
+de `1/T` mais a variação lenta ao longo da trajetória (comparar `λ` com
+`λ_meio`, a estimativa a meio do tempo). Evidência numérica de caos, não
+prova.
+
+Devolve `λ`, `λ_meio`, `z` (estado final) e `quota_mín` (menor quota
+setorial no estado final).
+"""
+function expoentes_lyapunov(p, parâmetro, θ, X0; k = 3, T_transiente = 3000.0, T = 30000.0,
+                            Δ = 1.0, tol = 1e-11, z0 = nothing, e_ref = p.e)
+    pθ = com_parâmetro(p, parâmetro, θ; e_ref = e_ref)
+    h = sistema_normalizado(pθ)
+    z = isnothing(z0) ? _para_livre(X0, pθ) .+ 1e-3 : collect(float.(z0))
+    n = length(z)
+    if T_transiente > 0
+        z = solve(ODEProblem((u, _, t) -> h(u), z, (0.0, T_transiente)), Vern9(),
+                  abstol = tol, reltol = tol, save_everystep = false).u[end]
+    end
+    function variacional!(du, u, _, t)
+        x = u[1:n]
+        du[1:n] = h(x)
+        du[n+1:end] = vec(ForwardDiff.jacobian(h, x) * reshape(u[n+1:end], n, k))
+    end
+    Q0 = Matrix(qr(Matrix{Float64}(I, n, k)).Q)
+    integ = init(ODEProblem(variacional!, [z; vec(Q0)], (0.0, T)), Vern9(),
+                 abstol = tol, reltol = tol, save_everystep = false)
+    passos = round(Int, T / Δ)
+    soma = zeros(k)
+    λ_meio = zeros(k)
+    for i in 1:passos
+        step!(integ, Δ, true)
+        F = qr(reshape(integ.u[n+1:end], n, k))
+        d = diag(F.R)
+        soma .+= log.(abs.(d))
+        integ.u[n+1:end] = vec(Matrix(F.Q) .* sign.(d)')
+        u_modified!(integ, true)
+        i == passos ÷ 2 && (λ_meio .= soma ./ (i * Δ))
+    end
+    zf = integ.u[1:n]
+    return (λ = soma ./ (passos * Δ), λ_meio = λ_meio, z = zf,
+            quota_mín = minimum(_do_livre(zf, p)[1:2length(p.e)]))
+end
+
+"""
+    histerese_simulada(p, parâmetro, grelha, X0; T_transiente=3000.0, T=3000.0, dt=0.02)
+
+Varrimento do parâmetro por simulação, para cima e depois para baixo em
+`grelha`, partindo cada ponto do estado final do anterior: deteta
+coexistência de atratores (histerese). Em cada ponto classifica o
+atrator pela secção de Poincaré (como `ciclo_simulado`): `:equilíbrio`,
+`:ciclo` ou `:irregular` (toro ou caos). Devolve `θ` e, para `subir` e
+`descer`, vetores com `classe`, `amplitude` e `retorno_médio`; e
+`coexistência`, os `θ` onde os dois sentidos dão atratores diferentes.
+"""
+function histerese_simulada(p, parâmetro, grelha, X0; T_transiente = 3000.0, T = 3000.0,
+                            dt = 0.02, e_ref = p.e)
+    nq = 2 * length(p.e)
+    function medir(θ, z)
+        h = sistema_normalizado(com_parâmetro(p, parâmetro, θ; e_ref = e_ref))
+        z1 = solve(ODEProblem((u, _, t) -> h(u), z, (0.0, T_transiente)), Vern9(),
+                   abstol = 1e-12, reltol = 1e-12, save_everystep = false).u[end]
+        s = solve(ODEProblem((u, _, t) -> h(u), z1, (0.0, T)), Vern9(),
+                  abstol = 1e-12, reltol = 1e-12, saveat = dt)
+        U = reduce(hcat, s.u)
+        m = _medidas_órbita(U, p)
+        c = mean(U[1, :])
+        idx = findall(i -> U[1, i] < c && U[1, i+1] >= c, 1:size(U, 2)-1)
+        esp = length(idx) < 2 ? 0.0 : maximum(U[2, idx]) - minimum(U[2, idx])
+        classe = m.amplitude < 1e-4 ? :equilíbrio : esp < 0.01 * m.amplitude ? :ciclo : :irregular
+        retorno = length(idx) < 2 ? NaN : mean(diff(idx)) * dt
+        return (classe = classe, amplitude = m.amplitude, retorno_médio = retorno), s.u[end]
+    end
+    θs = collect(grelha)
+    z = _para_livre(X0, com_parâmetro(p, parâmetro, θs[1]; e_ref = e_ref)) .+ 1e-3
+    subir = NamedTuple[]
+    for θ in θs
+        r, z = medir(θ, z); push!(subir, r)
+    end
+    descer = NamedTuple[]
+    for θ in reverse(θs)
+        r, z = medir(θ, z); pushfirst!(descer, r)
+    end
+    tabela(v) = (classe = getproperty.(v, :classe), amplitude = getproperty.(v, :amplitude),
+                 retorno_médio = getproperty.(v, :retorno_médio))
+    difere = [θs[i] for i in eachindex(θs) if subir[i].classe != descer[i].classe ||
+              abs(subir[i].retorno_médio - descer[i].retorno_médio) > 0.05 * subir[i].retorno_médio]
+    return (θ = θs, subir = tabela(subir), descer = tabela(descer), coexistência = difere)
+end

@@ -172,11 +172,14 @@ res = bifurcacao_acumulação(pb, X0, :μ_v; intervalo = (0.0, 2.5))
 res.hopf[1]                               # θ, frequency, period, Lyapunov coefficient
 ciclo_simulado(pb, :μ_v, 1.1, X0)         # check the cycle by direct simulation
 curva_hopf(pb, X0)                        # Hopf boundary μ_v,H(ω)
+expoentes_lyapunov(pb, :μ_v, 1.9, X0)     # λ₁ > 0: chaos
+histerese_simulada(pb, :μ_v, 1.30:0.01:1.56, X0)   # coexisting attractors
 ```
 
 In every random economy tested, balanced growth loses stability at a
 supercritical Hopf bifurcation in `μ_v`. A higher wage share moves the
-boundary up. See `paper/main.tex`, Sections 3.6 and 5.6, and
+boundary up. At higher `μ_v` the cycles give way to a torus, to a window
+where a stable cycle and the torus coexist, and to chaos. See `paper/main.tex`, Sections 3.6 and 5.6, and
 `docs/LIMITACOES.en.md` item 11.
 
 ## Real sectoral data (Eurostat)

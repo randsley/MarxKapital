@@ -167,11 +167,14 @@ res = bifurcacao_acumulação(pb, X0, :μ_v; intervalo = (0.0, 2.5))
 res.hopf[1]                               # θ, frequência, período, coeficiente de Lyapunov
 ciclo_simulado(pb, :μ_v, 1.1, X0)         # verificar o ciclo por simulação direta
 curva_hopf(pb, X0)                        # fronteira de Hopf μ_v,H(ω)
+expoentes_lyapunov(pb, :μ_v, 1.9, X0)     # λ₁ > 0: caos
+histerese_simulada(pb, :μ_v, 1.30:0.01:1.56, X0)   # atratores coexistentes
 ```
 
 Em todas as economias aleatórias testadas, o crescimento equilibrado perde
 estabilidade num Hopf supercrítico em `μ_v`. Uma parcela salarial mais
-alta sobe a fronteira. Ver `paper/main.tex`, Secções 3.6 e 5.6, e
+alta sobe a fronteira. Com `μ_v` mais alto, os ciclos dão lugar a um toro,
+a uma janela em que um ciclo estável e o toro coexistem, e a caos. Ver `paper/main.tex`, Secções 3.6 e 5.6, e
 `docs/LIMITACOES.md`, item 11.
 
 ## Dados setoriais reais (Eurostat)

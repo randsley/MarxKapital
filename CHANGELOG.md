@@ -6,6 +6,19 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [Por lançar]
+
+### Adicionado
+- `expoentes_lyapunov` (`src/bifurcacao.jl`): maiores expoentes de
+  Lyapunov do sistema normalizado (método de Benettin, jacobiana exata),
+  e `histerese_simulada`: varrimento do parâmetro para cima e para baixo
+  por simulação, para detetar atratores coexistentes.
+- **Resultado:** o regime irregular dos ciclos de acumulação é caótico
+  (maior expoente positivo, robusto à condição inicial, tolerância e
+  duração; dois expoentes positivos a `μ_v` alto), e um ciclo estável
+  coexiste com o toro numa janela de `μ_v` (histerese). Artigo, Secção
+  5.6 e figura nova (expoentes e histerese), atualizados.
+
 ## [0.7.0] — 2026-10-28
 
 DOI desta versão (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/zenodo.23718359). Para citar todas as versões, use o DOI conceptual acima.

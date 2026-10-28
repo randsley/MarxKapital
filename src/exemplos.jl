@@ -124,6 +124,9 @@ function ajuda_modelo()
                                             Hopf, forma normal e ciclos-limite
       ciclo_simulado(p, :μ_v, θ, X0)        Verificação por simulação (secção de Poincaré)
       curva_hopf(p, X0)                     Fronteira de Hopf no plano (ω, μ_v)
+      expoentes_lyapunov(p, :μ_v, θ, X0)    Expoentes de Lyapunov (λ₁ > 0: caos)
+      histerese_simulada(p, :μ_v, grelha, X0)
+                                            Atratores coexistentes (varrimento ↑↓)
 
     TESTES / AJUDA
       testar_modelo()                       Bateria de validação

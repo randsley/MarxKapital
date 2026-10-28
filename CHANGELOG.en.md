@@ -6,6 +6,19 @@
 
 Format based on Keep a Changelog. Semantic versioning.
 
+## [Unreleased]
+
+### Added
+- `expoentes_lyapunov` (`src/bifurcacao.jl`): largest Lyapunov exponents of
+  the normalized system (Benettin's method, exact Jacobian), and
+  `histerese_simulada`: up/down parameter sweeps by simulation, to detect
+  coexisting attractors.
+- **Result:** the irregular regime of the accumulation cycles is chaotic
+  (positive largest exponent, robust to the initial condition, tolerance
+  and run length; two positive exponents at high `μ_v`), and a stable cycle
+  coexists with the torus in a window of `μ_v` (hysteresis). Paper Section
+  5.6 and a new figure (exponents and hysteresis) updated.
+
 ## [0.7.0] — 2026-10-28
 
 DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/zenodo.23718359). To cite all versions, use the concept DOI above.

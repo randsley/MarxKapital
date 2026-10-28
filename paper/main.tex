@@ -69,8 +69,9 @@ model has no interior ones, add an optional cross-dual extension in which
 market prices respond to excess demand, and find that its balanced growth
 loses stability through a supercritical Hopf bifurcation in the mobility
 of variable capital in all \AccRobN{} random economies tested, giving way to
-limit cycles, tori and irregular accumulation dynamics that we continue
-numerically and confirm by direct simulation. We further present a live, reproducible
+limit cycles, tori, coexisting attractors and chaotic accumulation
+dynamics (positive Lyapunov exponents) that we continue numerically and
+confirm by direct simulation. We further present a live, reproducible
 empirical pipeline that calibrates the model directly from official
 European statistical sources (Eurostat and AMECO, via their SDMX REST
 APIs), replacing the synthetic or ad hoc calibration common in the
@@ -835,7 +836,16 @@ switching fails on this system. Every cycle is cross-checked by direct
 simulation of~\eqref{eq:normalized} with a Poincaré section
 (\texttt{ciclo\_simulado}): the spread of section crossings separates a
 limit cycle from quasi-periodic or irregular motion, and the return times
-give the period.
+give the period. Irregular motion is classified by its leading Lyapunov
+exponents (\texttt{expoentes\_lyapunov}), computed with the method of
+\citet{benettin1980lyapunov}: the variational equations, with the exact
+Jacobian, are integrated alongside the trajectory and re-orthonormalized
+by QR decomposition every time unit. Exponent signatures distinguish a
+limit cycle $(0,-,-)$, a torus $(0,0,-)$, chaos $(+,0,\dots)$ and
+hyperchaos (two positive exponents). Coexisting attractors are detected by
+sweeping the parameter up and then down with direct simulation, each
+step starting from the previous step's final state
+(\texttt{histerese\_simulada}).
 
 \section{Empirical calibration}
 
@@ -1439,11 +1449,9 @@ Neimark--Sacker bifurcation at $\mu_v=\AccNSFirst$, where it gives way to
 an invariant torus. The branch then turns back at
 $\mu_v\approx\AccFoldUpper$ and forward again at a fold of cycles at
 $\mu_v=\AccFoldList$; shortly after, the cycle, now of shorter period,
-regains stability. Below the upper turning point a stable cycle and the
-torus can therefore coexist (hysteresis), which we have not checked by
-simulation from different initial conditions. The upper turning point is
-not flagged by the Floquet-based detector at the continuation step used,
-a reminder that bifurcations along the cycle branch are step-dependent.
+regains stability. The upper turning point is not flagged by the
+Floquet-based detector at the continuation step used, a reminder that
+bifurcations along the cycle branch are step-dependent.
 Further Neimark--Sacker points (at $\mu_v=$ \AccNSFurther) and a period
 doubling at $\mu_v=\AccPDFirst$ follow. By $\mu_v=2.5$ the cycle has
 period \AccCyclePeriodEnd{} and amplitude \AccCycleAmpEnd, and the smallest
@@ -1464,8 +1472,41 @@ unstable; we read it as phase locking on the torus rather than as a
 point of the branch. The \AccSimNIrregular{} irregular cases ---
 quasi-periodic between the first Neimark--Sacker point and the fold, and
 irregular from $\mu_v\approx1.9$ --- are exactly where the continued
-cycle is unstable. Whether the irregular regime is chaotic is not
-established here.
+cycle is unstable.
+
+\emph{Coexistence and chaos.} The fold of cycles implies that a stable
+cycle and the torus may coexist. Sweeping $\mu_v$ up and then down by
+simulation in steps of \AccHystStep{} confirms it
+(Figure~\ref{fig:chaos}, right). For $\mu_v\in[\AccHystLo,\AccHystHi]$
+the economy ends on the torus (mean amplitude \AccHystTorusAmp) when
+$\mu_v$ is raised and on a stable cycle (mean amplitude
+\AccHystCycleAmp, period \AccHystCyclePeriodHi{} falling to
+\AccHystCyclePeriodLo) when it is lowered: which accumulation regime
+prevails depends on the path by which mobility reached its current value.
+The lower edge of the window is the fold of cycles; the upper edge is not
+the branch's turning point at $\mu_v\approx\AccFoldUpper$ but the
+destruction of the torus, between $\mu_v=\AccHystHi$ and \AccHystNext.
+
+The three largest Lyapunov exponents, estimated over \AccLyapT{} time
+units after a transient (Figure~\ref{fig:chaos}, left), separate the
+regimes. The control cases come out as theory requires: on the stable
+cycle at $\mu_v=1.1$, $|\lambda_1|=\AccLyapCycle$ and
+$\lambda_2=\AccLyapCycleTwo$; on the torus at $\mu_v=1.3$, two exponents
+vanish ($|\lambda_1|=\AccLyapTorusOne$, $|\lambda_2|=\AccLyapTorusTwo$)
+and $\lambda_3=\AccLyapTorusThree$. Beyond the second Neimark--Sacker
+point the largest exponent is positive at $\mu_v=$ \AccLyapChaosList{}
+($\lambda_1$ between \AccLyapOneMin{} and \AccLyapOneMax{}), and it
+agrees within \AccLyapICDev\% between the default and a randomly
+perturbed initial condition. At $\mu_v=$ \AccLyapWindowMuv{} it is zero
+to within \AccLyapWindowOne, a periodic window corresponding to the
+phase-locked orbit found above. At $\mu_v=$ \AccHyperList{} a second
+exponent is also positive (between \AccHyperTwoMin{} and
+\AccHyperTwoMax{} across both initial conditions), the signature of
+hyperchaos. The irregular regime is therefore chaotic, by the standard
+numerical criterion. This is evidence, not proof: the exponents are
+finite-time estimates, and the chaotic trajectories, like the cycles, come
+close to the boundary of the simplex (smallest sector share
+\AccLyapQuotaMin).
 
 \emph{Hopf boundary.} Repeating the continuation for uniform wage shares
 $\omega\in[\AccHopfCurveOmegaMin,\AccHopfCurveOmegaMax]$ traces the Hopf
@@ -1503,6 +1544,19 @@ points. Right: amplitude of the limit cycles continued from the first
 Hopf point (solid: stable; dashed: unstable), with their bifurcations,
 against direct simulations classified by their Poincaré section.}
 \label{fig:cycles}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/fig10c_lyapunov.pdf}
+\includegraphics[width=0.48\textwidth]{figures/fig10d_hysteresis.pdf}
+\caption{Chaos and coexisting attractors in the reference economy
+($N=\AccN$, $\beta=\AccBetaHopf$). Left: three largest Lyapunov
+exponents of the normalized system ($\times$: $\lambda_1$ from a second
+initial condition). Right: mean return time to a Poincaré section when
+$\mu_v$ is swept up from the torus and down from the stable cycle; in the
+shaded window both attractors coexist.}
+\label{fig:chaos}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -1800,7 +1854,10 @@ Numerically, two Hopf points within one continuation step escape
 detection (we use a step of at most $0.01$ and check against a direct
 count of unstable eigenvalues), and bifurcations along the cycle branch
 depend on the step size, so we treat them as established only where
-direct simulation agrees.
+direct simulation agrees. The chaos claim rests on finite-time
+Lyapunov exponents: they are robust to the initial condition, the
+integration tolerance and the run length in our checks, but they are not
+a computer-assisted proof.
 
 \emph{Reproducibility is live-query reproducibility, not archival
 reproducibility.} Every result in this paper is produced by re-running
@@ -1851,7 +1908,9 @@ value-accounting model has no interior balanced growth; with market
 prices that respond to excess demand it does, and that balanced growth
 gives way to accumulation cycles through a supercritical Hopf
 bifurcation in the mobility of variable capital, at a threshold that
-rises with the wage share and with the speed of price adjustment. A fourth audit, of the technical matrix
+rises with the wage share and with the speed of price adjustment; at
+higher mobility the cycles give way to coexisting attractors and to
+chaos. A fourth audit, of the technical matrix
 itself, found the most serious defect of the four: the pipeline had been
 using the wrong Eurostat dataflow, understating intermediate flows by
 more than an order of magnitude and producing an implausible spectral

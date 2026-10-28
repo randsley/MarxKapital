@@ -10,13 +10,13 @@ MarxKapital: a Julia model of Marxian economics (accumulation, exploitation, org
 
 ```bash
 julia install_deps.jl                         # one-time: Pkg.add the deps (see "Loading model" below)
-julia --project=. test/runtests.jl            # full suite (offline; 200 tests)
+julia --project=. test/runtests.jl            # full suite (offline; 207 tests)
 julia --project=. examples/demo.jl            # full demo
 julia --project=. paper/gerar_resultados.jl   # regenerate paper figures/tables (needs network)
 julia --project=. paper/monte_carlo.jl        # Monte Carlo sweeps for the paper (offline)
 julia --project=. paper/matrix_audit.jl       # audit of real matrix A (needs network)
 julia --project=. paper/jacobiana_bifurcacao.jl  # Jacobian/bifurcation/TSSI figures + figures/jacobian_stats.tex (offline)
-julia --project=. paper/acumulacao_bifurcacao.jl # balanced growth/Hopf/cycle figures + figures/acumulacao_stats.tex (offline, ~10 min)
+julia --project=. paper/acumulacao_bifurcacao.jl # balanced growth/Hopf/cycles/chaos figures + figures/acumulacao_stats.tex (offline, ~30 min)
 latexmk -pdf paper/main.tex                   # build the paper
 ```
 
@@ -53,7 +53,7 @@ This is **not** a registered package and is not loaded with `using MarxKapital`.
 - Rationing damping defaults to `RELAXAÇÃO_PADRÃO = 2/3` (`nucleo.jl`), the minimax-optimal value given the spectrum in `[−1, 0]`; don't hard-code a relaxation elsewhere.
 - `cruzado.jl`: optional cross-dual dynamics (`preços_mercado=true`, state `[C; V; q]` with log market prices `q`, `sistema_cruzado!`). Needs `acoplado=true` and cannot be combined with `realização`/`racionamento`. Without it there is **no interior balanced growth**, because sectoral profit rates don't depend on relative size. `μ_v` (mobility of variable capital, default 0) works in both coupled systems.
 - `crescimento.jl`: the RHS is homogeneous of degree 1, so steady states are balanced-growth rays. They are fixed points of `sistema_normalizado` in free simplex coordinates (`_do_livre`/`_para_livre`; prices mean-zero). Also `crescimento_equilibrado` (warm-up + Newton), `com_parâmetro` (`:μ`, `:μ_v`, `:ω`, `:escala_e`) and `varrimento_salarial`.
-- `tssi.jl`: TSSI valuation layer (fixed lag τ) over trajectories; does not change the dynamics. `bifurcacao.jl`: BifurcationKit continuation of fixed points of *maps* (rationing step, TSSI price map), with fold/flip/Neimark–Sacker classified from multipliers (BK's own detectors assume ODEs and miss flips). `bifurcacao_acumulação` continues balanced growth of the cross-dual ODE (BK's own Hopf detection; `dsmax` ≤ 0.01 or close Hopf pairs are missed). It seeds limit-cycle collocation from the Hopf normal-form predictor (`BK.predictor`), because BK's automatic branch switching hits a singular Jacobian here. Check cycles with `ciclo_simulado`. BifurcationKit is imported as `BK` (prefixed) to avoid name clashes; in 0.8.8 the collocation type is `BK.Collocation`.
+- `tssi.jl`: TSSI valuation layer (fixed lag τ) over trajectories; does not change the dynamics. `bifurcacao.jl`: BifurcationKit continuation of fixed points of *maps* (rationing step, TSSI price map), with fold/flip/Neimark–Sacker classified from multipliers (BK's own detectors assume ODEs and miss flips). `bifurcacao_acumulação` continues balanced growth of the cross-dual ODE (BK's own Hopf detection; `dsmax` ≤ 0.01 or close Hopf pairs are missed). It seeds limit-cycle collocation from the Hopf normal-form predictor (`BK.predictor`), because BK's automatic branch switching hits a singular Jacobian here. Check cycles with `ciclo_simulado`. `expoentes_lyapunov` (Benettin method, exact Jacobian; ≈100 s at N=6) classifies irregular motion, and `histerese_simulada` detects coexisting attractors with up/down sweeps. BifurcationKit is imported as `BK` (prefixed) to avoid name clashes; in 0.8.8 the collocation type is `BK.Collocation`.
 - `exemplos.jl` holds the ready-made examples, `ajuda_modelo()`, and `testar_modelo()` (internal battery, also called from the tests). `visualizacao.jl` holds the plots.
 
 ## Data and testing invariants

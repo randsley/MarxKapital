@@ -490,5 +490,14 @@ algebraically.
   agrees. BifurcationKit's automatic branch switching at the Hopf point
   fails (singular Jacobian); the branch is seeded from the normal-form
   predictor instead.
-- **Cost.** Collocation continuation of cycles is slow for N = 6 (≈100 s);
-  the tests use N = 3.
+- **Chaos: numerical evidence, not proof.** In the irregular regime the
+  largest Lyapunov exponent (`expoentes_lyapunov`) is positive and robust
+  to the initial condition, the integration tolerance and the run length
+  (and two exponents are positive at high `μ_v`: hyperchaos), but these
+  are finite-time estimates, not a computer-assisted proof. Coexistence of
+  a stable cycle and the torus was verified by sweeping the parameter in
+  both directions (`histerese_simulada`), not by mapping the full basins
+  of attraction.
+- **Cost.** Collocation continuation of cycles is slow for N = 6 (≈100 s),
+  and each Lyapunov-exponent estimate takes ≈100 s; the tests use short
+  horizons.

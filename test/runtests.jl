@@ -579,6 +579,27 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test ciclo_simulado(p, :μ_v, H.θ - 0.1, sol.u[1]; T = 3000.0).amplitude < 1e-4
     end
 
+    @testset "Expoentes de Lyapunov e histerese" begin
+        Random.seed!(5)
+        sol, _, p0 = simular_Ndept(6, T = 1.0, seed = 5, acoplado = true, μ = 0.5,
+                                   preços_mercado = true)
+        p = merge(p0, (β = 0.1,))
+        # ciclo-limite: (0, −, −)
+        ciclo = expoentes_lyapunov(p, :μ_v, 1.1, sol.u[1]; T_transiente = 2000.0, T = 4000.0)
+        @test abs(ciclo.λ[1]) < 1e-3
+        @test ciclo.λ[2] < -3e-3
+        # regime irregular: um expoente positivo e o do fluxo ≈ 0 (caos)
+        caos = expoentes_lyapunov(p, :μ_v, 1.9, sol.u[1]; T_transiente = 2000.0, T = 6000.0)
+        @test caos.λ[1] > 0.015
+        @test abs(caos.λ[2]) < 3e-3
+        # coexistência: a subir chega-se ao toro, a descer fica o ciclo
+        hs = histerese_simulada(p, :μ_v, [1.40, 1.46], sol.u[1]; T_transiente = 2000.0,
+                                T = 1500.0)
+        @test hs.subir.classe == [:irregular, :ciclo]
+        @test hs.descer.classe == [:ciclo, :ciclo]
+        @test hs.coexistência == [1.40]
+    end
+
     @testset "Bateria interna" begin
         @test testar_modelo()
     end

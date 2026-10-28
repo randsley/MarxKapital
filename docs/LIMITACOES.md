@@ -482,5 +482,14 @@ afirmado algebricamente.
   direta (`ciclo_simulado`) concorda. A troca de ramo automática do
   BifurcationKit no Hopf falha (jacobiana singular); o ramo é semeado
   pelo preditor da forma normal.
+- **Caos: evidência numérica, não prova.** No regime irregular, o maior
+  expoente de Lyapunov (`expoentes_lyapunov`) é positivo e robusto à
+  condição inicial, à tolerância de integração e à duração (e dois
+  expoentes são positivos a `μ_v` alto: hipercaos), mas são estimativas
+  de tempo finito, não uma demonstração assistida por computador. A
+  coexistência de um ciclo estável e do toro foi verificada por
+  varrimento do parâmetro nos dois sentidos (`histerese_simulada`), não
+  pelas bacias de atração completas.
 - **Custo.** A continuação de ciclos por colocação é lenta para N = 6
-  (≈100 s); os testes usam N = 3.
+  (≈100 s), e cada estimativa de expoentes de Lyapunov leva ≈100 s; os
+  testes usam horizontes curtos.

@@ -178,6 +178,83 @@ end
 savefig(fig10b, joinpath(FIG_DIR, "fig10b_accumulation_cycles.pdf"))
 
 # ----------------------------------------------------------------------------
+# 2b — Lyapunov exponents (chaos test) and hysteresis by simulation
+# ----------------------------------------------------------------------------
+
+println("\n[2b/5] Lyapunov exponents and up/down parameter sweeps...")
+T_lyap = 30000.0
+registar!("AccLyapT", fmt(T_lyap; d = 0))
+θ_lyap = [1.1, 1.3, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4]
+lyap = Dict(θ => expoentes_lyapunov(p, :μ_v, θ, X0; T = T_lyap) for θ in θ_lyap)
+for θ in θ_lyap
+    println("    μ_v = $θ: λ = $(round.(lyap[θ].λ, sigdigits = 3)), at T/2: $(round.(lyap[θ].λ_meio, sigdigits = 3))")
+end
+# second, randomly perturbed initial condition at every point with λ₁ > 0
+Random.seed!(107)
+caóticos = [θ for θ in θ_lyap if lyap[θ].λ[1] > 0.01]
+z_alt(θ) = _para_livre(X0, com_parâmetro(p, :μ_v, θ)) .+ 5e-3 .* randn(length(_para_livre(X0, p)))
+lyap_alt = Dict(θ => expoentes_lyapunov(p, :μ_v, θ, X0; T = T_lyap, z0 = z_alt(θ)) for θ in caóticos)
+for θ in caóticos
+    println("    μ_v = $θ (alt. IC): λ = $(round.(lyap_alt[θ].λ, sigdigits = 3))")
+end
+λ1_todos = [x for θ in caóticos for x in (lyap[θ].λ[1], lyap_alt[θ].λ[1])]
+λ2_todos(θ) = (lyap[θ].λ[2], lyap_alt[θ].λ[2])
+hiper = [θ for θ in caóticos if all(>(5e-3), λ2_todos(θ))]
+registar!("AccLyapCycle", sci(abs(lyap[1.1].λ[1])))
+registar!("AccLyapCycleTwo", fmt(lyap[1.1].λ[2]; d = 4))
+registar!("AccLyapTorusOne", sci(abs(lyap[1.3].λ[1])))
+registar!("AccLyapTorusTwo", sci(abs(lyap[1.3].λ[2])))
+registar!("AccLyapTorusThree", fmt(lyap[1.3].λ[3]; d = 4))
+registar!("AccLyapNChaos", string(length(caóticos)))
+registar!("AccLyapChaosList", join(fmt.(caóticos; d = 1), ", "))
+registar!("AccLyapOneMin", fmt(minimum(λ1_todos); d = 3))
+registar!("AccLyapOneMax", fmt(maximum(λ1_todos); d = 3))
+registar!("AccLyapICDev", fmt(100 * maximum(abs(lyap[θ].λ[1] - lyap_alt[θ].λ[1]) / lyap[θ].λ[1] for θ in caóticos); d = 0))
+registar!("AccLyapWindowMuv", join(fmt.([θ for θ in θ_lyap if θ > 1.5 && lyap[θ].λ[1] < 0.01]; d = 1), ", "))
+registar!("AccLyapWindowOne", sci(maximum(abs(lyap[θ].λ[1]) for θ in θ_lyap if θ > 1.5 && lyap[θ].λ[1] < 0.01)))
+registar!("AccHyperList", isempty(hiper) ? "none" : join(fmt.(hiper; d = 1), ", "))
+registar!("AccHyperTwoMin", isempty(hiper) ? "none" : fmt(minimum(minimum(λ2_todos(θ)) for θ in hiper); d = 3))
+registar!("AccHyperTwoMax", isempty(hiper) ? "none" : fmt(maximum(maximum(λ2_todos(θ)) for θ in hiper); d = 3))
+registar!("AccLyapQuotaMin", sci(minimum(lyap[θ].quota_mín for θ in caóticos)))
+
+passo_h = 0.01
+hs = histerese_simulada(p, :μ_v, 1.30:passo_h:1.56, X0)
+coex = hs.coexistência
+println("    coexistence at μ_v = ", coex)
+registar!("AccHystStep", fmt(passo_h; d = 2))
+registar!("AccHystLo", fmt(minimum(coex); d = 2))
+registar!("AccHystHi", fmt(maximum(coex); d = 2))
+registar!("AccHystNext", fmt(maximum(coex) + passo_h; d = 2))
+ic = findall(θ -> θ in coex, hs.θ)
+registar!("AccHystCyclePeriodHi", fmt(maximum(hs.descer.retorno_médio[ic]); d = 1))
+registar!("AccHystCyclePeriodLo", fmt(minimum(hs.descer.retorno_médio[ic]); d = 1))
+registar!("AccHystTorusAmp", fmt(mean(hs.subir.amplitude[ic]); d = 2))
+registar!("AccHystCycleAmp", fmt(mean(hs.descer.amplitude[ic]); d = 2))
+registar!("AccHystAllSame", string(all(hs.subir.classe[ic] .== :irregular) && all(hs.descer.classe[ic] .== :ciclo)))
+
+λs_plot = [lyap[θ].λ for θ in θ_lyap]
+fig10c = scatter(θ_lyap, getindex.(λs_plot, 1), ms = 6, color = :firebrick, label = "λ₁",
+                 xlabel = "Mobility of variable capital μ_v", ylabel = "Lyapunov exponent",
+                 title = "Largest Lyapunov exponents", size = (700, 450), margin = 5Plots.mm,
+                 legend = :topleft)
+scatter!(fig10c, θ_lyap, getindex.(λs_plot, 2), ms = 5, marker = :square, color = :steelblue, label = "λ₂")
+scatter!(fig10c, θ_lyap, getindex.(λs_plot, 3), ms = 5, marker = :utriangle, color = :gray, label = "λ₃")
+scatter!(fig10c, caóticos, [lyap_alt[θ].λ[1] for θ in caóticos], ms = 4, marker = :x,
+         color = :black, label = "λ₁, second initial condition")
+hline!(fig10c, [0.0], ls = :dash, color = :black, label = "")
+savefig(fig10c, joinpath(FIG_DIR, "fig10c_lyapunov.pdf"))
+
+fig10d = plot(hs.θ, hs.subir.retorno_médio, lw = 2, marker = :circle, ms = 3, color = :darkorange,
+              label = "sweeping up (from the torus)", xlabel = "Mobility of variable capital μ_v",
+              ylabel = "Mean return time to the Poincaré section",
+              title = "Coexisting attractors (hysteresis)", size = (700, 450), margin = 5Plots.mm)
+plot!(fig10d, hs.θ, hs.descer.retorno_médio, lw = 2, marker = :diamond, ms = 3, color = :steelblue,
+      label = "sweeping down (from the cycle)")
+vspan!(fig10d, [minimum(coex) - passo_h / 2, maximum(coex) + passo_h / 2], alpha = 0.12,
+       color = :seagreen, label = "torus and stable cycle coexist")
+savefig(fig10d, joinpath(FIG_DIR, "fig10d_hysteresis.pdf"))
+
+# ----------------------------------------------------------------------------
 # 3 — Wage-share sweep: uniform ω and proportional exploration scale
 # ----------------------------------------------------------------------------
 
