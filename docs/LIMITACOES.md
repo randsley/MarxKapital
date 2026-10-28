@@ -437,15 +437,50 @@ afirmado algebricamente.
   e fixo (não uma distribuição de tempos de rotação por setor), e a
   depreciação `d = δC/x` é valorizada a preços-base, não a preços
   históricos de aquisição.
-- **As bifurcações são de mapas, não da EDO.** `sistema_Ndept!` e
-  `sistema_Ndept_io!` crescem sem limite e não têm equilíbrios em níveis;
-  analisar bifurcações da própria EDO exigiria reescrevê-la em variáveis
-  normalizadas (quotas de capital, composições orgânicas). A deteção de
-  bifurcações do BifurcationKit assume EDOs, pelo que a classificação
-  (fold/flip/Neimark–Sacker) é feita sobre os multiplicadores do mapa em
-  `continuar_ponto_fixo`; no racionamento, a perda de estabilidade em
-  `s_c` é uma colisão de fronteira (mapa seccionalmente suave), localizada
-  só à resolução do passo de continuação.
+- **Bifurcações da EDO de acumulação: só no modelo cruzado (corrigido em
+  parte).** `sistema_Ndept!` e `sistema_Ndept_io!` crescem sem limite e
+  não têm equilíbrios em níveis; os estados estacionários são raios de
+  crescimento equilibrado, pontos fixos do sistema normalizado
+  (`src/crescimento.jl`). Mas sem preços de mercado a taxa de lucro de um
+  setor não depende da sua dimensão relativa: não há crescimento
+  equilibrado interior (o capital concentra-se num setor), mesmo com
+  `μ_v`, `realização` ou `racionamento`. Só a dinâmica cruzada opcional
+  (`preços_mercado=true`, `src/cruzado.jl`) tem raios interiores, e é aí
+  que `bifurcacao_acumulação` deteta Hopf e continua os ciclos-limite.
+  Nos mapas (racionamento, TSSI), a classificação fold/flip/Neimark–Sacker
+  é feita sobre os multiplicadores em `continuar_ponto_fixo`, porque a
+  deteção do BifurcationKit assume EDOs; no racionamento, a perda de
+  estabilidade em `s_c` é uma colisão de fronteira (mapa seccionalmente
+  suave), localizada só à resolução do passo de continuação.
 - **Sem bifurcação no mapa de preços TSSI nos casos testados** (50
   economias aleatórias, escala da mais-valia em [0.05, 10]). É uma
   verificação empírica, não uma prova de estabilidade para todo o `A`.
+
+## 11. Dinâmica cruzada (preços de mercado) e ciclos de acumulação — alcance
+
+- **Hipóteses do modelo cruzado.** Os preços de mercado respondem ao
+  excesso de procura relativo com velocidade única `β`; os bens de capital
+  são comprados na composição das colunas de A e todo o consumo num cabaz
+  fixo `cesto` (por omissão, as quotas do output líquido inicial — não há
+  dados de procura final por setor de origem no pipeline). Os preços são
+  normalizados para que o lucro total iguale a mais-valia total. Não se
+  combina com `realização` nem com `racionamento`.
+- **`μ_v` (mobilidade do capital variável) está desligado por omissão.**
+  Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
+  supercrítico em todas as 30 economias aleatórias testadas, com
+  `β = 0.1`); o valor empírico de `μ_v` não está calibrado.
+- **Os ciclos aproximam-se da fronteira do simplex.** Longe do Hopf, as
+  quotas setoriais descem a 10⁻³–10⁻⁴: as oscilações quase eliminam
+  setores, o que é pouco plausível economicamente e indica que falta um
+  mecanismo de travagem (p.ex. entrada de capital novo ou limites à
+  saída).
+- **Deteção de bifurcações.** Dois Hopf no mesmo passo de continuação
+  escapam à deteção (`dsmax = 0.01` por omissão; `bifurcacao_acumulação`
+  avisa quando a contagem de valores próprios instáveis discorda). As
+  bifurcações dos ciclos (fold, duplicação de período, Neimark–Sacker)
+  dependem do passo e só se consideram confirmadas quando a simulação
+  direta (`ciclo_simulado`) concorda. A troca de ramo automática do
+  BifurcationKit no Hopf falha (jacobiana singular); o ramo é semeado
+  pelo preditor da forma normal.
+- **Custo.** A continuação de ciclos por colocação é lenta para N = 6
+  (≈100 s); os testes usam N = 3.

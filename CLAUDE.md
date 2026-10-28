@@ -10,12 +10,13 @@ MarxKapital: a Julia model of Marxian economics (accumulation, exploitation, org
 
 ```bash
 julia install_deps.jl                         # one-time: Pkg.add the deps (see "Loading model" below)
-julia --project=. test/runtests.jl            # full suite (offline; 168 tests)
+julia --project=. test/runtests.jl            # full suite (offline; 200 tests)
 julia --project=. examples/demo.jl            # full demo
 julia --project=. paper/gerar_resultados.jl   # regenerate paper figures/tables (needs network)
 julia --project=. paper/monte_carlo.jl        # Monte Carlo sweeps for the paper (offline)
 julia --project=. paper/matrix_audit.jl       # audit of real matrix A (needs network)
 julia --project=. paper/jacobiana_bifurcacao.jl  # Jacobian/bifurcation/TSSI figures + figures/jacobian_stats.tex (offline)
+julia --project=. paper/acumulacao_bifurcacao.jl # balanced growth/Hopf/cycle figures + figures/acumulacao_stats.tex (offline, ~10 min)
 latexmk -pdf paper/main.tex                   # build the paper
 ```
 
@@ -50,7 +51,9 @@ This is **not** a registered package and is not loaded with `using MarxKapital`.
 - Data layer: `calibracao_pt.jl` (INE, 19/10/3 sectors), `ameco.jl` (calibration, comparison, time series), `ameco_sdmx.jl` (official AMECO SDMX API), `ameco_download.jl` (legacy TXT/CSV parser), and `eurostat_sdmx.jl` (real sectoral data and the IOT matrix `A` from `NAIO_10_CP1700`, `stk_flow=DOM`; **not** `NAIO_10_CP1620`, which is a margins satellite table and was a past bug).
 - `diferenciacao.jl`: ForwardDiff Jacobians/Hessians of the ODE RHS and the rationing map spectrum (`jacobiana_racionamento`). The rationing fixed point is differentiated via the implicit function theorem (`_racionamento_dual` in `nucleo.jl`), so model code on the AD path must stay **generic in number type**: no `ones(N)`/`zeros(N)` buffers written with `.=` from state-dependent values, no `try/catch` that swallows `MethodError` (see `_razão_preço_valor`).
 - Rationing damping defaults to `RELAXAÇÃO_PADRÃO = 2/3` (`nucleo.jl`), the minimax-optimal value given the spectrum in `[−1, 0]`; don't hard-code a relaxation elsewhere.
-- `tssi.jl`: TSSI valuation layer (fixed lag τ) over trajectories; does not change the dynamics. `bifurcacao.jl`: BifurcationKit continuation of fixed points of *maps* (rationing step, TSSI price map), with fold/flip/Neimark–Sacker classified from multipliers (BK's own detectors assume ODEs and miss flips). BifurcationKit is imported as `BK` (prefixed) to avoid name clashes.
+- `cruzado.jl`: optional cross-dual dynamics (`preços_mercado=true`, state `[C; V; q]` with log market prices `q`, `sistema_cruzado!`). Needs `acoplado=true` and cannot be combined with `realização`/`racionamento`. Without it there is **no interior balanced growth**, because sectoral profit rates don't depend on relative size. `μ_v` (mobility of variable capital, default 0) works in both coupled systems.
+- `crescimento.jl`: the RHS is homogeneous of degree 1, so steady states are balanced-growth rays. They are fixed points of `sistema_normalizado` in free simplex coordinates (`_do_livre`/`_para_livre`; prices mean-zero). Also `crescimento_equilibrado` (warm-up + Newton), `com_parâmetro` (`:μ`, `:μ_v`, `:ω`, `:escala_e`) and `varrimento_salarial`.
+- `tssi.jl`: TSSI valuation layer (fixed lag τ) over trajectories; does not change the dynamics. `bifurcacao.jl`: BifurcationKit continuation of fixed points of *maps* (rationing step, TSSI price map), with fold/flip/Neimark–Sacker classified from multipliers (BK's own detectors assume ODEs and miss flips). `bifurcacao_acumulação` continues balanced growth of the cross-dual ODE (BK's own Hopf detection; `dsmax` ≤ 0.01 or close Hopf pairs are missed). It seeds limit-cycle collocation from the Hopf normal-form predictor (`BK.predictor`), because BK's automatic branch switching hits a singular Jacobian here. Check cycles with `ciclo_simulado`. BifurcationKit is imported as `BK` (prefixed) to avoid name clashes; in 0.8.8 the collocation type is `BK.Collocation`.
 - `exemplos.jl` holds the ready-made examples, `ajuda_modelo()`, and `testar_modelo()` (internal battery, also called from the tests). `visualizacao.jl` holds the plots.
 
 ## Data and testing invariants
@@ -59,7 +62,7 @@ This is **not** a registered package and is not loaded with `using MarxKapital`.
 - The test suite must stay **offline**. Network paths are checked manually with `verificar_sdmx_ameco()`, `verificar_eurostat_setorial()`, and `paper/matrix_audit.jl`.
 - `seed` in `simular_Ndept` only fixes matrix `A`. `criar_departamentos` uses the global RNG, so tests call `Random.seed!` before simulating.
 - The Eurostat IOT is a benchmark table, not annual (PT: 2010/2013/2015/2017/2020); a missing year falls back to the nearest one with a warning.
-- No number in `paper/main.tex` is entered by hand. Figures and tables come from the `paper/*.jl` scripts into `paper/figures/` (committed, as is `paper/main.pdf`). Sections 3.4/5.5 read their numbers as `\newcommand` macros from `paper/figures/jacobian_stats.tex`; rerun `paper/jacobiana_bifurcacao.jl` after changing rationing/TSSI code.
+- No number in `paper/main.tex` is entered by hand. Figures and tables come from the `paper/*.jl` scripts into `paper/figures/` (committed, as is `paper/main.pdf`). Sections 3.3–3.5/5.5 read their numbers as `\newcommand` macros from `paper/figures/jacobian_stats.tex`, and Sections 3.6/5.6 from `paper/figures/acumulacao_stats.tex`; rerun `paper/jacobiana_bifurcacao.jl` after changing rationing/TSSI code, and `paper/acumulacao_bifurcacao.jl` after changing the cross-dual, balanced-growth or accumulation-bifurcation code.
 - `docs/LIMITACOES.md` is the record of known limitations and their fixes. Update it (both languages) when a model limitation changes.
 
 ## Releases

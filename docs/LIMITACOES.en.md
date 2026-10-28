@@ -445,15 +445,50 @@ algebraically.
   variant of the dynamics. The lag τ is a single fixed constant (not a
   distribution of turnover times by sector), and depreciation
   `d = δC/x` is valued at base prices, not historical acquisition prices.
-- **The bifurcations are of maps, not of the ODE.** `sistema_Ndept!` and
-  `sistema_Ndept_io!` grow without bound and have no equilibria in
-  levels; analyzing bifurcations of the ODE itself would require
-  rewriting it in normalized variables (capital shares, organic
-  compositions). BifurcationKit's bifurcation detection assumes ODEs, so
-  the classification (fold/flip/Neimark–Sacker) is done on the map's
-  multipliers in `continuar_ponto_fixo`; for rationing, the loss of
-  stability at `s_c` is a border collision (piecewise-smooth map),
-  located only to the resolution of the continuation step.
+- **Bifurcations of the accumulation ODE: only in the cross-dual model
+  (partly fixed).** `sistema_Ndept!` and `sistema_Ndept_io!` grow without
+  bound and have no equilibria in levels; their steady states are
+  balanced-growth rays, fixed points of the normalized system
+  (`src/crescimento.jl`). But without market prices a sector's profit
+  rate does not depend on its relative size: there is no interior
+  balanced growth (capital concentrates in one sector), even with
+  `μ_v`, `realização` or `racionamento`. Only the optional cross-dual
+  dynamics (`preços_mercado=true`, `src/cruzado.jl`) have interior rays,
+  and that is where `bifurcacao_acumulação` detects Hopf points and
+  continues the limit cycles. For the maps (rationing, TSSI), the
+  fold/flip/Neimark–Sacker classification is done on the multipliers in
+  `continuar_ponto_fixo`, because BifurcationKit's detection assumes ODEs;
+  for rationing, the loss of stability at `s_c` is a border collision
+  (piecewise-smooth map), located only to the resolution of the
+  continuation step.
 - **No bifurcation of the TSSI price map in the cases tested** (50 random
   economies, surplus-value scale in [0.05, 10]). This is an empirical
   check, not a stability proof for every `A`.
+
+## 11. Cross-dual dynamics (market prices) and accumulation cycles — scope
+
+- **Assumptions of the cross-dual model.** Market prices respond to
+  relative excess demand with a single speed `β`; capital goods are
+  bought in the composition of A's columns and all consumption in a fixed
+  basket `cesto` (by default, initial net-output shares — the pipeline
+  has no final demand by sector of origin). Prices are normalized so that
+  total profit equals total surplus value. It cannot be combined with
+  `realização` or `racionamento`.
+- **`μ_v` (mobility of variable capital) is off by default.** Accumulation
+  cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random
+  economies tested, with `β = 0.1`); the empirical value of `μ_v` is not
+  calibrated.
+- **The cycles approach the boundary of the simplex.** Away from the
+  Hopf point, sector shares fall to 10⁻³–10⁻⁴: the oscillations nearly
+  wipe out sectors, which is economically implausible and points to a
+  missing braking mechanism (e.g. entry of new capital or limits to exit).
+- **Bifurcation detection.** Two Hopf points in the same continuation
+  step escape detection (`dsmax = 0.01` by default; `bifurcacao_acumulação`
+  warns when its count of unstable eigenvalues disagrees). Bifurcations
+  of the cycles (fold, period doubling, Neimark–Sacker) depend on the step
+  and count as confirmed only where direct simulation (`ciclo_simulado`)
+  agrees. BifurcationKit's automatic branch switching at the Hopf point
+  fails (singular Jacobian); the branch is seeded from the normal-form
+  predictor instead.
+- **Cost.** Collocation continuation of cycles is slow for N = 6 (≈100 s);
+  the tests use N = 3.

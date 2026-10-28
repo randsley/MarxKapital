@@ -231,6 +231,16 @@ por via de restrições algébricas geridas pelo solver; ver
 `verificar_equilibrio_Ndept` (`src/analise.jl`) para uma verificação a
 posteriori mais detalhada, e `docs/LIMITACOES.md` item 1 para a fronteira de
 alcance explícita desta aproximação.
+
+Se `p.μ_v ≠ 0` (campo opcional), o capital variável também se move entre
+setores: `dVᵢ/dt = σ_v,ᵢ·Sᵢ + μ_v·(rᵢ − r̄_V)·Vᵢ`, com `r̄_V` a média de `r`
+ponderada por `V`. Sem este termo, cada `Vᵢ` cresce à sua própria taxa
+`σ_v,ᵢ·eᵢ` e não há crescimento equilibrado interior (o setor com a maior
+taxa acaba com todo o capital variável) — ver `src/crescimento.jl`.
+
+O lado direito é homogéneo de grau 1 no estado (`f(λX) = λf(X)`): só as
+proporções importam, e os estados estacionários relevantes são raios de
+crescimento equilibrado, `f(X★) = g★·X★`.
 """
 function sistema_Ndept_io!(dX, X, p, t)
     N = length(p.e)
@@ -238,13 +248,7 @@ function sistema_Ndept_io!(dX, X, p, t)
     V = @view X[N+1:2N]
     S = p.e .* V
 
-    r̄_naive = sum(S) / sum(C .+ V)
-    r_efetivo = clamp(r̄_naive, 0.0, 0.95 * p.R_max)
-
-    π = _razão_preço_valor(p, r_efetivo, N)
-
-    C_valorizado = π .* C
-    r = S ./ (C_valorizado .+ V)
+    r = _taxas_lucro_io(C, V, S, p)
     # r̄ é a média de r ponderada por C (o stock em livro, o mesmo peso que
     # multiplica o termo de mobilidade abaixo) — não Σ S/Σ(C+V), a razão
     # agregada usada antes. É a única escolha para a qual Σμ(rᵢ-r̄)Cᵢ = 0
@@ -294,7 +298,16 @@ function sistema_Ndept_io!(dX, X, p, t)
     end
 
     dX[1:N]    = κ .* p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C
-    dX[N+1:2N] = p.σ_v .* S
+    # Mobilidade do capital variável (opcional, `p.μ_v`; ausente ou 0 = desligada,
+    # dinâmica idêntica à anterior). Com r̄_V ponderado por V, Σᵢ μ_v(rᵢ-r̄_V)Vᵢ = 0
+    # exatamente: o termo realoca capital variável entre setores sem o criar.
+    μ_v = get(p, :μ_v, 0.0)
+    if iszero(μ_v)
+        dX[N+1:2N] = p.σ_v .* S
+    else
+        r̄_V = sum(r .* V) / sum(V)
+        dX[N+1:2N] = p.σ_v .* S .+ μ_v .* (r .- r̄_V) .* V
+    end
 end
 
 """
@@ -308,6 +321,21 @@ o valor anterior, contrai por 1/2). Verificado em 6870 casos (sweep de
 convergência em todos, ≈30% menos iterações do que com 0.5.
 """
 const RELAXAÇÃO_PADRÃO = 2 / 3
+
+"""
+    _taxas_lucro_io(C, V, S, p)
+
+Taxas de lucro por setor com o capital constante valorizado a preços de
+produção de Sraffa, `rᵢ = Sᵢ/(πᵢCᵢ + Vᵢ)`, tal como `sistema_Ndept_io!` as
+usa. Para evitar a circularidade de usar r̄ para calcular preços que por sua
+vez definem r̄, a taxa que entra nos preços é a razão agregada
+`ΣS/Σ(C+V)`, limitada a 95% de `p.R_max`.
+"""
+function _taxas_lucro_io(C, V, S, p)
+    r_efetivo = clamp(sum(S) / sum(C .+ V), 0.0, 0.95 * p.R_max)
+    π = _razão_preço_valor(p, r_efetivo, length(S))
+    return S ./ (π .* C .+ V)
+end
 
 """
     _razão_preço_valor(p, r_efetivo, N)
@@ -462,41 +490,67 @@ function simular_2dept(; T = 100.0)
 end
 
 """
-    simular_Ndept(N; T=100.0, nomes=String[], seed=nothing, acoplado=false, μ=0.3, realização=false, racionamento=false)
+    simular_Ndept(N; T=100.0, nomes=String[], seed=nothing, acoplado=false, μ=0.3, μ_v=0.0,
+                  realização=false, racionamento=false, preços_mercado=false, β=0.5, cesto=nothing)
 
 Simula o modelo de N departamentos com departamentos gerados aleatoriamente.
 Com `acoplado=true`, usa `sistema_Ndept_io!` (mobilidade de capital via A e
-preços de produção); `μ` é o coeficiente de mobilidade nesse caso.
+preços de produção); `μ` é o coeficiente de mobilidade nesse caso, e `μ_v`
+o da mobilidade do capital variável (0 = desligada, por omissão).
 `realização=true` (só tem efeito com `acoplado=true`) acresce a pressão de
 realização agregada; `racionamento=true` (tem precedência sobre
 `realização`) usa racionamento por setor — ver docstring de
-`sistema_Ndept_io!`.
+`sistema_Ndept_io!`. `preços_mercado=true` (exige `acoplado=true`) usa a
+dinâmica cruzada de `sistema_cruzado!`: preços de mercado com velocidade de
+ajustamento `β` e cabaz de consumo `cesto` (por omissão `cesto_inicial`).
 """
 function simular_Ndept(N::Int; T = 100.0, nomes::Vector{String} = String[],
-                       seed = nothing, acoplado = false, μ = 0.3,
-                       realização = false, racionamento = false)
+                       seed = nothing, acoplado = false, μ = 0.3, μ_v = 0.0,
+                       realização = false, racionamento = false,
+                       preços_mercado = false, β = 0.5, cesto = nothing)
     depts = criar_departamentos(N, nomes)
     return simular_Ndept_customizado(depts, T = T, seed = seed, acoplado = acoplado, μ = μ,
-                                     realização = realização, racionamento = racionamento)
+                                     μ_v = μ_v, realização = realização,
+                                     racionamento = racionamento,
+                                     preços_mercado = preços_mercado, β = β, cesto = cesto)
 end
 
 """
-    simular_Ndept_customizado(depts; T=100.0, seed=nothing, acoplado=false, μ=0.3, realização=false, racionamento=false)
+    simular_Ndept_customizado(depts; T=100.0, seed=nothing, acoplado=false, μ=0.3, μ_v=0.0,
+                              realização=false, racionamento=false,
+                              preços_mercado=false, β=0.5, cesto=nothing)
 
 Simula o modelo de N departamentos a partir de departamentos pré-configurados.
-Com `acoplado=true`, usa `sistema_Ndept_io!` em vez de `sistema_Ndept!`.
+Com `acoplado=true`, usa `sistema_Ndept_io!` em vez de `sistema_Ndept!`
+(`μ_v`, mobilidade do capital variável, só tem efeito nesse caso).
+`preços_mercado=true` usa `sistema_cruzado!` (ver `simular_Ndept`); não se
+combina com `realização`/`racionamento`.
 `realização=true` (só tem efeito com `acoplado=true`) acresce a pressão de
 realização agregada; `racionamento=true` (tem precedência sobre
 `realização`) usa racionamento por setor — ver docstring de
 `sistema_Ndept_io!`.
 """
 function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
-                                   seed = nothing, acoplado = false, μ = 0.3,
-                                   realização = false, racionamento = false)
+                                   seed = nothing, acoplado = false, μ = 0.3, μ_v = 0.0,
+                                   realização = false, racionamento = false,
+                                   preços_mercado = false, β = 0.5, cesto = nothing)
     N = length(depts)
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
     A = criar_matriz_tecnica(N, seed = seed)
-    (acoplado && (realização || racionamento)) && (A, _ = _garantir_admissibilidade_output(A))
+    (acoplado && (realização || racionamento || preços_mercado)) &&
+        (A, _ = _garantir_admissibilidade_output(A))
+
+    if preços_mercado
+        acoplado || error("preços_mercado=true exige acoplado=true")
+        (realização || racionamento) &&
+            error("preços_mercado=true não se combina com realização/racionamento")
+        p = (e = [d.e for d in depts], σ_c = [d.σ_c for d in depts],
+             σ_v = [d.σ_v for d in depts], δ = [d.δ for d in depts],
+             A = A, μ = μ, μ_v = μ_v, β = β)
+        p = merge(p, (cesto = isnothing(cesto) ? cesto_inicial(A, X0, p) : cesto,))
+        prob = ODEProblem(sistema_cruzado!, [X0; zeros(N)], (0.0, T), p)
+        return solve(prob, Tsit5(), saveat = 0.5), depts, p
+    end
 
     if acoplado
         l = [d.v for d in depts]
@@ -509,6 +563,7 @@ function simular_Ndept_customizado(depts::Vector{Departamento}; T = 100.0,
             l           = l,
             R_max       = calcular_taxa_lucro_maxima(A, l),
             μ           = μ,
+            μ_v         = μ_v,
             w           = 1.0,
             realização  = realização,
             racionamento = racionamento,

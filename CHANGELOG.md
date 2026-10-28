@@ -36,6 +36,29 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   artigo (figuras 7–9). Os números citados são gerados em
   `paper/figures/jacobian_stats.tex`, que o artigo lê diretamente.
 - Dependências novas: `ForwardDiff`, `BifurcationKit` (`install_deps.jl`).
+- **Dinâmica cruzada** (`src/cruzado.jl`, opcional com
+  `preços_mercado=true`): preços de mercado que respondem ao excesso de
+  procura (`β`), lucros e mobilidade de capital a esses preços
+  (Flaschel–Semmler), lei de Walras exata. Sem ela não há crescimento
+  equilibrado interior.
+- **Mobilidade do capital variável** `μ_v` (desligada por omissão), no
+  sistema acoplado e no cruzado; o termo soma exatamente 0.
+- **Crescimento equilibrado** (`src/crescimento.jl`): sistema normalizado
+  no simplex (`sistema_normalizado`, `simular_normalizado`), raios de
+  crescimento equilibrado por Newton com jacobiana exata
+  (`crescimento_equilibrado`), `indicadores_crescimento`, `com_parâmetro`
+  e o varrimento da parcela salarial (`varrimento_salarial`, uniforme ou
+  proporcional).
+- **Bifurcações da acumulação** (`src/bifurcacao.jl`):
+  `bifurcacao_acumulação` (Hopf com forma normal, continuação de
+  ciclos-limite por colocação com multiplicadores de Floquet),
+  `ciclo_simulado` (verificação por simulação, secção de Poincaré) e
+  `curva_hopf` (fronteira de Hopf no plano parcela salarial × `μ_v`).
+- **Resultado:** o crescimento equilibrado perde estabilidade num Hopf
+  supercrítico em `μ_v` em todas as 30 economias aleatórias testadas; a
+  fronteira de Hopf sobe com a parcela salarial.
+- `paper/acumulacao_bifurcacao.jl` e as novas Secções 3.6 e 5.6 do artigo
+  (figuras 10–11), com os números em `paper/figures/acumulacao_stats.tex`.
 
 ### Alterado
 - **Relaxação por omissão do racionamento: 0.5 → 2/3**

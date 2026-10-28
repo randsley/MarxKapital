@@ -146,6 +146,39 @@ while undamped iteration (`α = 1`) sits exactly on a flip boundary (see
 runs (`paper/main.tex`, Table 2). The TSSI layer is valuation only: the
 dynamics are unchanged.
 
+## Balanced growth and accumulation cycles
+
+With the optional cross-dual dynamics (`preços_mercado=true`), market
+prices respond to sectoral excess demand and capital moves on profit
+rates at those prices (Flaschel–Semmler). This gives the coupled model
+interior balanced-growth rays. Without market prices it has none: capital
+concentrates in one sector. The ODE is homogeneous of degree 1, so
+balanced growth is a fixed point of the system normalized to the simplex,
+and it can be continued and its bifurcations analysed:
+
+```julia
+Random.seed!(5)
+sol, _, p = simular_Ndept(6, T = 1.0, seed = 5, acoplado = true, μ = 0.5,
+                          preços_mercado = true)          # β = 0.5 by default
+X0 = sol.u[1]
+
+eq = crescimento_equilibrado(p, X0)       # g★, r★, k★, shares, eigenvalues, stability
+varrimento_salarial(p, X0; variante = :uniforme)          # g★, r★ against the wage share ω
+
+# Hopf bifurcation in the mobility of variable capital μ_v (off by default),
+# with the normal form and the branch of limit cycles (collocation, Floquet)
+pb = merge(p, (β = 0.1,))
+res = bifurcacao_acumulação(pb, X0, :μ_v; intervalo = (0.0, 2.5))
+res.hopf[1]                               # θ, frequency, period, Lyapunov coefficient
+ciclo_simulado(pb, :μ_v, 1.1, X0)         # check the cycle by direct simulation
+curva_hopf(pb, X0)                        # Hopf boundary μ_v,H(ω)
+```
+
+In every random economy tested, balanced growth loses stability at a
+supercritical Hopf bifurcation in `μ_v`. A higher wage share moves the
+boundary up. See `paper/main.tex`, Sections 3.6 and 5.6, and
+`docs/LIMITACOES.en.md` item 11.
+
 ## Real sectoral data (Eurostat)
 
 Both calibration paths use synthetic structure or fixed sectoral weights
@@ -197,7 +230,9 @@ marxkapital/
 │   ├── choques.jl          # wage shocks
 │   ├── diferenciacao.jl    # automatic differentiation: Jacobians, Hessians, rationing spectrum
 │   ├── tssi.jl             # temporal single-system (TSSI) valuation, fixed lag τ
-│   ├── bifurcacao.jl       # fixed-point continuation and bifurcations (BifurcationKit)
+│   ├── cruzado.jl          # cross-dual dynamics: market prices and capital mobility
+│   ├── crescimento.jl      # balanced growth: normalized system, wage-share sweep
+│   ├── bifurcacao.jl       # continuation and bifurcations: maps, Hopf, limit cycles (BifurcationKit)
 │   ├── calibracao_pt.jl    # Portuguese (INE) calibration, synthetic and real (Eurostat)
 │   ├── ameco.jl            # AMECO: synthetic, calibration, comparison, series
 │   ├── ameco_sdmx.jl       # official AMECO SDMX API
@@ -214,6 +249,7 @@ marxkapital/
 │   ├── matrix_audit.jl     # technical matrix A audit (manual check)
 │   ├── monte_carlo.jl      # systematic sweeps (convergence, dispersion)
 │   ├── jacobiana_bifurcacao.jl # exact Jacobian, bifurcations, TSSI (offline)
+│   ├── acumulacao_bifurcacao.jl # balanced growth, Hopf, cycles (offline)
 │   └── figures/
 ├── data/                   # (empty; downloaded data lands here, not version-controlled)
 ├── install_deps.jl

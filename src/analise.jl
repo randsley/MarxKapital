@@ -36,12 +36,7 @@ function calcular_taxas_lucro_precos(sol, p)
         V = sol[N+1:2N, idx]
         S = p.e .* V
 
-        r̄_naive = sum(S) / sum(C .+ V)
-        r_efetivo = clamp(r̄_naive, 0.0, 0.95 * p.R_max)
-
-        π = _razão_preço_valor(p, r_efetivo, N)
-
-        r[:, idx] = S ./ (π .* C .+ V)
+        r[:, idx] = _taxas_lucro_io(C, V, S, p)
     end
     return r
 end

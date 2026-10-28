@@ -117,6 +117,14 @@ function ajuda_modelo()
       bifurcacao_racionamento(A,σ_c,S,O)    Continuação na escala da procura (BifurcationKit)
       bifurcacao_tssi(X, p; τ=1.0)          Continuação do mapa de preços TSSI
 
+    CRESCIMENTO EQUILIBRADO E CICLOS (preços_mercado=true)
+      crescimento_equilibrado(p, X0)        Raio de crescimento equilibrado g★, estabilidade
+      varrimento_salarial(p, X0)            g★, r★ contra a parcela salarial ω
+      bifurcacao_acumulação(p, X0, :μ_v; intervalo=(0,2.5))
+                                            Hopf, forma normal e ciclos-limite
+      ciclo_simulado(p, :μ_v, θ, X0)        Verificação por simulação (secção de Poincaré)
+      curva_hopf(p, X0)                     Fronteira de Hopf no plano (ω, μ_v)
+
     TESTES / AJUDA
       testar_modelo()                       Bateria de validação
       ajuda_modelo()                        Este guia

@@ -8,13 +8,22 @@
 # implícita (`_racionamento_dual`, `src/nucleo.jl`), não iteração a iteração.
 # ============================================================================
 
-"""Escolhe o sistema de EDOs a partir dos campos de `p` (acoplado se tiver `μ`)."""
-_sistema_de(p) = haskey(p, :μ) ? sistema_Ndept_io! : sistema_Ndept!
+"""Escolhe o sistema de EDOs a partir dos campos de `p`: cruzado se tiver `β`
+(preços de mercado), acoplado se tiver `μ`, independente caso contrário."""
+_sistema_de(p) = haskey(p, :β) ? sistema_cruzado! : haskey(p, :μ) ? sistema_Ndept_io! : sistema_Ndept!
 
-"""Lado direito da EDO como função não-mutante `X ↦ f(X)` (para ForwardDiff)."""
+"""Tipo numérico comum aos campos numéricos de `p` (Dual quando se diferencia
+em ordem a um parâmetro)."""
+_tipo_parâmetros(p) = mapreduce(v -> v isa Number ? typeof(v) :
+                                     v isa AbstractArray{<:Number} ? eltype(v) : Bool,
+                                promote_type, values(p); init = Bool)
+
+"""Lado direito da EDO como função não-mutante `X ↦ f(X)` (para ForwardDiff,
+em ordem ao estado ou a parâmetros de `p`)."""
 function _rhs(p, t = 0.0)
     sistema! = _sistema_de(p)
-    return X -> (dX = similar(X); sistema!(dX, X, p, t); dX)
+    T = _tipo_parâmetros(p)
+    return X -> (dX = similar(X, promote_type(eltype(X), T)); sistema!(dX, X, p, t); dX)
 end
 
 """

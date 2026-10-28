@@ -489,6 +489,96 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test all(bt.r★ .< p.R_max)
     end
 
+    @testset "Mobilidade do capital variável (μ_v)" begin
+        Random.seed!(3)
+        sol0, _, p0 = simular_Ndept(4, T = 5.0, seed = 3, acoplado = true, μ = 0.5)
+        Random.seed!(3)
+        sol1, _, _ = simular_Ndept(4, T = 5.0, seed = 3, acoplado = true, μ = 0.5, μ_v = 0.0)
+        @test sol0.u[end] == sol1.u[end]                 # μ_v = 0: sem alteração
+        X = sol0.u[end]
+        N = 4
+        f0 = similar(X); sistema_Ndept_io!(f0, X, p0, 0.0)
+        f1 = similar(X); sistema_Ndept_io!(f1, X, merge(p0, (μ_v = 0.7,)), 0.0)
+        @test sum(f1[N+1:2N]) ≈ sum(f0[N+1:2N]) rtol = 1e-12   # o termo soma 0
+        @test f1[1:N] == f0[1:N]
+        # homogeneidade de grau 1 (Euler): J·X = f(X)
+        pv = merge(p0, (μ_v = 0.7,))
+        @test jacobiana_sistema(pv, X) * X ≈ f1 rtol = 1e-9
+    end
+
+    @testset "Sistema cruzado — identidades" begin
+        Random.seed!(2)
+        sol, _, p = simular_Ndept(3, T = 1.0, seed = 2, acoplado = true, μ = 0.5,
+                                  preços_mercado = true)
+        X = sol.u[end] .+ [zeros(6); [0.1, -0.2, 0.05]]
+        C, V, q = X[1:3], X[4:6], X[7:9]
+        ec = estado_cruzado(C, V, q, p)
+        @test sum(ec.P .* ec.procura) ≈ sum(ec.P .* ec.x) rtol = 1e-12   # lei de Walras
+        @test sum(ec.Π) ≈ sum(p.e .* V) rtol = 1e-12                      # ΣΠ = ΣS
+        ec2 = estado_cruzado(C, V, q .+ 0.3, p)
+        @test ec2.P ≈ ec.P rtol = 1e-12                                     # só preços relativos
+        f = similar(X); sistema_cruzado!(f, X, p, 0.0)
+        f2 = similar(X); sistema_cruzado!(f2, [2 .* X[1:6]; q], p, 0.0)
+        @test f2 ≈ [2 .* f[1:6]; f[7:9]] rtol = 1e-12                      # homogeneidade
+        @test_throws ErrorException simular_Ndept(3, T = 1.0, seed = 2, acoplado = true,
+                                                  preços_mercado = true, realização = true)
+    end
+
+    @testset "Crescimento equilibrado" begin
+        Random.seed!(2)
+        sol, _, p = simular_Ndept(3, T = 1.0, seed = 2, acoplado = true, μ = 0.5,
+                                  preços_mercado = true)
+        eq = crescimento_equilibrado(p, sol.u[1])
+        @test eq.convergiu && eq.estável
+        @test minimum(eq.X[1:6]) > 0
+        # o raio cresce exatamente a g★ na EDO em níveis
+        s = solve(ODEProblem(sistema_cruzado!, eq.X, (0.0, 20.0), p), Tsit5(),
+                  abstol = 1e-11, reltol = 1e-11)
+        @test log(sum(s.u[end][1:6]) / sum(s.u[1][1:6])) / 20 ≈ eq.g rtol = 1e-7
+        @test s.u[end][1:6] ./ sum(s.u[end][1:6]) ≈ eq.X[1:6] rtol = 1e-7
+        # e é o limite de uma simulação longa
+        ys = simular_normalizado(p, sol.u[1]; T = 1500.0, saveat = 1500.0)
+        @test ys.u[end][1:6] ≈ eq.X[1:6] rtol = 1e-5
+        # TSSI = simultaneísmo no raio de crescimento equilibrado
+        v = valorizar_tssi(s, p; τ = 1.0, h = 0.5)
+        @test v.r_tssi[end] ≈ v.r_simultâneo[end] rtol = 1e-10
+        # parcela salarial: g e r caem com ω
+        vs = varrimento_salarial(p, sol.u[1]; valores = 0.3:0.1:0.6)
+        @test all(vs.convergiu) && all(vs.estável)
+        @test vs.ω ≈ collect(0.3:0.1:0.6)
+        @test issorted(vs.g; rev = true) && issorted(vs.r; rev = true)
+    end
+
+    @testset "Bifurcação de Hopf e ciclos-limite da acumulação" begin
+        Random.seed!(2)
+        sol, _, p0 = simular_Ndept(3, T = 1.0, seed = 2, acoplado = true, μ = 0.5,
+                                   preços_mercado = true)
+        p = merge(p0, (β = 0.1,))
+        r = bifurcacao_acumulação(p, sol.u[1], :μ_v; intervalo = (0.0, 2.0),
+                                  intervalo_órbitas = (0.0, 1.3), Ntst = 20)
+        @test r.parte_real_máx[1] < 0
+        H = r.hopf[1]
+        @test H.supercrítico && H.transversalidade > 0
+        # dois Hopf próximos (≈ 1.220 e 1.232): ambos detetados com dsmax = 0.01
+        @test count(pt -> pt.tipo == :hopf && pt.θ < 1.24, r.pontos) == 2
+        k = findfirst(>(H.θ), r.θ)
+        @test r.parte_real_máx[k-2] < 0 < r.parte_real_máx[k+1]
+        o = r.órbitas
+        @test o.θ[1] ≈ H.θ atol = 1e-6
+        @test o.amplitude[1] < 1e-2                          # nasce com amplitude 0
+        @test o.período[1] ≈ H.período rtol = 1e-3
+        @test o.estável[2]                                   # supercrítico: ciclo estável
+        # ciclo confirmado por simulação direta
+        θ = 1.225
+        k = argmin(abs.(o.θ .- θ))
+        cs = ciclo_simulado(p, :μ_v, o.θ[k], sol.u[1]; T = 6000.0)
+        @test cs.dispersão_secção < 1e-2
+        @test cs.T_min ≈ o.período[k] rtol = 1e-2
+        @test cs.amplitude ≈ o.amplitude[k] rtol = 0.1    # colocação grosseira (Ntst = 20)
+        # e convergência para o equilíbrio antes do Hopf
+        @test ciclo_simulado(p, :μ_v, H.θ - 0.1, sol.u[1]; T = 3000.0).amplitude < 1e-4
+    end
+
     @testset "Bateria interna" begin
         @test testar_modelo()
     end

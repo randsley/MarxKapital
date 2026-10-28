@@ -140,6 +140,40 @@ amortecimento (`α = 1`) fica exatamente numa fronteira de flip (ver
 execuções de teste (`paper/main.tex`, Tabela 2). A camada TSSI é só de valorização: a
 dinâmica não muda.
 
+## Crescimento equilibrado e ciclos de acumulação
+
+Com a dinâmica cruzada opcional (`preços_mercado=true`), os preços de
+mercado respondem ao excesso de procura setorial e o capital desloca-se
+pelas taxas de lucro a esses preços (Flaschel–Semmler). Assim, o modelo
+acoplado tem raios interiores de crescimento equilibrado. Sem preços de
+mercado não tem: o capital concentra-se num setor. A EDO é homogénea de
+grau 1, pelo que o crescimento equilibrado é um ponto fixo do sistema
+normalizado no simplex, e pode ser continuado e as suas bifurcações
+analisadas:
+
+```julia
+Random.seed!(5)
+sol, _, p = simular_Ndept(6, T = 1.0, seed = 5, acoplado = true, μ = 0.5,
+                          preços_mercado = true)          # β = 0.5 por omissão
+X0 = sol.u[1]
+
+eq = crescimento_equilibrado(p, X0)       # g★, r★, k★, quotas, valores próprios, estabilidade
+varrimento_salarial(p, X0; variante = :uniforme)          # g★, r★ contra a parcela salarial ω
+
+# Hopf na mobilidade do capital variável μ_v (desligada por omissão), com a
+# forma normal e o ramo de ciclos-limite (colocação, Floquet)
+pb = merge(p, (β = 0.1,))
+res = bifurcacao_acumulação(pb, X0, :μ_v; intervalo = (0.0, 2.5))
+res.hopf[1]                               # θ, frequência, período, coeficiente de Lyapunov
+ciclo_simulado(pb, :μ_v, 1.1, X0)         # verificar o ciclo por simulação direta
+curva_hopf(pb, X0)                        # fronteira de Hopf μ_v,H(ω)
+```
+
+Em todas as economias aleatórias testadas, o crescimento equilibrado perde
+estabilidade num Hopf supercrítico em `μ_v`. Uma parcela salarial mais
+alta sobe a fronteira. Ver `paper/main.tex`, Secções 3.6 e 5.6, e
+`docs/LIMITACOES.md`, item 11.
+
 ## Dados setoriais reais (Eurostat)
 
 Ambos os caminhos de calibração usam, por omissão, estrutura sintética ou
@@ -187,7 +221,9 @@ marxkapital/
 │   ├── choques.jl          # choques salariais
 │   ├── diferenciacao.jl    # diferenciação automática: jacobianas, hessianas, espetro do racionamento
 │   ├── tssi.jl             # valorização TSSI (sistema único temporal), desfasamento τ fixo
-│   ├── bifurcacao.jl       # continuação de pontos fixos e bifurcações (BifurcationKit)
+│   ├── cruzado.jl          # dinâmica cruzada: preços de mercado e mobilidade de capital
+│   ├── crescimento.jl      # crescimento equilibrado: sistema normalizado, parcela salarial
+│   ├── bifurcacao.jl       # continuação e bifurcações: mapas, Hopf, ciclos-limite (BifurcationKit)
 │   ├── calibracao_pt.jl    # calibração INE (Portugal), sintética e real (Eurostat)
 │   ├── ameco.jl            # AMECO: sintético, calibração, comparação, séries
 │   ├── ameco_sdmx.jl       # API SDMX oficial da AMECO
@@ -204,6 +240,7 @@ marxkapital/
 │   ├── matrix_audit.jl     # auditoria da matriz técnica A (verificação manual)
 │   ├── monte_carlo.jl      # sweeps sistemáticos (convergência, dispersão)
 │   ├── jacobiana_bifurcacao.jl # jacobiana exata, bifurcações, TSSI (offline)
+│   ├── acumulacao_bifurcacao.jl # crescimento equilibrado, Hopf, ciclos (offline)
 │   └── figures/
 ├── data/                   # (vazio; dados descarregados ficam aqui, não versionados)
 ├── install_deps.jl

@@ -37,6 +37,27 @@ Format based on Keep a Changelog. Semantic versioning.
   and 5.5 (figures 7–9). The quoted numbers are generated into
   `paper/figures/jacobian_stats.tex`, which the paper reads directly.
 - New dependencies: `ForwardDiff`, `BifurcationKit` (`install_deps.jl`).
+- **Cross-dual dynamics** (`src/cruzado.jl`, opt-in with
+  `preços_mercado=true`): market prices that respond to excess demand
+  (`β`), profits and capital mobility at those prices (Flaschel–Semmler),
+  Walras' law exact. Without it there is no interior balanced growth.
+- **Mobility of variable capital** `μ_v` (off by default), in the coupled
+  and cross-dual systems; the term sums to exactly 0.
+- **Balanced growth** (`src/crescimento.jl`): normalized system on the
+  simplex (`sistema_normalizado`, `simular_normalizado`), balanced-growth
+  rays by Newton with the exact Jacobian (`crescimento_equilibrado`),
+  `indicadores_crescimento`, `com_parâmetro`, and the wage-share sweep
+  (`varrimento_salarial`, uniform or proportional).
+- **Bifurcations of accumulation** (`src/bifurcacao.jl`):
+  `bifurcacao_acumulação` (Hopf with normal form, limit-cycle continuation
+  by collocation with Floquet multipliers), `ciclo_simulado` (check by
+  simulation, Poincaré section) and `curva_hopf` (Hopf boundary in the
+  wage share × `μ_v` plane).
+- **Result:** balanced growth loses stability at a supercritical Hopf
+  bifurcation in `μ_v` in all 30 random economies tested; the Hopf
+  boundary rises with the wage share.
+- `paper/acumulacao_bifurcacao.jl` and the new Sections 3.6 and 5.6 of the
+  paper (figures 10–11), with the numbers in `paper/figures/acumulacao_stats.tex`.
 
 ### Changed
 - **Default rationing relaxation: 0.5 → 2/3** (`RELAXAÇÃO_PADRÃO`, used

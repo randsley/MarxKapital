@@ -10,9 +10,12 @@
 #   - o mapa de preços TSSI com desfasamento τ fixo, `p(t−τ) ↦ p(t)`, com a
 #     intensidade da mais-valia como parâmetro (`bifurcacao_tssi`).
 #
-# Porquê mapas e não a EDO: `sistema_Ndept!`/`sistema_Ndept_io!` crescem sem
-# limite (C, V exponenciais), pelo que não têm equilíbrios em níveis — não há
-# pontos fixos da EDO a continuar sem a reescrever em variáveis normalizadas.
+# As EDOs de acumulação crescem sem limite (C, V exponenciais) e não têm
+# equilíbrios em níveis; os seus estados estacionários são raios de
+# crescimento equilibrado, pontos fixos do sistema normalizado de
+# `src/crescimento.jl`. Esses são continuados na secção final
+# (`bifurcacao_acumulação`), com deteção de Hopf e continuação de órbitas
+# periódicas.
 #
 # O BifurcationKit faz a continuação (pseudo-comprimento de arco, PALC) do
 # ramo `G(z, θ) − z = 0`. A deteção de bifurcações dele assume EDOs (valores
@@ -161,4 +164,196 @@ function plotar_bifurcacao(res; titulo = "")
               title = "Região de convergência local")
     hline!(p2, [res.relaxação], ls = :dash, label = "α usado")
     return plot(p1, p2, layout = (1, 2), size = (1000, 400))
+end
+
+# ============================================================================
+# ACUMULAÇÃO: CRESCIMENTO EQUILIBRADO, HOPF E ÓRBITAS PERIÓDICAS
+# ----------------------------------------------------------------------------
+# Continuação dos raios de crescimento equilibrado (zeros de
+# `sistema_normalizado`) num parâmetro de `com_parâmetro`. Aqui o problema é
+# uma EDO, e as deteções do BifurcationKit aplicam-se diretamente: Hopf
+# (par complexo a cruzar o eixo imaginário) com forma normal (primeiro
+# coeficiente de Lyapunov), e folds / pontos de ramificação. Dos Hopf
+# supercríticos continuam-se os ciclos-limite por colocação ortogonal, com
+# estabilidade pelos multiplicadores de Floquet e as bifurcações de ciclos
+# (fold de ciclos, duplicação de período, Neimark–Sacker / toro).
+# ============================================================================
+
+"""Problema do BifurcationKit para o sistema normalizado com `θ` = `parâmetro`."""
+function _problema_acumulação(p, parâmetro, z0, θ0; e_ref = p.e)
+    F(z, par) = sistema_normalizado(com_parâmetro(p, parâmetro, par.θ; e_ref = e_ref))(z)
+    J(z, par) = ForwardDiff.jacobian(zz -> F(zz, par), z)
+    return BK.BifurcationProblem(F, collect(float.(z0)), (θ = θ0,), (BK.@optic _.θ); J = J,
+                                 record_from_solution = (z, par; k...) -> (quota_mín = minimum(_do_livre(z, p)[1:2length(p.e)]),))
+end
+
+"""Amplitude e quota mínima de uma órbita (matriz dim(z) × pontos)."""
+function _medidas_órbita(U, p)
+    nq = 2 * length(p.e)
+    Y = vcat(U[1:nq-1, :], 1 .- sum(U[1:nq-1, :], dims = 1))
+    amplitude = maximum(maximum(Y, dims = 2) .- minimum(Y, dims = 2))
+    return (amplitude = amplitude, quota_mín = minimum(Y))
+end
+
+"""
+    ciclo_simulado(p, parâmetro, θ, X0; T=4000.0, dt=0.02, e_ref=p.e)
+
+Verificação por simulação direta do sistema normalizado em `θ`: integra
+desde `X0` e, na segunda metade da trajetória, mede uma secção de Poincaré
+(cruzamentos ascendentes da média na primeira coordenada). Devolve `n`
+(número de cruzamentos), `dispersão_secção` (variação da segunda coordenada
+nos cruzamentos: ≈ 0 num ciclo-limite, > 0 num toro ou atrator irregular),
+`T_min`/`T_max` (tempos de retorno; iguais num ciclo, ≈ período),
+`amplitude` e `quota_mín` (como em `bifurcacao_acumulação`). Sem
+cruzamentos (`n < 2`) a trajetória convergiu para o equilíbrio.
+"""
+function ciclo_simulado(p, parâmetro, θ, X0; T = 4000.0, dt = 0.02, e_ref = p.e)
+    pθ = com_parâmetro(p, parâmetro, θ; e_ref = e_ref)
+    h = sistema_normalizado(pθ)
+    prob = ODEProblem((z, _, t) -> h(z), _para_livre(X0, pθ), (0.0, T))
+    sol = solve(prob, Tsit5(), abstol = 1e-11, reltol = 1e-9, saveat = dt)
+    U = reduce(hcat, sol.u[end÷2:end])
+    medidas = _medidas_órbita(U, pθ)
+    c = mean(U[1, :])
+    idx = findall(i -> U[1, i] < c && U[1, i+1] >= c, 1:size(U, 2)-1)
+    length(idx) < 2 && return merge((n = length(idx), dispersão_secção = 0.0, T_min = NaN, T_max = NaN), medidas)
+    secção = U[2, idx]
+    retornos = diff(idx) .* dt
+    return merge((n = length(idx), dispersão_secção = maximum(secção) - minimum(secção),
+                  T_min = minimum(retornos), T_max = maximum(retornos)), medidas)
+end
+
+"""
+    bifurcacao_acumulação(p, X0, parâmetro; intervalo, θ0=intervalo[1], ds=0.01,
+                          dsmax=0.01, max_passos=1000, órbitas=true,
+                          intervalo_órbitas=intervalo, δθ=1e-3, Ntst=40, m=4)
+
+Bifurcações do crescimento equilibrado do sistema cruzado (`p` de
+`simular_Ndept(...; acoplado=true, preços_mercado=true)`) no `parâmetro` de
+`com_parâmetro` (`:μ`, `:μ_v`, `:ω`, `:escala_e`), em `θ ∈ intervalo`:
+
+1. Ramo de equilíbrios: `crescimento_equilibrado` em `θ0` (a partir de `X0`)
+   e continuação PALC com jacobiana exata (ForwardDiff). Devolve `θ`, `z`,
+   `parte_real_máx` (maior parte real dos valores próprios, < 0 = estável),
+   `g` e `quota_mín` ao longo do ramo, e `pontos` (`(tipo, θ)` do
+   BifurcationKit: `:hopf`, `:bp`, `:fold`, ...).
+2. `hopf`: forma normal de cada Hopf (`θ`, frequência `ω`, `período = 2π/ω`,
+   coeficiente de Lyapunov `l1 = Re b`, `supercrítico = l1 < 0` e
+   `transversalidade = Re a`, a velocidade de cruzamento: > 0 se o par
+   passa a instável com θ a subir).
+3. `órbitas` (se `órbitas=true` e o primeiro Hopf for supercrítico): ramo de
+   ciclos-limite por colocação (`Ntst` intervalos de grau `m`), semeado pelo
+   preditor da forma normal em `θ_H + δθ` (integrado um período) e
+   continuado em ambos os sentidos — para o Hopf (amplitude → 0) e até ao
+   limite de `intervalo_órbitas`. Devolve `θ`, `amplitude` (máxima oscilação de uma
+   quota), `período`, `quota_mín`, `estável` (multiplicadores de Floquet) e
+   `pontos` (bifurcações de ciclos: `:bp` = fold de ciclos, `:pd` =
+   duplicação de período, `:ns` = Neimark–Sacker).
+
+Confirmar os resultados com `ciclo_simulado` (o BifurcationKit não sabe se
+um ciclo encosta à fronteira do simplex — ver `quota_mín`).
+"""
+function bifurcacao_acumulação(p, X0, parâmetro::Symbol; intervalo, θ0 = intervalo[1],
+                               ds = 0.01, dsmax = 0.01, max_passos = 1000, órbitas = true,
+                               intervalo_órbitas = intervalo, δθ = 1e-3, Ntst = 40, m = 4,
+                               e_ref = p.e)
+    _cruzado(p) || error("bifurcacao_acumulação requer o sistema cruzado (preços_mercado=true)")
+    eq = crescimento_equilibrado(com_parâmetro(p, parâmetro, θ0; e_ref = e_ref), X0)
+    eq.convergiu || @warn "crescimento_equilibrado não convergiu em θ0 = $θ0 (resíduo $(eq.resíduo))"
+    prob = _problema_acumulação(p, parâmetro, eq.z, θ0; e_ref = e_ref)
+    nz = length(eq.z)
+    opts = BK.ContinuationPar(p_min = intervalo[1], p_max = intervalo[2], ds = ds, dsmax = dsmax,
+                              max_steps = max_passos, detect_bifurcation = 3, n_inversion = 8,
+                              nev = nz, save_sol_every_step = 1)
+    ramo = BK.continuation(prob, BK.PALC(), opts; verbosity = 0)
+
+    θs = [s.p for s in ramo.sol]
+    Z = reduce(hcat, [s.x for s in ramo.sol])
+    pθ(θ) = com_parâmetro(p, parâmetro, θ; e_ref = e_ref)
+    λs = [eigvals(ForwardDiff.jacobian(sistema_normalizado(pθ(θ)), Z[:, k])) for (k, θ) in enumerate(θs)]
+    λ_máx = [maximum(real.(λ)) for λ in λs]
+    g = [indicadores_crescimento(pθ(θ), _do_livre(Z[:, k], p)).g for (k, θ) in enumerate(θs)]
+    quota = [minimum(_do_livre(Z[:, k], p)[1:2length(p.e)]) for k in eachindex(θs)]
+    pontos = [(tipo = sp.type, θ = sp.param) for sp in ramo.specialpoint if sp.type !== :endpoint]
+    # salvaguarda: dois cruzamentos no mesmo passo escapam à deteção — comparar
+    # com a contagem direta de valores próprios instáveis ao longo do ramo
+    n_inst = [count(real.(λ) .> 1e-9) for λ in λs]
+    cruzamentos = sum(abs, diff(n_inst); init = 0)
+    detetados = sum(pt.tipo === :hopf ? 2 : 1 for pt in pontos; init = 0)
+    cruzamentos == detetados ||
+        @warn "bifurcacao_acumulação: $cruzamentos cruzamentos de valores próprios, $detetados nos pontos detetados — reduzir dsmax"
+
+    hopf = NamedTuple[]
+    formas = []
+    for (i, sp) in enumerate(ramo.specialpoint)
+        sp.type === :hopf || continue
+        nf = BK.get_normal_form(ramo, i; verbose = false)
+        push!(formas, nf)
+        l1 = real(nf.nf.b)
+        push!(hopf, (θ = nf.p, ω = nf.ω, período = 2π / abs(nf.ω), l1 = l1, supercrítico = l1 < 0,
+                     transversalidade = real(nf.nf.a)))
+    end
+
+    res = (parâmetro = parâmetro, θ = θs, z = Z, parte_real_máx = λ_máx, g = g, quota_mín = quota,
+           pontos = pontos, hopf = hopf, ramo = ramo, órbitas = nothing)
+    (órbitas && !isempty(hopf)) || return res
+    H = hopf[1]
+    H.supercrítico || (@warn "primeiro Hopf subcrítico (θ = $(H.θ)): ciclos instáveis, sem semente por simulação"; return res)
+
+    # semente: preditor da forma normal em θ_H + δθ (lado supercrítico),
+    # integrado ~1 período e projetado na malha de colocação — a troca de
+    # ramo automática do BifurcationKit falha aqui (jacobiana singular)
+    lado = sign(H.transversalidade)
+    pred = BK.predictor(formas[1], δθ)
+    θ_s = pred.p
+    T_s = 2π / abs(pred.ω)
+    h = sistema_normalizado(pθ(θ_s))
+    ode = ODEProblem((z, par, t) -> h(z), pred.orbit(0.0), (0.0, 1.25 * T_s), (θ = θ_s,))
+    sol = solve(ode, Tsit5(), abstol = 1e-11, reltol = 1e-9)
+    probθ = BK.re_make(prob; params = (θ = θ_s,))
+    probPO, ci = BK.generate_ci_problem(BK.Collocation(Ntst, m), probθ, sol, T_s)
+
+    registo = (x, par; k...) -> begin
+        U = BK.get_periodic_orbit(par.prob, x, par.p).u
+        merge(_medidas_órbita(U, p), (período = x[end],))
+    end
+    limite_fora = intervalo_órbitas[lado > 0 ? 2 : 1]
+    function perna(alvo)
+        o = BK.ContinuationPar(p_min = min(θ_s, alvo), p_max = max(θ_s, alvo),
+                               ds = sign(alvo - θ_s) * 0.005, dsmax = 0.01, max_steps = max_passos,
+                               detect_bifurcation = 3, nev = nz, tol_stability = 1e-5)
+        BK.continuation(probPO, ci, BK.PALC(), o; verbosity = 0, record_from_solution = registo)
+    end
+    para_hopf = perna(H.θ)
+    para_fora = perna(limite_fora)
+    b1, b2 = para_hopf.branch, para_fora.branch
+    junta(campo) = [reverse(getproperty(b1, campo)[2:end]); getproperty(b2, campo)]
+    pontos_po = [(tipo = sp.type, θ = sp.param) for br in (para_hopf, para_fora)
+                 for sp in br.specialpoint if sp.type !== :endpoint]
+    órb = (θ = junta(:param), amplitude = junta(:amplitude), período = junta(:período),
+           quota_mín = junta(:quota_mín), estável = junta(:stable), pontos = pontos_po,
+           ramos = (para_hopf, para_fora))
+    return merge(res, (órbitas = órb,))
+end
+
+"""
+    curva_hopf(p, X0; ω_valores=0.2:0.05:0.65, intervalo_μv=(0.0, 4.0))
+
+Fronteira de Hopf no plano (parcela salarial ω, mobilidade do capital
+variável μ_v): para cada ω uniforme, continua o crescimento equilibrado em
+`μ_v` (`bifurcacao_acumulação`, sem órbitas) e regista o primeiro Hopf —
+`μ_v_H` (`NaN` se não houver em `intervalo_μv`), a sua frequência, o
+coeficiente de Lyapunov `l1` e `supercrítico`. Abaixo da curva o
+crescimento equilibrado é estável; acima, oscila.
+"""
+function curva_hopf(p, X0; ω_valores = 0.2:0.05:0.65, intervalo_μv = (0.0, 4.0), dsmax = 0.01)
+    linhas = map(ω_valores) do ω
+        pω = com_parâmetro(p, :ω, ω)
+        r = bifurcacao_acumulação(pω, X0, :μ_v; intervalo = intervalo_μv, órbitas = false,
+                                  dsmax = dsmax, ds = dsmax)
+        isempty(r.hopf) && return (ω = ω, μ_v_H = NaN, frequência = NaN, l1 = NaN, supercrítico = false)
+        H = r.hopf[1]
+        (ω = ω, μ_v_H = H.θ, frequência = abs(H.ω), l1 = H.l1, supercrítico = H.supercrítico)
+    end
+    return (; (c => getproperty.(linhas, c) for c in keys(linhas[1]))...)
 end
