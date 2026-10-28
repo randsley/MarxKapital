@@ -24,7 +24,7 @@ países da base).
 ```bash
 git clone <este-repositório> marxkapital
 cd marxkapital
-julia install_deps.jl        # instala DifferentialEquations, Plots, DataFrames, CSV, HTTP, StatsPlots
+julia install_deps.jl        # instala DifferentialEquations, Plots, DataFrames, CSV, HTTP, StatsPlots, ForwardDiff, BifurcationKit
 ```
 
 ## Uso rápido
@@ -93,6 +93,53 @@ Comissão. Corra `verificar_sdmx_ameco()` para confirmar o acesso antes de uma
 análise real; ver `docs/LIMITACOES.md` item 3 para o estado exato de cada
 variável.
 
+## Diferenciação automática, TSSI e bifurcações
+
+Jacobianas e hessianas exatas por diferenciação automática em modo direto
+(ForwardDiff), uma camada de valorização TSSI (interpretação temporal de
+sistema único) e continuação numérica de pontos fixos (BifurcationKit):
+
+```julia
+Random.seed!(5)
+sol, depts, p = simular_Ndept(6, T = 60.0, seed = 5, acoplado = true, realização = true)
+X = sol.u[end]
+
+jacobiana_sistema(p, X)          # ∂f/∂X exata do lado direito da EDO (também com racionamento=true)
+jacobiana_parametro(p, X, :μ)    # ∂f/∂μ (qualquer campo de p, escalar ou vetorial)
+hessiana_sistema(p, X)           # H[k,i,j] = ∂²f_k/∂X_i∂X_j
+curvatura_fronteira(p.A, p.l, 0.2)   # w(r), w'(r), w''(r) da fronteira salário-lucro
+
+# Mapa de racionamento: jacobiana exata no ponto fixo, espetro, limite de
+# estabilidade α_max e a relaxação α que minimiza o raio espectral
+A = criar_matriz_tecnica(12, densidade = 0.5); σ_c = fill(0.5, 12)
+S = 5 .+ 10rand(12); O = 0.3 .+ 0.5rand(12)
+jacobiana_racionamento(A, σ_c, S, O)
+
+# TSSI: inputs comprados em t−τ custam os preços de t−τ (desfasamento τ fixo),
+# comparado com a valorização simultaneísta (preços correntes)
+v = valorizar_tssi(sol, p; τ = 1.0, h = 0.5)
+estabilidade_tssi(dados_tssi(X, p))   # a TSSI converge para os preços simultaneístas?
+
+# Bifurcações: iteração amortecida do racionamento na escala da procura s, e
+# o mapa de preços TSSI na escala da mais-valia (τ fixo)
+bifurcacao_racionamento(A, σ_c, S, O; escala = (0.005, 2.0))
+bifurcacao_tssi(X, p; τ = 1.0, escala = (0.05, 10.0))
+```
+
+O ponto fixo do racionamento é diferenciado pelo teorema da função
+implícita (não iteração a iteração), pelo que `jacobiana_sistema` funciona
+com `racionamento=true`. Um resultado desta análise: com os setores
+ordenados pela severidade do racionamento, a jacobiana do mapa de
+racionamento é triangular, com espetro em `[−1, 0]`, e `−1` é valor próprio
+assim que algum setor é racionado. A iteração amortecida converge, por
+isso, localmente para toda a relaxação `α ∈ (0, 1)`, e a iteração sem
+amortecimento (`α = 1`) fica exatamente numa fronteira de flip (ver
+`paper/main.tex`, Proposição 1). A relaxação por omissão é `α = 2/3`
+(`RELAXAÇÃO_PADRÃO`), que minimiza a taxa de contração local: cerca de
+30% menos iterações do que o anterior 0.5, com convergência nas 6870
+execuções de teste (`paper/main.tex`, Tabela 2). A camada TSSI é só de valorização: a
+dinâmica não muda.
+
 ## Dados setoriais reais (Eurostat)
 
 Ambos os caminhos de calibração usam, por omissão, estrutura sintética ou
@@ -138,6 +185,9 @@ marxkapital/
 │   ├── analise.jl          # taxas de lucro, valores-trabalho, preços, transformação
 │   ├── distributiva.jl     # curva w-r e validação de calibração
 │   ├── choques.jl          # choques salariais
+│   ├── diferenciacao.jl    # diferenciação automática: jacobianas, hessianas, espetro do racionamento
+│   ├── tssi.jl             # valorização TSSI (sistema único temporal), desfasamento τ fixo
+│   ├── bifurcacao.jl       # continuação de pontos fixos e bifurcações (BifurcationKit)
 │   ├── calibracao_pt.jl    # calibração INE (Portugal), sintética e real (Eurostat)
 │   ├── ameco.jl            # AMECO: sintético, calibração, comparação, séries
 │   ├── ameco_sdmx.jl       # API SDMX oficial da AMECO
@@ -153,6 +203,7 @@ marxkapital/
 │   ├── gerar_resultados.jl # gera todas as figuras/tabelas do artigo
 │   ├── matrix_audit.jl     # auditoria da matriz técnica A (verificação manual)
 │   ├── monte_carlo.jl      # sweeps sistemáticos (convergência, dispersão)
+│   ├── jacobiana_bifurcacao.jl # jacobiana exata, bifurcações, TSSI (offline)
 │   └── figures/
 ├── data/                   # (vazio; dados descarregados ficam aqui, não versionados)
 ├── install_deps.jl
@@ -178,7 +229,7 @@ raio espectral de `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-111 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
+168 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
 em cada push a `main` — ver `.github/workflows/test.yml`. A suite cobre os
 caminhos sintéticos/opt-in por omissão e corre totalmente offline; os
 caminhos de dados reais (`método=:sdmx`, `fonte_dados=:eurostat`,

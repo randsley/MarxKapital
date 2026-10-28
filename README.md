@@ -24,7 +24,7 @@ INE) and European (**AMECO**, all countries in the database) data.
 ```bash
 git clone <this-repository> marxkapital
 cd marxkapital
-julia install_deps.jl        # installs DifferentialEquations, Plots, DataFrames, CSV, HTTP, StatsPlots
+julia install_deps.jl        # installs DifferentialEquations, Plots, DataFrames, CSV, HTTP, StatsPlots, ForwardDiff, BifurcationKit
 ```
 
 ## Quick start
@@ -100,6 +100,52 @@ Commission. Run `verificar_sdmx_ameco()` to confirm access before a real
 analysis; see `docs/LIMITACOES.en.md` item 3 for the exact status of each
 variable.
 
+## Automatic differentiation, TSSI and bifurcations
+
+Exact Jacobians and Hessians by forward-mode automatic differentiation
+(ForwardDiff), a temporal single-system (TSSI) valuation layer, and
+numerical continuation of fixed points (BifurcationKit):
+
+```julia
+Random.seed!(5)
+sol, depts, p = simular_Ndept(6, T = 60.0, seed = 5, acoplado = true, realização = true)
+X = sol.u[end]
+
+jacobiana_sistema(p, X)          # exact ∂f/∂X of the ODE right-hand side (also with racionamento=true)
+jacobiana_parametro(p, X, :μ)    # ∂f/∂μ (any field of p, scalar or vector)
+hessiana_sistema(p, X)           # H[k,i,j] = ∂²f_k/∂X_i∂X_j
+curvatura_fronteira(p.A, p.l, 0.2)   # w(r), w'(r), w''(r) of the wage-profit frontier
+
+# Rationing map: exact Jacobian at the fixed point, spectrum, stability bound
+# α_max and the radius-minimizing relaxation α
+A = criar_matriz_tecnica(12, densidade = 0.5); σ_c = fill(0.5, 12)
+S = 5 .+ 10rand(12); O = 0.3 .+ 0.5rand(12)
+jacobiana_racionamento(A, σ_c, S, O)
+
+# TSSI: inputs bought at t−τ are costed at t−τ prices (fixed lag τ);
+# compared against simultaneist (current-price) valuation
+v = valorizar_tssi(sol, p; τ = 1.0, h = 0.5)
+estabilidade_tssi(dados_tssi(X, p))   # does TSSI converge to simultaneist prices?
+
+# Bifurcations: damped rationing iteration in the demand scale s, and the
+# TSSI price map in the surplus-value scale (τ fixed)
+bifurcacao_racionamento(A, σ_c, S, O; escala = (0.005, 2.0))
+bifurcacao_tssi(X, p; τ = 1.0, escala = (0.05, 10.0))
+```
+
+The rationing fixed point is differentiated through the implicit function
+theorem (not by unrolling the iteration), so `jacobiana_sistema` works with
+`racionamento=true`. A result from this analysis: ordered by rationing
+severity, the rationing map's Jacobian is triangular with spectrum in
+`[−1, 0]`, and `−1` is an eigenvalue once any sector is rationed. Damped
+iteration therefore converges locally for every relaxation `α ∈ (0, 1)`,
+while undamped iteration (`α = 1`) sits exactly on a flip boundary (see
+`paper/main.tex`, Proposition 1). The default relaxation is `α = 2/3`
+(`RELAXAÇÃO_PADRÃO`), which minimizes the local contraction rate: about
+30% fewer iterations than the previous 0.5, converging in all 6870 test
+runs (`paper/main.tex`, Table 2). The TSSI layer is valuation only: the
+dynamics are unchanged.
+
 ## Real sectoral data (Eurostat)
 
 Both calibration paths use synthetic structure or fixed sectoral weights
@@ -149,6 +195,9 @@ marxkapital/
 │   ├── analise.jl          # profit rates, labor values, prices, transformation
 │   ├── distributiva.jl     # wage-profit curve and calibration validation
 │   ├── choques.jl          # wage shocks
+│   ├── diferenciacao.jl    # automatic differentiation: Jacobians, Hessians, rationing spectrum
+│   ├── tssi.jl             # temporal single-system (TSSI) valuation, fixed lag τ
+│   ├── bifurcacao.jl       # fixed-point continuation and bifurcations (BifurcationKit)
 │   ├── calibracao_pt.jl    # Portuguese (INE) calibration, synthetic and real (Eurostat)
 │   ├── ameco.jl            # AMECO: synthetic, calibration, comparison, series
 │   ├── ameco_sdmx.jl       # official AMECO SDMX API
@@ -164,6 +213,7 @@ marxkapital/
 │   ├── gerar_resultados.jl # generates every figure/table in the paper
 │   ├── matrix_audit.jl     # technical matrix A audit (manual check)
 │   ├── monte_carlo.jl      # systematic sweeps (convergence, dispersion)
+│   ├── jacobiana_bifurcacao.jl # exact Jacobian, bifurcations, TSSI (offline)
 │   └── figures/
 ├── data/                   # (empty; downloaded data lands here, not version-controlled)
 ├── install_deps.jl
@@ -189,7 +239,7 @@ derived from the spectral radius of `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-111 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
+168 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
 every push to `main` — see `.github/workflows/test.yml`. The suite covers
 the default synthetic/opt-in paths and runs fully offline; the real-data
 paths (`método=:sdmx`, `fonte_dados=:eurostat`, `dados_setoriais=:eurostat`)

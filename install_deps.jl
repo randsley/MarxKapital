@@ -16,6 +16,8 @@ deps = [
     "DataFrames",             # tabelas
     "CSV",                    # leitura de CSV AMECO
     "HTTP",                   # download automático AMECO
+    "ForwardDiff",            # diferenciação automática (jacobianas, hessianas)
+    "BifurcationKit",         # continuação numérica e análise de bifurcações
 ]
 
 # Standard library — não precisam de add, mas listadas para referência:

@@ -106,6 +106,16 @@ function ajuda_modelo()
     ANÁLISE
       curva_salario_lucro(A, l)             Fronteira distributiva w-r
       simular_choque_salarial(depts, 0.10)  Choque de +10% nos salários
+      curvatura_fronteira(A, l, r)          w(r), w'(r), w''(r) exatos (AD)
+
+    DIFERENCIAÇÃO AUTOMÁTICA, TSSI E BIFURCAÇÕES
+      jacobiana_sistema(p, X)               Jacobiana exata da EDO (ForwardDiff)
+      hessiana_sistema(p, X)                Hessianas do lado direito da EDO
+      jacobiana_racionamento(A,σ_c,S,O)     Espetro do mapa de racionamento, α_max, α ótimo
+      valorizar_tssi(sol, p; τ=1.0)         Valores/preços TSSI com desfasamento τ
+      comparar_tssi_simultaneo(sol, p)      Taxa de lucro TSSI vs. simultaneísta
+      bifurcacao_racionamento(A,σ_c,S,O)    Continuação na escala da procura (BifurcationKit)
+      bifurcacao_tssi(X, p; τ=1.0)          Continuação do mapa de preços TSSI
 
     TESTES / AJUDA
       testar_modelo()                       Bateria de validação

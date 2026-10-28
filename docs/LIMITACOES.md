@@ -370,7 +370,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 111 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 168 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`fonte_dados=:eurostat`,
@@ -409,3 +409,43 @@ investimento em vez do deflator do PIB, para testar sensibilidade à
 escolha do deflator). Verificado diretamente: `e` é agora idêntico entre
 convenções para todos os anos, para Portugal e Espanha — não apenas
 afirmado algebricamente.
+
+## 10. Diferenciação automática, TSSI e bifurcações — alcance
+
+- **Convergência do racionamento: local provada, global não.** A
+  jacobiana exata (`jacobiana_racionamento`) é triangular com os setores
+  ordenados por ρ*, com espetro em `[−1, 0]` (`paper/main.tex`,
+  Proposição 1): a iteração amortecida converge localmente para todo
+  `α ∈ (0, 1)`. Continuam em aberto a unicidade do ponto fixo e a
+  convergência global a partir de qualquer ρ inicial. A Proposição
+  assume o caso genérico (sem empates no mínimo que define κⱼ, nenhum
+  `xᵢ/Dᵢ = 1` exato); nos empates a diferenciação automática devolve a
+  derivada do ramo escolhido por `minimum`.
+- **Relaxação por omissão (corrigido: 0.5 → 2/3).** Com valores próprios
+  0 e −1 presentes (todos os casos do sweep), o `α` que minimiza o raio
+  espectral é 2/3 (raio 1/3). Passou a ser o valor por omissão
+  (`RELAXAÇÃO_PADRÃO`): ≈30% menos iterações, e a convergência longe do
+  ponto fixo foi verificada empiricamente (6870 execuções por `α`, de 0.4
+  a 0.95, sem falhas — `paper/main.tex`, Tabela 2), já que a Proposição 1
+  só garante convergência local.
+- **Hessianas através do racionamento não são suportadas.** A derivada do
+  ponto fixo pelo teorema da função implícita é só de primeira ordem;
+  `hessiana_sistema` funciona sem `racionamento=true`.
+- **A TSSI é só uma camada de valorização.** O termo de mobilidade de
+  capital continua a usar taxas de lucro simultaneístas (Sraffa); não há
+  uma variante da dinâmica conduzida pela TSSI. O desfasamento τ é um só
+  e fixo (não uma distribuição de tempos de rotação por setor), e a
+  depreciação `d = δC/x` é valorizada a preços-base, não a preços
+  históricos de aquisição.
+- **As bifurcações são de mapas, não da EDO.** `sistema_Ndept!` e
+  `sistema_Ndept_io!` crescem sem limite e não têm equilíbrios em níveis;
+  analisar bifurcações da própria EDO exigiria reescrevê-la em variáveis
+  normalizadas (quotas de capital, composições orgânicas). A deteção de
+  bifurcações do BifurcationKit assume EDOs, pelo que a classificação
+  (fold/flip/Neimark–Sacker) é feita sobre os multiplicadores do mapa em
+  `continuar_ponto_fixo`; no racionamento, a perda de estabilidade em
+  `s_c` é uma colisão de fronteira (mapa seccionalmente suave), localizada
+  só à resolução do passo de continuação.
+- **Sem bifurcação no mapa de preços TSSI nos casos testados** (50
+  economias aleatórias, escala da mais-valia em [0.05, 10]). É uma
+  verificação empírica, não uma prova de estabilidade para todo o `A`.

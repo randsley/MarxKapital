@@ -241,13 +241,7 @@ function sistema_Ndept_io!(dX, X, p, t)
     r̄_naive = sum(S) / sum(C .+ V)
     r_efetivo = clamp(r̄_naive, 0.0, 0.95 * p.R_max)
 
-    π = try
-        precos = calcular_precos_producao(p.A, p.l, p.w, r_efetivo)
-        λ = calcular_valores_trabalho(p.A, p.l)
-        precos ./ λ
-    catch
-        ones(N)
-    end
+    π = _razão_preço_valor(p, r_efetivo, N)
 
     C_valorizado = π .* C
     r = S ./ (C_valorizado .+ V)
@@ -259,7 +253,9 @@ function sistema_Ndept_io!(dX, X, p, t)
     # discussão da conservação do termo de mobilidade).
     r̄ = sum(r .* C) / sum(C)
 
-    κ = ones(N)
+    # `κ` herda o tipo de `S` (não `ones(N)`, Float64): sob diferenciação
+    # automática (ForwardDiff, `src/diferenciacao.jl`) o estado é `Dual`.
+    κ = fill(one(eltype(S)), N)
     if p.racionamento || p.realização
         # W = fluxo tipo valor-acrescentado do período (capital constante
         # TRANSFERIDO, δ.*C, não o stock C — ver `capital_transferido` em
@@ -293,7 +289,7 @@ function sistema_Ndept_io!(dX, X, p, t)
         else
             procura_intermédia = p.A * O
             soma_procura = sum(procura_intermédia)
-            soma_procura > 0 && (κ .= min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0))
+            soma_procura > 0 && (κ = fill(min(sum(min.(O, procura_intermédia)) / soma_procura, 1.0), N))
         end
     end
 
@@ -302,7 +298,40 @@ function sistema_Ndept_io!(dX, X, p, t)
 end
 
 """
-    _resolver_racionamento(A, σ_c, S, O; max_iter=100, tol=1e-8)
+Relaxação por omissão da iteração de racionamento, `ρ ↦ (1−α)ρ + αF(ρ)`.
+Com os setores ordenados por ρ*, a jacobiana de `F` é triangular com
+valores próprios `−θₖ ∈ [−1, 0]`, e 0 e −1 ocorrem sempre que há
+racionamento (`paper/main.tex`, Proposição 1); `α = 2/3` minimiza
+`max(|1−α|, |1−2α|)`, contraindo o erro local por 1/3 a cada passo (0.5,
+o valor anterior, contrai por 1/2). Verificado em 6870 casos (sweep de
+`paper/monte_carlo.jl`, pontos iniciais aleatórios, oferta muito escassa):
+convergência em todos, ≈30% menos iterações do que com 0.5.
+"""
+const RELAXAÇÃO_PADRÃO = 2 / 3
+
+"""
+    _razão_preço_valor(p, r_efetivo, N)
+
+Razão preço de produção / valor-trabalho, `πᵢ = pᵢ/λᵢ`, usada para valorizar
+o capital constante em `sistema_Ndept_io!` e `calcular_taxas_lucro_precos`.
+Se o sistema de preços for singular (`calcular_precos_producao` lança
+`ErrorException`), cai para `π = 1` (preços = valores). Outros erros — por
+exemplo um `MethodError` sob diferenciação automática — são relançados, para
+não serem mascarados silenciosamente pelo fallback.
+"""
+function _razão_preço_valor(p, r_efetivo, N)
+    try
+        precos = calcular_precos_producao(p.A, p.l, p.w, r_efetivo)
+        λ = calcular_valores_trabalho(p.A, p.l)
+        return precos ./ λ
+    catch err
+        err isa ErrorException || rethrow()
+        return fill(one(r_efetivo), N)
+    end
+end
+
+"""
+    _resolver_racionamento(A, σ_c, S, O; max_iter=200, tol=1e-8, relaxação=RELAXAÇÃO_PADRÃO)
 
 Resolve o racionamento de mercado (regra do lado curto, tecnologia Leontief)
 para os bens de investimento, dado o estado corrente. Para cada setor
@@ -319,27 +348,38 @@ iteração de ponto fixo (`ρ`= fator de racionamento por setor fornecedor,
     Dᵢ = Σⱼ A[i,j]·κⱼ·σ_c,ⱼ·Sⱼ                     (procura efetiva, já consistente com o racionamento)
     ρᵢ = min(1, Oᵢ / Dᵢ)                          (regra do lado curto)
 
+A iteração é amortecida, `ρ ← (1−α)ρ + α·F(ρ)` com `α = relaxação`
+(por omissão `RELAXAÇÃO_PADRÃO = 2/3`; ver a sua docstring).
+
 Se não convergir em `max_iter` iterações, cai-se para `κ = ones(N)` (sem
 racionamento, equivalente a desligar este mecanismo) com um aviso — a
 mesma filosofia de degradação graciosa usada no resto do código (fallback
 de preços de Sraffa na mesma função, fallbacks de rede AMECO/Eurostat).
 """
-function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8, relaxação = 0.5,
+function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8,
+                                relaxação = RELAXAÇÃO_PADRÃO,
                                 ρ_inicial = nothing, devolver_diagnóstico::Bool = false)
     N = length(S)
     D_planeado = σ_c .* S
-    fornecedores(j) = A[:, j] .> 0
+    # Sob diferenciação automática, o ponto fixo resolve-se em valores
+    # (Float64) e a derivada propaga-se pelo teorema da função implícita
+    # (`_racionamento_dual`), em vez de diferenciar cada iteração.
+    if eltype(D_planeado) <: ForwardDiff.Dual || eltype(O) <: ForwardDiff.Dual ||
+       eltype(A) <: ForwardDiff.Dual
+        devolver_diagnóstico && error("devolver_diagnóstico não suportado com números Dual")
+        return _racionamento_dual(A, D_planeado, O; max_iter = max_iter, tol = tol,
+                                  relaxação = relaxação, ρ_inicial = ρ_inicial)
+    end
     ρ = isnothing(ρ_inicial) ? ones(N) : copy(ρ_inicial)
     convergiu = false
     iterações = max_iter
     for it in 1:max_iter
-        κ = [minimum(ρ[fornecedores(j)]; init = 1.0) for j in 1:N]
-        D_real = A * (κ .* D_planeado)
-        ρ_alvo = min.(1.0, O ./ max.(D_real, 1e-12))
+        ρ_alvo = _mapa_racionamento(ρ, A, D_planeado, O)
         # sub-relaxação: sem isto, a iteração pode oscilar entre dois estados em vez de
         # convergir (o mapa min(1,O/D) não é uma contração pura) — verificado num exemplo
         # de 2 setores em que a versão sem relaxação oscilava indefinidamente entre
-        # ρ=[0.8,1] e ρ=[1,1].
+        # ρ=[0.8,1] e ρ=[1,1]. Ver `jacobiana_racionamento` (`src/diferenciacao.jl`)
+        # para o intervalo de `relaxação` que garante convergência local.
         ρ_novo = (1 - relaxação) .* ρ .+ relaxação .* ρ_alvo
         if maximum(abs.(ρ_novo .- ρ)) < tol
             ρ = ρ_novo
@@ -350,12 +390,58 @@ function _resolver_racionamento(A, σ_c, S, O; max_iter = 200, tol = 1e-8, relax
         ρ = ρ_novo
     end
     convergiu || @warn "Racionamento não convergiu em $max_iter iterações; a usar κ=1 (sem racionamento)."
-    κ_final = convergiu ? [minimum(ρ[fornecedores(j)]; init = 1.0) for j in 1:N] : ones(N)
+    κ_final = convergiu ? _κ_racionamento(ρ, A) : ones(N)
     if devolver_diagnóstico
-        return (κ = κ_final, convergiu = convergiu, iterações = iterações,
+        return (κ = κ_final, ρ = ρ, convergiu = convergiu, iterações = iterações,
                 fração_racionada = count(κ_final .< 0.999) / N)
     end
     return κ_final
+end
+
+"""
+    _κ_racionamento(ρ, A)
+
+`κⱼ = min_{i: A[i,j]>0} ρᵢ` (1 se a coluna j de A não tiver fornecedores).
+"""
+_κ_racionamento(ρ, A) = [minimum((ρ[i] for i in axes(A, 1) if A[i, j] > 0); init = one(eltype(ρ)))
+                         for j in axes(A, 2)]
+
+"""
+    _mapa_racionamento(ρ, A, D_planeado, O)
+
+O mapa `F(ρ)` cujo ponto fixo `_resolver_racionamento` procura (Equação
+`eq:rationing` de `paper/main.tex`): `F(ρ)ᵢ = min(1, Oᵢ/Dᵢ(κ(ρ)))`, com
+`Dᵢ = Σⱼ A[i,j]·κⱼ·D_planeadoⱼ`. Genérico no tipo de número, para que
+ForwardDiff possa calcular `∂F/∂ρ` (ver `jacobiana_racionamento`).
+"""
+function _mapa_racionamento(ρ, A, D_planeado, O)
+    κ = _κ_racionamento(ρ, A)
+    D_real = A * (κ .* D_planeado)
+    return min.(one(eltype(D_real)), O ./ max.(D_real, 1e-12))
+end
+
+"""
+    _racionamento_dual(A, D_planeado, O; kwargs...)
+
+Versão de `_resolver_racionamento` para entradas `ForwardDiff.Dual`. Resolve
+o ponto fixo `ρ* = F(ρ*; θ)` em valores e propaga as derivadas pelo teorema
+da função implícita, `dρ* = (I − ∂F/∂ρ)⁻¹ · ∂F/∂θ·dθ`, que é exato no ponto
+fixo (mesma técnica que `SpatialEconometrics.StructuralMacroCalibration`
+usa para o balanceamento GRAS). Devolve `κ(ρ*)` como vetor de `Dual`.
+"""
+function _racionamento_dual(A, D_planeado, O; kwargs...)
+    val(x) = ForwardDiff.value.(x)
+    Av, Dv, Ov = val(A), val(D_planeado), val(O)
+    diag = _resolver_racionamento(Av, ones(length(Dv)), Dv, Ov; devolver_diagnóstico = true, kwargs...)
+    diag.convergiu || return fill(one(eltype(promote_type(eltype(A), eltype(D_planeado), eltype(O)))), length(Dv))
+    ρ★ = diag.ρ
+    Fθ = _mapa_racionamento(ρ★, A, D_planeado, O)            # ∂F/∂θ·dθ nas partials
+    Jρ = ForwardDiff.jacobian(r -> _mapa_racionamento(r, Av, Dv, Ov), ρ★)
+    TD = eltype(Fθ)
+    P = reduce(vcat, (collect(ForwardDiff.partials(f))' for f in Fθ))
+    dρ = (matriz_identidade(length(ρ★)) .- Jρ) \ P
+    ρ_dual = [TD(ρ★[i], ForwardDiff.Partials(Tuple(dρ[i, :]))) for i in eachindex(ρ★)]
+    return _κ_racionamento(ρ_dual, A)
 end
 
 # ----------------------------------------------------------------------------

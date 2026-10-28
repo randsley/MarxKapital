@@ -39,13 +39,7 @@ function calcular_taxas_lucro_precos(sol, p)
         r̄_naive = sum(S) / sum(C .+ V)
         r_efetivo = clamp(r̄_naive, 0.0, 0.95 * p.R_max)
 
-        π = try
-            precos = calcular_precos_producao(p.A, p.l, p.w, r_efetivo)
-            λ = calcular_valores_trabalho(p.A, p.l)
-            precos ./ λ
-        catch
-            ones(N)
-        end
+        π = _razão_preço_valor(p, r_efetivo, N)
 
         r[:, idx] = S ./ (π .* C .+ V)
     end

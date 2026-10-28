@@ -6,6 +6,54 @@
 
 Format based on Keep a Changelog. Semantic versioning.
 
+## [Unreleased]
+
+### Added
+- **Automatic differentiation** (`src/diferenciacao.jl`, ForwardDiff):
+  exact Jacobian of the ODE right-hand side (`jacobiana_sistema`, also
+  with `racionamento=true`), parameter sensitivities
+  (`jacobiana_parametro`), Hessians (`hessiana_sistema`), exact
+  curvature of the wage-profit frontier (`curvatura_fronteira`), and
+  the spectrum of the rationing map at its fixed point
+  (`jacobiana_racionamento`: eigenvalues, `α_max`, optimal `α`). The
+  rationing fixed point is differentiated through the implicit function
+  theorem (`_racionamento_dual`).
+- **Result:** with sectors ordered by ρ*, the rationing map's Jacobian is
+  triangular, with real spectrum in `[−1, 0]`, and `−1` is an eigenvalue
+  once any sector is rationed. Damped iteration converges locally for
+  every `α ∈ (0, 1)`; `α = 1` sits exactly on a flip boundary. Checked on
+  the 270 cases of the `paper/monte_carlo.jl` sweep and proved in
+  `paper/main.tex` (Proposition 1).
+- **TSSI** (`src/tssi.jl`): temporal single-system valuation along
+  trajectories, with a fixed production lag τ (`valorizar_tssi`,
+  `mapa_tssi`, `preços_simultâneos`, `estabilidade_tssi`,
+  `comparar_tssi_simultaneo`). Valuation layer only; the dynamics are
+  unchanged.
+- **Bifurcations** (`src/bifurcacao.jl`, BifurcationKit): continuation of
+  fixed points of maps, with classification by multipliers (fold, flip,
+  Neimark–Sacker): `continuar_ponto_fixo`, `bifurcacao_racionamento`,
+  `bifurcacao_tssi`, `plotar_bifurcacao`.
+- `paper/jacobiana_bifurcacao.jl` and the paper's new Sections 3.4, 3.5
+  and 5.5 (figures 7–9). The quoted numbers are generated into
+  `paper/figures/jacobian_stats.tex`, which the paper reads directly.
+- New dependencies: `ForwardDiff`, `BifurcationKit` (`install_deps.jl`).
+
+### Changed
+- **Default rationing relaxation: 0.5 → 2/3** (`RELAXAÇÃO_PADRÃO`, used
+  by `_resolver_racionamento`, `jacobiana_racionamento` and
+  `bifurcacao_racionamento`). With spectrum in `[−1, 0]` and the 0 and −1
+  modes always present, 2/3 minimizes the spectral radius (1/3 instead of
+  1/2): ≈30% fewer iterations (mean 18.0 vs. 25.8 on the 270-case sweep),
+  converging in all 6870 runs per value of α (including random initial
+  points and much scarcer supply; Table 2 of the paper). The fixed point
+  does not change (difference ≤ 2.4e-9 along the Figure 4 trajectory).
+- `README.md` is now the English version (the default); the Portuguese
+  one is `README.pt.md`.
+- `sistema_Ndept_io!` and `_resolver_racionamento` are generic in the
+  number type (they accept `ForwardDiff.Dual`). The price fallback
+  (π = 1) now catches only singular systems (`ErrorException`) and
+  rethrows other errors instead of masking them (`_razão_preço_valor`).
+
 ## [0.6.1] — 2026-07-30
 
 ### Added

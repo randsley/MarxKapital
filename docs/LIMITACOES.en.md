@@ -380,7 +380,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 111 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 168 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`fonte_dados=:eurostat`,
@@ -419,3 +419,41 @@ instead of the GDP deflator, to test sensitivity to the choice of
 deflator). Verified directly: `e` is now identical across conventions
 for every year, for both Portugal and Spain — not merely asserted
 algebraically.
+
+## 10. Automatic differentiation, TSSI and bifurcations — scope
+
+- **Rationing convergence: local proved, global not.** The exact
+  Jacobian (`jacobiana_racionamento`) is triangular with sectors ordered
+  by ρ*, with spectrum in `[−1, 0]` (`paper/main.tex`, Proposition 1):
+  damped iteration converges locally for every `α ∈ (0, 1)`. Uniqueness
+  of the fixed point and global convergence from any initial ρ remain
+  open. The Proposition assumes the generic case (no ties in the minimum
+  defining κⱼ, no exact `xᵢ/Dᵢ = 1`); at ties, automatic differentiation
+  returns the derivative of the branch `minimum` selects.
+- **Default relaxation (fixed: 0.5 → 2/3).** With eigenvalues 0 and −1
+  both present (every case in the sweep), the radius-minimizing `α` is
+  2/3 (radius 1/3). It is now the default (`RELAXAÇÃO_PADRÃO`): ≈30% fewer
+  iterations, with convergence far from the fixed point checked
+  empirically (6870 runs per `α`, from 0.4 to 0.95, no failures —
+  `paper/main.tex`, Table 2), since Proposition 1 only guarantees local
+  convergence.
+- **Hessians through rationing are not supported.** The implicit-function
+  derivative of the fixed point is first-order only; `hessiana_sistema`
+  works without `racionamento=true`.
+- **TSSI is a valuation layer only.** The capital-mobility term still
+  uses simultaneist (Sraffian) profit rates; there is no TSSI-driven
+  variant of the dynamics. The lag τ is a single fixed constant (not a
+  distribution of turnover times by sector), and depreciation
+  `d = δC/x` is valued at base prices, not historical acquisition prices.
+- **The bifurcations are of maps, not of the ODE.** `sistema_Ndept!` and
+  `sistema_Ndept_io!` grow without bound and have no equilibria in
+  levels; analyzing bifurcations of the ODE itself would require
+  rewriting it in normalized variables (capital shares, organic
+  compositions). BifurcationKit's bifurcation detection assumes ODEs, so
+  the classification (fold/flip/Neimark–Sacker) is done on the map's
+  multipliers in `continuar_ponto_fixo`; for rationing, the loss of
+  stability at `s_c` is a border collision (piecewise-smooth map),
+  located only to the resolution of the continuation step.
+- **No bifurcation of the TSSI price map in the cases tested** (50 random
+  economies, surplus-value scale in [0.05, 10]). This is an empirical
+  check, not a stability proof for every `A`.

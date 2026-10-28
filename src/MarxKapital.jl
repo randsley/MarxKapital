@@ -21,6 +21,10 @@ using Dates
 using Random
 using HTTP
 using CSV
+using ForwardDiff
+# Importado com prefixo (BK.continuation, BK.@optic, ...) para não poluir o
+# espaço de nomes com os exports genéricos do BifurcationKit.
+import BifurcationKit as BK
 
 # Import explícito para evitar ambiguidades com StatsBase/Distributions se
 # carregados noutro ponto da sessão.
@@ -35,6 +39,9 @@ include(joinpath(_MK_SRC, "nucleo.jl"))
 include(joinpath(_MK_SRC, "analise.jl"))
 include(joinpath(_MK_SRC, "distributiva.jl"))
 include(joinpath(_MK_SRC, "choques.jl"))
+include(joinpath(_MK_SRC, "diferenciacao.jl"))
+include(joinpath(_MK_SRC, "tssi.jl"))
+include(joinpath(_MK_SRC, "bifurcacao.jl"))
 include(joinpath(_MK_SRC, "eurostat_sdmx.jl"))
 include(joinpath(_MK_SRC, "calibracao_pt.jl"))
 include(joinpath(_MK_SRC, "ameco_sdmx.jl"))

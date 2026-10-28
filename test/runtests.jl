@@ -307,6 +307,188 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test !(st_fbcf.e[1] ≈ st_corrente.e[1])
     end
 
+    # Diferenças finitas centrais, referência independente para a diferenciação automática.
+    function jacobiana_df(f, x; h = 1e-6)
+        f0 = f(x)
+        J = zeros(length(f0), length(x))
+        for j in eachindex(x)
+            δx = zeros(length(x)); δx[j] = h
+            J[:, j] = (f(x .+ δx) .- f(x .- δx)) ./ (2h)
+        end
+        return J
+    end
+
+    @testset "Jacobiana exata da EDO (AD vs. diferenças finitas)" begin
+        for (realização, racionamento) in ((false, false), (true, false), (false, true))
+            Random.seed!(5)
+            sol, _, p = simular_Ndept(6, T = 50.0, seed = 5, acoplado = true, μ = 0.5,
+                                      realização = realização, racionamento = racionamento)
+            X = sol.u[end]
+            J = jacobiana_sistema(p, X)
+            J_df = jacobiana_df(_rhs(p), X; h = 1e-4 * maximum(X))
+            @test size(J) == (12, 12)
+            @test maximum(abs.(J .- J_df)) / maximum(abs.(J)) < 1e-2
+        end
+        Random.seed!(3)
+        sol, _, p = simular_Ndept(5, T = 20.0, seed = 3)
+        X = sol.u[end]   # sistema linear: diferenças finitas exatas a menos de arredondamento
+        @test jacobiana_sistema(p, X) ≈ jacobiana_df(_rhs(p), X; h = 1e-3 * maximum(X)) rtol = 1e-8
+        @test size(jacobiana_parametro(p, X, :e)) == (10, 5)
+    end
+
+    @testset "Hessiana da EDO" begin
+        Random.seed!(5)
+        sol, _, p = simular_Ndept(4, T = 20.0, seed = 5, acoplado = true, μ = 0.5)
+        X = sol.u[end]
+        H = hessiana_sistema(p, X)
+        @test size(H) == (8, 8, 8)
+        @test maximum(abs.(H .- permutedims(H, (1, 3, 2)))) < 1e-8 * max(1, maximum(abs.(H)))
+        # linha k da hessiana = jacobiana de ∂f_k/∂X
+        H_df = jacobiana_df(x -> jacobiana_sistema(p, x)[1, :], X; h = 1e-4 * maximum(X))
+        @test maximum(abs.(H[1, :, :] .- H_df)) <= 1e-3 * max(1e-12, maximum(abs.(H[1, :, :])))
+    end
+
+    @testset "Jacobiana do racionamento — exemplo de 2 setores" begin
+        # Secção 3.3 do artigo: um único valor próprio ativo λ = −1. O setor 2 não é
+        # racionado (λ = 0), donde α_max = 1 (flip na iteração sem amortecimento) e o
+        # α minimax é 2/3 = RELAXAÇÃO_PADRÃO (não 1/2: o modo λ = 0 decai a |1−α|).
+        jr = jacobiana_racionamento([0.0 0.5; 0.0 0.0], [0.5, 0.5], [10.0, 10.0], [2.0, 100.0])
+        @test jr.ρ[1] ≈ sqrt(0.8) atol = 1e-9
+        @test sort(real.(jr.valores_próprios)) ≈ [-1.0, 0.0] atol = 1e-9
+        @test jr.antítona
+        @test jr.α_max ≈ 1.0 atol = 1e-9
+        @test jr.α_ótimo ≈ 2 / 3 atol = 1e-6
+        @test jr.α_ótimo ≈ RELAXAÇÃO_PADRÃO atol = 1e-6
+        @test jr.raio_espectral ≈ 1 / 3 atol = 1e-9    # max(|1−α|, |1−2α|) com α = 2/3
+        # α = 0.5 anula o modo λ = −1, mas o modo λ = 0 fica a 0.5
+        @test raio_espectral_amortecido(jr.valores_próprios, 0.5) ≈ 0.5 atol = 1e-9
+        @test jr.convergência_local
+    end
+
+    @testset "Racionamento — λ = −1 estrutural e forma fechada" begin
+        Random.seed!(11)
+        N = 12
+        A = criar_matriz_tecnica(N, densidade = 0.5)
+        σ_c = fill(0.5, N)
+        S = 5.0 .+ 10 * rand(N)
+        O = 0.3 .+ rand(N) * 0.5
+        jr = jacobiana_racionamento(A, σ_c, S, O)
+        @test jr.antítona
+        @test minimum(abs.(jr.valores_próprios .+ 1)) < 1e-9
+        k = argmin(jr.ρ)
+        @test jr.J[k, :] ≈ -[i == k ? 1.0 : 0.0 for i in 1:N] atol = 1e-9
+        L_k = sum(A[k, :] .* σ_c .* S)
+        @test jr.ρ[k] ≈ sqrt(O[k] / L_k) atol = 1e-9
+        @test jr.α_max <= 1 + 1e-9
+        # J é triangular com os setores ordenados por ρ* (J_ik ≠ 0 só se ρ_k ≤ ρ_i):
+        # valores próprios = diagonal, reais e em [−1, 0].
+        ordem = sortperm(jr.ρ)
+        Jo = jr.J[ordem, ordem]
+        @test all(abs(Jo[i, j]) < 1e-10 for i in 1:N, j in 1:N if j > i)
+        @test sort(real.(jr.valores_próprios)) ≈ sort(diag(jr.J)) atol = 1e-10
+        @test all(-1 - 1e-10 .<= real.(jr.valores_próprios) .<= 1e-10)
+        @test jr.raio_espectral ≈ 1 / 3 atol = 1e-9
+    end
+
+    @testset "Derivada do ponto fixo de racionamento (função implícita)" begin
+        Random.seed!(11)
+        N = 12
+        A = criar_matriz_tecnica(N, densidade = 0.5)
+        σ_c = fill(0.5, N)
+        S = 5.0 .+ 10 * rand(N)
+        O = 0.3 .+ rand(N) * 0.5
+        f(o) = _resolver_racionamento(A, σ_c, S, o; tol = 1e-13, max_iter = 10_000)
+        J = ForwardDiff.jacobian(f, O)
+        @test J ≈ jacobiana_df(f, O) rtol = 1e-6
+    end
+
+    @testset "Curvatura da fronteira salário-lucro (forma fechada)" begin
+        # Se l é vetor próprio de Aᵀ com valor próprio λ, w(r) = (1/(1+r) − λ)/l₁,
+        # donde w''(r) = 2/((1+r)³·l₁).
+        A = [0.20 0.10 0.05; 0.10 0.30 0.10; 0.05 0.10 0.20]   # irredutível: vetor de PF > 0
+        vals, vecs = eigen(Matrix(A'))
+        k = argmax(real.(vals))
+        l = abs.(real.(vecs[:, k]))
+        λ = real(vals[k])
+        c = curvatura_fronteira(A, l, 0.2)
+        @test c.w ≈ (1 / 1.2 - λ) / l[1]
+        @test c.dw ≈ -1 / (1.2^2 * l[1])
+        @test c.d2w ≈ 2 / (1.2^3 * l[1])
+        @test c.forma == :convexa
+    end
+
+    @testset "TSSI — invariantes e convergência" begin
+        Random.seed!(5)
+        sol, _, p = simular_Ndept(6, T = 60.0, seed = 5, acoplado = true, μ = 0.5,
+                                  realização = true)
+        v = valorizar_tssi(sol, p; τ = 1.0, h = 0.5)
+        @test v.erro_invariantes < 1e-12
+        @test length(v.r_tssi) == length(v.t)
+        @test all(v.r_tssi .> 0)
+        # τ tem de ser múltiplo de h
+        @test_throws ErrorException valorizar_tssi(sol, p; τ = 0.7, h = 0.5)
+
+        # Com dados congelados, os preços TSSI convergem para os simultaneístas,
+        # à taxa dada pelo raio espectral da jacobiana exata.
+        d = dados_tssi(sol.u[end], p)
+        est = estabilidade_tssi(d; τ = 2.0)
+        @test est.estável
+        @test est.taxa_convergência ≈ log(est.raio_espectral) / 2.0
+        q = ones(6)
+        for _ in 1:300
+            q = mapa_tssi(q, d).p
+        end
+        @test q ≈ est.p★ rtol = 1e-10
+        # J em forma fechada: [(1+r)I − r·c·xᵀ/(xᵀc)]·Aᵀ
+        c = d.A' * est.p★ .+ d.d .+ d.v
+        J_fechada = ((1 + est.r★) .* matriz_identidade(6) .- est.r★ .* (c * d.x') ./ sum(d.x .* c)) * d.A'
+        @test est.J ≈ J_fechada rtol = 1e-10
+        # Ponto fixo ⇒ TSSI e simultaneísmo coincidem.
+        passo = mapa_tssi(est.p★, d)
+        @test passo.r ≈ est.r★
+    end
+
+    @testset "Bifurcações — racionamento" begin
+        Random.seed!(11)
+        N = 12
+        A = criar_matriz_tecnica(N, densidade = 0.5)
+        σ_c = fill(0.5, N)
+        S = 5.0 .+ 10 * rand(N)
+        O = 0.3 .+ rand(N) * 0.5
+        br = bifurcacao_racionamento(A, σ_c, S, O; escala = (0.005, 2.0))
+        @test isempty(br.pontos)                        # α = 2/3 estável em todo o ramo
+        @test all(br.raio .< 1)
+        @test br.α_max[1] ≈ 2.0                          # sem racionamento: F constante
+        @test all(br.α_max[br.fração_racionada .> 0] .<= 1 + 1e-9)
+        @test br.fração_racionada[end] == 1.0
+        k = length(br.θ)
+        diag = _resolver_racionamento(A, ones(N), br.θ[k] .* σ_c .* S, O; tol = 1e-12,
+                                      max_iter = 10_000, devolver_diagnóstico = true)
+        @test diag.ρ ≈ br.z[:, k] atol = 1e-8
+
+        # α > 1: flip (duplicação de período) no início do racionamento, em
+        # s_c = minᵢ Oᵢ/Lᵢ (Lᵢ = procura sem racionamento) — colisão de fronteira,
+        # localizada à resolução do passo de continuação (dsmax = 0.05).
+        s_c = minimum(O ./ (A * (σ_c .* S)))
+        @test br.θ[findfirst(br.fração_racionada .> 0)] >= s_c - 1e-9
+        br_flip = bifurcacao_racionamento(A, σ_c, S, O; escala = (0.005, 2.0), relaxação = 1.1)
+        @test !isempty(br_flip.pontos)
+        @test br_flip.pontos[1].tipo == :flip
+        @test br_flip.pontos[1].θ ≈ s_c atol = 0.05
+    end
+
+    @testset "Bifurcações — preços TSSI (τ fixo)" begin
+        Random.seed!(5)
+        sol, _, p = simular_Ndept(6, T = 60.0, seed = 5, acoplado = true, μ = 0.5,
+                                  realização = true)
+        bt = bifurcacao_tssi(sol.u[end], p; τ = 1.0, escala = (0.05, 10.0))
+        @test bt.θ[end] ≈ 10.0
+        @test all(bt.raio .< 1)
+        @test isempty(bt.pontos)
+        @test issorted(bt.r★)                            # r★ cresce com a mais-valia
+        @test all(bt.r★ .< p.R_max)
+    end
+
     @testset "Bateria interna" begin
         @test testar_modelo()
     end

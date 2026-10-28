@@ -6,6 +6,54 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [Por lançar]
+
+### Adicionado
+- **Diferenciação automática** (`src/diferenciacao.jl`, ForwardDiff):
+  jacobiana exata do lado direito da EDO (`jacobiana_sistema`, também
+  com `racionamento=true`), sensibilidade a parâmetros
+  (`jacobiana_parametro`), hessianas (`hessiana_sistema`), curvatura
+  exata da fronteira salário-lucro (`curvatura_fronteira`) e espetro do
+  mapa de racionamento no ponto fixo (`jacobiana_racionamento`: valores
+  próprios, `α_max`, `α` ótimo). O ponto fixo do racionamento é
+  diferenciado pelo teorema da função implícita (`_racionamento_dual`).
+- **Resultado:** a jacobiana do mapa de racionamento é triangular com os
+  setores ordenados por ρ*, com espetro real em `[−1, 0]`, e `−1` é valor
+  próprio assim que algum setor é racionado. A iteração amortecida
+  converge localmente para todo `α ∈ (0, 1)`; `α = 1` está exatamente
+  numa fronteira de flip. Verificado nos 270 casos do sweep de
+  `paper/monte_carlo.jl` e provado em `paper/main.tex` (Proposição 1).
+- **TSSI** (`src/tssi.jl`): valorização temporal de sistema único ao
+  longo de trajetórias, com desfasamento de produção τ fixo
+  (`valorizar_tssi`, `mapa_tssi`, `preços_simultâneos`,
+  `estabilidade_tssi`, `comparar_tssi_simultaneo`). Camada de
+  valorização apenas; a dinâmica não muda.
+- **Bifurcações** (`src/bifurcacao.jl`, BifurcationKit): continuação de
+  pontos fixos de mapas com classificação por multiplicadores (fold,
+  flip, Neimark–Sacker) — `continuar_ponto_fixo`,
+  `bifurcacao_racionamento`, `bifurcacao_tssi`, `plotar_bifurcacao`.
+- `paper/jacobiana_bifurcacao.jl` e as novas Secções 3.4, 3.5 e 5.5 do
+  artigo (figuras 7–9). Os números citados são gerados em
+  `paper/figures/jacobian_stats.tex`, que o artigo lê diretamente.
+- Dependências novas: `ForwardDiff`, `BifurcationKit` (`install_deps.jl`).
+
+### Alterado
+- **Relaxação por omissão do racionamento: 0.5 → 2/3**
+  (`RELAXAÇÃO_PADRÃO`, usada por `_resolver_racionamento`,
+  `jacobiana_racionamento` e `bifurcacao_racionamento`). Com espetro em
+  `[−1, 0]` e os modos 0 e −1 sempre presentes, 2/3 minimiza o raio
+  espectral (1/3 em vez de 1/2): ≈30% menos iterações (média 18.0 vs.
+  25.8 no sweep de 270 casos), convergência em todas as 6870 execuções
+  por valor de α (pontos iniciais aleatórios e oferta muito escassa
+  incluídos; Tabela 2 do artigo). O ponto fixo não muda (diferença
+  ≤ 2.4e-9 na trajetória da Figura 4).
+- `README.md` passa a ser a versão inglesa (por omissão); a portuguesa
+  está em `README.pt.md`.
+- `sistema_Ndept_io!` e `_resolver_racionamento` são genéricos no tipo de
+  número (aceitam `ForwardDiff.Dual`). O fallback de preços (π = 1)
+  passa a apanhar só sistemas singulares (`ErrorException`) e relança
+  outros erros, em vez de os mascarar (`_razão_preço_valor`).
+
 ## [0.6.1] — 2026-07-30
 
 ### Adicionado
