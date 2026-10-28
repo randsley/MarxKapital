@@ -6,7 +6,7 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
-## [Por lançar]
+## [0.8.0] — 2026-10-28
 
 ### Adicionado
 - `expoentes_lyapunov` (`src/bifurcacao.jl`): maiores expoentes de

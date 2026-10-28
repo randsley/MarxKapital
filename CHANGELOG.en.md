@@ -6,7 +6,7 @@
 
 Format based on Keep a Changelog. Semantic versioning.
 
-## [Unreleased]
+## [0.8.0] — 2026-10-28
 
 ### Added
 - `expoentes_lyapunov` (`src/bifurcacao.jl`): largest Lyapunov exponents of
