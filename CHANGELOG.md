@@ -8,6 +8,8 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 
 ## [0.7.0] — 2026-10-28
 
+DOI desta versão (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/zenodo.23718359). Para citar todas as versões, use o DOI conceptual acima.
+
 ### Adicionado
 - **Diferenciação automática** (`src/diferenciacao.jl`, ForwardDiff):
   jacobiana exata do lado direito da EDO (`jacobiana_sistema`, também

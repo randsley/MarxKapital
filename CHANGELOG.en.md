@@ -8,6 +8,8 @@ Format based on Keep a Changelog. Semantic versioning.
 
 ## [0.7.0] — 2026-10-28
 
+DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/zenodo.23718359). To cite all versions, use the concept DOI above.
+
 ### Added
 - **Automatic differentiation** (`src/diferenciacao.jl`, ForwardDiff):
   exact Jacobian of the ODE right-hand side (`jacobiana_sistema`, also
