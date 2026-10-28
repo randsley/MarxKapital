@@ -6,7 +6,7 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
-## [Por lançar]
+## [0.7.0] — 2026-10-28
 
 ### Adicionado
 - **Diferenciação automática** (`src/diferenciacao.jl`, ForwardDiff):
