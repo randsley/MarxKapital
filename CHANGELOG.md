@@ -2,7 +2,7 @@
 
 *[🇬🇧 Read this in English](CHANGELOG.en.md)*
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705370.svg)](https://doi.org/10.5281/zenodo.21705370)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705369.svg)](https://doi.org/10.5281/zenodo.21705369)
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 

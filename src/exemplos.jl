@@ -98,7 +98,7 @@ function ajuda_modelo()
       analisar_série_temporal_ameco("PT")   Evolução histórica
       verificar_sdmx_ameco()                Verificar acesso à API SDMX oficial
 
-    DADOS SETORIAIS REAIS (Eurostat, opt-in — ver README "Dados setoriais reais")
+    DADOS SETORIAIS REAIS (Eurostat, opt-in — ver README.md "Real sectoral data (Eurostat)" / README.pt.md "Dados setoriais reais")
       calibrar_modelo_portugal(fonte_dados=:eurostat)          INE, 19 setores, matriz A real
       calibrar_com_ameco_v2("Portugal", dados_setoriais=:eurostat)  AMECO, 3 setores macro
       verificar_eurostat_setorial()         Verificar acesso à API do Eurostat
