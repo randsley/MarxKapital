@@ -104,7 +104,7 @@ The largest real part of the eigenvalues along `μ_v`, at the current `β` and r
 varrimento_μ_v = let grelha = 0.0:0.05:2.5
 	(θ = grelha, parte_real = map(grelha) do θ
 		e = crescimento_equilibrado(com_parâmetro(pβ, :μ_v, θ), X0; T_aquecimento = 200.0)
-		maximum(real.(e.valores_próprios))
+		e.convergiu ? maximum(real.(e.valores_próprios)) : NaN   # gaps where Newton fails
 	end)
 end;
 

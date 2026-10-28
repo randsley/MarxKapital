@@ -142,7 +142,9 @@ function crescimento_equilibrado(p, X0; T_aquecimento = 400.0, tol = 1e-12, max_
     for _ in 1:max_iter
         hz = h(z)
         maximum(abs.(hz)) < tol && (convergiu = true; break)
-        Δ = ForwardDiff.jacobian(h, z) \ hz
+        F = lu(ForwardDiff.jacobian(h, z); check = false)
+        issuccess(F) || break   # jacobiana singular: devolve convergiu = false em vez de falhar
+        Δ = F \ hz
         # passo amortecido: quantidades estritamente positivas
         α = 1.0
         while α > 1e-8 && any(_do_livre(z .- α .* Δ, p)[1:nq] .<= 0)
