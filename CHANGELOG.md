@@ -1,356 +1,363 @@
-# Registo de alterações
+# Changelog
 
-*[🇬🇧 Read this in English](CHANGELOG.en.md)*
+*[🇵🇹 Ler em português](CHANGELOG.md)*
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21705369.svg)](https://doi.org/10.5281/zenodo.21705369)
 
-Formato baseado em Keep a Changelog. Versionamento semântico.
+Format based on Keep a Changelog. Semantic versioning.
 
-## [Por lançar]
+## [Unreleased]
 
-### Adicionado
-- **Notebooks** (`notebooks/`, em inglês, offline): seis notebooks Jupyter
-  gravados com as saídas (fundamentos da acumulação; valores, preços e
-  fronteira salário-lucro; calibração e choques salariais; setores
-  acoplados e diferenciação automática; valorização TSSI; crescimento
-  equilibrado, ciclos e caos) e três notebooks Pluto interativos (fronteira
-  salário-lucro, acumulação com acoplamento e choque salarial, ciclos de
-  acumulação no modelo cruzado). Guia em `notebooks/README.md`.
-- `test/notebooks.jl`: teste de fumo que corre todos os notebooks offline
-  (sem as células marcadas `slow`), em CI depois da suite principal.
-  `install_deps.jl --notebooks` instala IJulia, Pluto, PlutoUI e JSON;
-  `notebooks/limpar_saidas.jl` deixa só o PNG de cada gráfico nas saídas
-  gravadas.
+### Added
+- **Notebooks** (`notebooks/`, in English, offline): six Jupyter notebooks
+  committed with their outputs (accumulation basics; values, prices and the
+  wage–profit frontier; calibration and wage shocks; coupled sectors and
+  automatic differentiation; TSSI valuation; balanced growth, cycles and
+  chaos) and three interactive Pluto notebooks (wage–profit frontier,
+  accumulation with coupling and a wage shock, accumulation cycles in the
+  cross-dual model). Guide in `notebooks/README.md`.
+- `test/notebooks.jl`: smoke test that runs every notebook offline (except
+  cells tagged `slow`), in CI after the main suite. `install_deps.jl
+  --notebooks` installs IJulia, Pluto, PlutoUI and JSON;
+  `notebooks/limpar_saidas.jl` keeps only the PNG of each plot in the
+  committed outputs.
 
-### Corrigido
-- **Calibração AMECO com pesos fixos** (`calibrar_com_dados_ameco`,
-  `dados_setoriais=:fixo`, o caminho por omissão): deduzia como depreciação
-  10% do stock de capital em vez do CCF real da AMECO, e repartia o stock
-  por `[0.10, 0.35, 0.55]`, o que dava taxas de lucro negativas no Primário
-  (e no Secundário com dados sintéticos), com `e` no piso 0.1. Usa agora a
-  série `UKCT`, repartida como o VAB, e quotas de stock do Eurostat
-  (`[0.02, 0.16, 0.82]`); `r = e/(k+1)` com o `e` já com piso, e os setores
-  no piso são reportados. Ver `docs/LIMITACOES.md` item 4.
-- `comparar_países_ameco`: as colunas `PIB` e `Quota_Salarial` mediam o
-  capital adiantado `Σ(C+V)` e `ΣV/Σ(C+V)`; medem agora o VAB e `ΣV/ΣVAB`.
+### Fixed
+- **AMECO calibration with fixed weights** (`calibrar_com_dados_ameco`,
+  `dados_setoriais=:fixo`, the default path): it deducted 10% of the capital
+  stock as depreciation instead of AMECO's real CCF, and split the stock by
+  `[0.10, 0.35, 0.55]`, which gave negative profit rates in the Primary
+  sector (and in the Secondary with synthetic data), with `e` at the 0.1
+  floor. It now uses the `UKCT` series, split like value added, and
+  Eurostat capital-stock shares (`[0.02, 0.16, 0.82]`); `r = e/(k+1)` from
+  the floored `e`, and sectors at the floor are reported. See
+  `docs/LIMITACOES.en.md` item 4.
+- `comparar_países_ameco`: the `PIB` and `Quota_Salarial` columns measured
+  capital advanced `Σ(C+V)` and `ΣV/Σ(C+V)`; they now measure value added
+  and `ΣV/ΣVAB`.
 
 ## [0.8.0] — 2026-10-28
 
-DOI desta versão (Zenodo): [10.5281/zenodo.23735182](https://doi.org/10.5281/zenodo.23735182). Para citar todas as versões, use o DOI conceptual acima.
+DOI of this version (Zenodo): [10.5281/zenodo.23735182](https://doi.org/10.5281/zenodo.23735182). To cite all versions, use the concept DOI above.
 
-### Adicionado
-- `expoentes_lyapunov` (`src/bifurcacao.jl`): maiores expoentes de
-  Lyapunov do sistema normalizado (método de Benettin, jacobiana exata),
-  e `histerese_simulada`: varrimento do parâmetro para cima e para baixo
-  por simulação, para detetar atratores coexistentes.
-- **Resultado:** o regime irregular dos ciclos de acumulação é caótico
-  (maior expoente positivo, robusto à condição inicial, tolerância e
-  duração; dois expoentes positivos a `μ_v` alto), e um ciclo estável
-  coexiste com o toro numa janela de `μ_v` (histerese). Artigo, Secção
-  5.6 e figura nova (expoentes e histerese), atualizados.
+### Added
+- `expoentes_lyapunov` (`src/bifurcacao.jl`): largest Lyapunov exponents of
+  the normalized system (Benettin's method, exact Jacobian), and
+  `histerese_simulada`: up/down parameter sweeps by simulation, to detect
+  coexisting attractors.
+- **Result:** the irregular regime of the accumulation cycles is chaotic
+  (positive largest exponent, robust to the initial condition, tolerance
+  and run length; two positive exponents at high `μ_v`), and a stable cycle
+  coexists with the torus in a window of `μ_v` (hysteresis). Paper Section
+  5.6 and a new figure (exponents and hysteresis) updated.
 
 ## [0.7.0] — 2026-10-28
 
-DOI desta versão (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/zenodo.23718359). Para citar todas as versões, use o DOI conceptual acima.
+DOI of this version (Zenodo): [10.5281/zenodo.23718359](https://doi.org/10.5281/zenodo.23718359). To cite all versions, use the concept DOI above.
 
-### Adicionado
-- **Diferenciação automática** (`src/diferenciacao.jl`, ForwardDiff):
-  jacobiana exata do lado direito da EDO (`jacobiana_sistema`, também
-  com `racionamento=true`), sensibilidade a parâmetros
-  (`jacobiana_parametro`), hessianas (`hessiana_sistema`), curvatura
-  exata da fronteira salário-lucro (`curvatura_fronteira`) e espetro do
-  mapa de racionamento no ponto fixo (`jacobiana_racionamento`: valores
-  próprios, `α_max`, `α` ótimo). O ponto fixo do racionamento é
-  diferenciado pelo teorema da função implícita (`_racionamento_dual`).
-- **Resultado:** a jacobiana do mapa de racionamento é triangular com os
-  setores ordenados por ρ*, com espetro real em `[−1, 0]`, e `−1` é valor
-  próprio assim que algum setor é racionado. A iteração amortecida
-  converge localmente para todo `α ∈ (0, 1)`; `α = 1` está exatamente
-  numa fronteira de flip. Verificado nos 270 casos do sweep de
-  `paper/monte_carlo.jl` e provado em `paper/main.tex` (Proposição 1).
-- **TSSI** (`src/tssi.jl`): valorização temporal de sistema único ao
-  longo de trajetórias, com desfasamento de produção τ fixo
-  (`valorizar_tssi`, `mapa_tssi`, `preços_simultâneos`,
-  `estabilidade_tssi`, `comparar_tssi_simultaneo`). Camada de
-  valorização apenas; a dinâmica não muda.
-- **Bifurcações** (`src/bifurcacao.jl`, BifurcationKit): continuação de
-  pontos fixos de mapas com classificação por multiplicadores (fold,
-  flip, Neimark–Sacker) — `continuar_ponto_fixo`,
-  `bifurcacao_racionamento`, `bifurcacao_tssi`, `plotar_bifurcacao`.
-- `paper/jacobiana_bifurcacao.jl` e as novas Secções 3.4, 3.5 e 5.5 do
-  artigo (figuras 7–9). Os números citados são gerados em
-  `paper/figures/jacobian_stats.tex`, que o artigo lê diretamente.
-- Dependências novas: `ForwardDiff`, `BifurcationKit` (`install_deps.jl`).
-- **Dinâmica cruzada** (`src/cruzado.jl`, opcional com
-  `preços_mercado=true`): preços de mercado que respondem ao excesso de
-  procura (`β`), lucros e mobilidade de capital a esses preços
-  (Flaschel–Semmler), lei de Walras exata. Sem ela não há crescimento
-  equilibrado interior.
-- **Mobilidade do capital variável** `μ_v` (desligada por omissão), no
-  sistema acoplado e no cruzado; o termo soma exatamente 0.
-- **Crescimento equilibrado** (`src/crescimento.jl`): sistema normalizado
-  no simplex (`sistema_normalizado`, `simular_normalizado`), raios de
-  crescimento equilibrado por Newton com jacobiana exata
-  (`crescimento_equilibrado`), `indicadores_crescimento`, `com_parâmetro`
-  e o varrimento da parcela salarial (`varrimento_salarial`, uniforme ou
-  proporcional).
-- **Bifurcações da acumulação** (`src/bifurcacao.jl`):
-  `bifurcacao_acumulação` (Hopf com forma normal, continuação de
-  ciclos-limite por colocação com multiplicadores de Floquet),
-  `ciclo_simulado` (verificação por simulação, secção de Poincaré) e
-  `curva_hopf` (fronteira de Hopf no plano parcela salarial × `μ_v`).
-- **Resultado:** o crescimento equilibrado perde estabilidade num Hopf
-  supercrítico em `μ_v` em todas as 30 economias aleatórias testadas; a
-  fronteira de Hopf sobe com a parcela salarial.
-- `paper/acumulacao_bifurcacao.jl` e as novas Secções 3.6 e 5.6 do artigo
-  (figuras 10–11), com os números em `paper/figures/acumulacao_stats.tex`.
+### Added
+- **Automatic differentiation** (`src/diferenciacao.jl`, ForwardDiff):
+  exact Jacobian of the ODE right-hand side (`jacobiana_sistema`, also
+  with `racionamento=true`), parameter sensitivities
+  (`jacobiana_parametro`), Hessians (`hessiana_sistema`), exact
+  curvature of the wage-profit frontier (`curvatura_fronteira`), and
+  the spectrum of the rationing map at its fixed point
+  (`jacobiana_racionamento`: eigenvalues, `α_max`, optimal `α`). The
+  rationing fixed point is differentiated through the implicit function
+  theorem (`_racionamento_dual`).
+- **Result:** with sectors ordered by ρ*, the rationing map's Jacobian is
+  triangular, with real spectrum in `[−1, 0]`, and `−1` is an eigenvalue
+  once any sector is rationed. Damped iteration converges locally for
+  every `α ∈ (0, 1)`; `α = 1` sits exactly on a flip boundary. Checked on
+  the 270 cases of the `paper/monte_carlo.jl` sweep and proved in
+  `paper/main.tex` (Proposition 1).
+- **TSSI** (`src/tssi.jl`): temporal single-system valuation along
+  trajectories, with a fixed production lag τ (`valorizar_tssi`,
+  `mapa_tssi`, `preços_simultâneos`, `estabilidade_tssi`,
+  `comparar_tssi_simultaneo`). Valuation layer only; the dynamics are
+  unchanged.
+- **Bifurcations** (`src/bifurcacao.jl`, BifurcationKit): continuation of
+  fixed points of maps, with classification by multipliers (fold, flip,
+  Neimark–Sacker): `continuar_ponto_fixo`, `bifurcacao_racionamento`,
+  `bifurcacao_tssi`, `plotar_bifurcacao`.
+- `paper/jacobiana_bifurcacao.jl` and the paper's new Sections 3.4, 3.5
+  and 5.5 (figures 7–9). The quoted numbers are generated into
+  `paper/figures/jacobian_stats.tex`, which the paper reads directly.
+- New dependencies: `ForwardDiff`, `BifurcationKit` (`install_deps.jl`).
+- **Cross-dual dynamics** (`src/cruzado.jl`, opt-in with
+  `preços_mercado=true`): market prices that respond to excess demand
+  (`β`), profits and capital mobility at those prices (Flaschel–Semmler),
+  Walras' law exact. Without it there is no interior balanced growth.
+- **Mobility of variable capital** `μ_v` (off by default), in the coupled
+  and cross-dual systems; the term sums to exactly 0.
+- **Balanced growth** (`src/crescimento.jl`): normalized system on the
+  simplex (`sistema_normalizado`, `simular_normalizado`), balanced-growth
+  rays by Newton with the exact Jacobian (`crescimento_equilibrado`),
+  `indicadores_crescimento`, `com_parâmetro`, and the wage-share sweep
+  (`varrimento_salarial`, uniform or proportional).
+- **Bifurcations of accumulation** (`src/bifurcacao.jl`):
+  `bifurcacao_acumulação` (Hopf with normal form, limit-cycle continuation
+  by collocation with Floquet multipliers), `ciclo_simulado` (check by
+  simulation, Poincaré section) and `curva_hopf` (Hopf boundary in the
+  wage share × `μ_v` plane).
+- **Result:** balanced growth loses stability at a supercritical Hopf
+  bifurcation in `μ_v` in all 30 random economies tested; the Hopf
+  boundary rises with the wage share.
+- `paper/acumulacao_bifurcacao.jl` and the new Sections 3.6 and 5.6 of the
+  paper (figures 10–11), with the numbers in `paper/figures/acumulacao_stats.tex`.
 
-### Alterado
-- **Relaxação por omissão do racionamento: 0.5 → 2/3**
-  (`RELAXAÇÃO_PADRÃO`, usada por `_resolver_racionamento`,
-  `jacobiana_racionamento` e `bifurcacao_racionamento`). Com espetro em
-  `[−1, 0]` e os modos 0 e −1 sempre presentes, 2/3 minimiza o raio
-  espectral (1/3 em vez de 1/2): ≈30% menos iterações (média 18.0 vs.
-  25.8 no sweep de 270 casos), convergência em todas as 6870 execuções
-  por valor de α (pontos iniciais aleatórios e oferta muito escassa
-  incluídos; Tabela 2 do artigo). O ponto fixo não muda (diferença
-  ≤ 2.4e-9 na trajetória da Figura 4).
-- `README.md` passa a ser a versão inglesa (por omissão); a portuguesa
-  está em `README.pt.md`.
-- `sistema_Ndept_io!` e `_resolver_racionamento` são genéricos no tipo de
-  número (aceitam `ForwardDiff.Dual`). O fallback de preços (π = 1)
-  passa a apanhar só sistemas singulares (`ErrorException`) e relança
-  outros erros, em vez de os mascarar (`_razão_preço_valor`).
+### Changed
+- **Default rationing relaxation: 0.5 → 2/3** (`RELAXAÇÃO_PADRÃO`, used
+  by `_resolver_racionamento`, `jacobiana_racionamento` and
+  `bifurcacao_racionamento`). With spectrum in `[−1, 0]` and the 0 and −1
+  modes always present, 2/3 minimizes the spectral radius (1/3 instead of
+  1/2): ≈30% fewer iterations (mean 18.0 vs. 25.8 on the 270-case sweep),
+  converging in all 6870 runs per value of α (including random initial
+  points and much scarcer supply; Table 2 of the paper). The fixed point
+  does not change (difference ≤ 2.4e-9 along the Figure 4 trajectory).
+- `README.md` is now the English version (the default); the Portuguese
+  one is `README.pt.md`.
+- `sistema_Ndept_io!` and `_resolver_racionamento` are generic in the
+  number type (they accept `ForwardDiff.Dual`). The price fallback
+  (π = 1) now catches only singular systems (`ErrorException`) and
+  rethrows other errors instead of masking them (`_razão_preço_valor`).
 
 ## [0.6.1] — 2026-07-30
 
-### Adicionado
-- `CITATION.cff` e `.zenodo.json`: metadados de citação e arquivo,
-  preparando o repositório para a integração GitHub-Zenodo (release
-  sem alterações funcionais, só para acionar o primeiro arquivo
-  Zenodo depois de ativada a integração).
+### Added
+- `CITATION.cff` and `.zenodo.json`: citation and archival metadata,
+  preparing the repository for the GitHub-Zenodo integration (a release
+  with no functional changes, solely to trigger the first Zenodo
+  archive once the integration was enabled).
 
 ## [0.6.0] — 2026-07-30
 
-### Corrigido
-- **Matriz técnica A usava o dataflow errado do Eurostat.** Uma auditoria
-  pedida em revisão externa do artigo em `paper/` (destinada a quantificar
-  o efeito de um passo de "clipping" de margens) revelou que
-  `NAIO_10_CP1620` — usado desde a primeira integração da matriz real —
-  não é a tabela IOT simétrica, mas sim "Table of trade and transport
-  margins", uma tabela satélite pequena. Construir `A` a partir dela
-  subavaliava os fluxos intersetoriais em mais de uma ordem de grandeza
-  (consumo intermédio total implícito ≈8.8 mil M€ para Portugal 2020,
-  contra um verdadeiro ≈177.8 mil M€) e explicava o raio espectral
-  implausivelmente baixo (ρ(A)≈0.11-0.15) e o `R_max` implausivelmente
-  alto (≈600-700%) reportados até agora. Corrigido com `NAIO_10_CP1700`
-  (a tabela real), `stk_flow=DOM` (só uso doméstico — a tabela publica
-  também `IMP`/`TOTAL`, ao contrário da anterior). Verificado: zero
-  células negativas, reconciliação exata contra o `P1` (output bruto)
-  publicado pela própria tabela, ρ(A)≈0.52-0.60, `R_max`≈68-91%. Ver
+### Fixed
+- **The technical matrix A used the wrong Eurostat dataflow.** An audit
+  requested during external review of the paper in `paper/` (meant to
+  quantify the effect of a margin-clipping step) revealed that
+  `NAIO_10_CP1620` — used since the first integration of the real matrix
+  — is not the symmetric IOT table, but rather "Table of trade and
+  transport margins," a small satellite table. Building `A` from it
+  understated intersectoral flows by more than an order of magnitude
+  (implied total intermediate consumption ≈€8.8bn for Portugal 2020,
+  against a true ≈€177.8bn) and explained the implausibly low spectral
+  radius (ρ(A)≈0.11-0.15) and the implausibly high `R_max` (≈600-700%)
+  reported until now. Fixed with `NAIO_10_CP1700` (the real table),
+  `stk_flow=DOM` (domestic use only — the table also publishes
+  `IMP`/`TOTAL`, unlike the earlier one). Verified: zero negative cells,
+  exact reconciliation against `P1` (gross output) published by the
+  table itself, ρ(A)≈0.52-0.60, `R_max`≈68-91%. See
   `docs/LIMITACOES.md` item 4-bis, `paper/matrix_audit.jl`.
-- **Output bruto do modelo dinâmico (`sistema_Ndept_io!`) omitia consumo
-  intermédio circulante.** Os mecanismos `realização`/`racionamento`
-  usavam `O=W=δC+V+S` (um fluxo tipo valor-acrescentado) como oferta,
-  não gross output no sentido usado para construir `A`. Corrigido
-  reconstruindo o output bruto genuíno `x=W/(1-Σᵢ A[i,j])` a partir da
-  própria identidade custo-output do modelo, sem novo estado — válido
-  só para as matrizes sintéticas fechadas usadas nestas simulações
-  (nunca aplicado à matriz real do Eurostat, de uso doméstico). A
-  condição de admissibilidade (`Σᵢ A[i,j]<1`) é agora verificada e
-  corrigida uma única vez quando a simulação é montada
-  (`_garantir_admissibilidade_output`), não reclamada a cada avaliação
-  do lado direito da EDO.
-- **Procura de investimento no racionamento aplicava A à despesa, não ao
-  output.** `_resolver_racionamento` recebia `σ_c,ⱼSⱼ` (despesa de
-  investimento planeada) diretamente; corrigido para `Δxⱼ=σ_c,ⱼSⱼ·xⱼ/Cⱼ`
-  (expansão de output desejada, via o rácio capital-output corrente),
-  para que `A` seja aplicada a uma grandeza em escala de output,
-  consistente com a sua própria definição.
-- **Termo de mobilidade de capital não conservava capital constante
-  agregado.** `r̄` era a razão agregada `ΣS/Σ(C+V)`, que não garante
-  `Σᵢμ(rᵢ-r̄)Cᵢ=0`. Corrigido usando a média de `r` ponderada por `C` — a
-  única escolha para a qual a soma é exatamente zero por construção.
-- **Série temporal AMECO (`analisar_série_temporal_com_dados`) deduzia
-  uma depreciação fixa de 10% do stock de capital**, em vez de consumo
-  de capital fixo (CCF) real — isto quebrava a invariância algébrica que
-  `e=(Y-V-CCF)/V` deve ter sob um deflator comum aplicado a `Y`, `V` e
-  CCF. Corrigido usando a série real de CCF da AMECO (item `UKCT`);
-  `deflator_FBCF` também acrescentado a `MAPA_AMECO_SDMX`, para testar
-  sensibilidade à escolha do deflator (`valorização=:consistente_fbcf`).
-  Verificado: `e` agora idêntico entre convenções de valorização para
-  todos os anos, Portugal e Espanha.
-- Tabela de calibração setorial (usada em `paper/gerar_resultados.jl`)
-  reconstruía VAB como `C+V+e·V` (uma stock somada a fluxos), em vez de
-  reportar o VAB real já calculado pelo pipeline — somava duas ordens de
-  grandeza a menos que o total nacional. `ParâmetrosCalibrados` ganhou um
-  campo `VAB` real.
+- **The dynamical model's gross output (`sistema_Ndept_io!`) omitted
+  circulating intermediate consumption.** The `realização`/`racionamento`
+  mechanisms used `O=W=δC+V+S` (a value-added-type flow) as supply, not
+  gross output in the sense used to build `A`. Fixed by reconstructing
+  genuine gross output `x=W/(1-Σᵢ A[i,j])` from the model's own
+  cost-output identity, with no new state — valid only for the closed
+  synthetic matrices used in these simulations (never applied to the
+  real, domestic-use Eurostat matrix). The admissibility condition
+  (`Σᵢ A[i,j]<1`) is now checked and fixed once when the simulation is
+  assembled (`_garantir_admissibilidade_output`), not reclaimed at every
+  evaluation of the ODE's right-hand side.
+- **Investment demand in the rationing mechanism applied A to
+  expenditure, not to output.** `_resolver_racionamento` received
+  `σ_c,ⱼSⱼ` (planned investment expenditure) directly; fixed to
+  `Δxⱼ=σ_c,ⱼSⱼ·xⱼ/Cⱼ` (desired output expansion, via the current
+  capital-output ratio), so that `A` is applied to a quantity in output
+  scale, consistent with its own definition.
+- **The capital-mobility term did not conserve aggregate constant
+  capital.** `r̄` was the aggregate ratio `ΣS/Σ(C+V)`, which does not
+  guarantee `Σᵢμ(rᵢ-r̄)Cᵢ=0`. Fixed by using the mean of `r` weighted by
+  `C` — the only choice for which the sum is exactly zero by
+  construction.
+- **The AMECO time series (`analisar_série_temporal_com_dados`) deducted
+  a flat 10% depreciation from the capital stock**, instead of real
+  consumption of fixed capital (CCF) — this broke the algebraic
+  invariance that `e=(Y-V-CCF)/V` should have under a common deflator
+  applied to `Y`, `V`, and CCF together. Fixed by using the real AMECO
+  CCF series (item `UKCT`); `deflator_FBCF` was also added to
+  `MAPA_AMECO_SDMX`, to test sensitivity to the choice of deflator
+  (`valorização=:consistente_fbcf`). Verified: `e` is now identical
+  across valuation conventions for every year, Portugal and Spain.
+- The sectoral calibration table (used in `paper/gerar_resultados.jl`)
+  reconstructed VAB as `C+V+e·V` (a stock added to flows), instead of
+  reporting the real VAB already computed by the pipeline — off by two
+  orders of magnitude relative to the national total.
+  `ParâmetrosCalibrados` gained a real `VAB` field.
 
-### Adicionado
-- `capital_transferido(d)`/correção de `valor_produto(d)` em
-  `estruturas.jl`: distingue capital constante *avançado* (stock, `d.c`)
-  de capital constante *transferido* num período (`δ·c`) — a magnitude
-  correta a somar com fluxos anuais.
-- `paper/` (novo): artigo académico completo em LaTeX combinando
-  metodologia (o modelo, os três mecanismos de acoplamento, o
-  racionamento como ponto fixo com prova de existência e antitonicidade)
-  e aplicação empírica a Portugal, com todas as figuras/tabelas
-  reproduzíveis a partir de dados reais (`gerar_resultados.jl`,
-  `monte_carlo.jl` — sweeps sistemáticos de convergência e dispersão,
-  `matrix_audit.jl` — auditoria da matriz técnica).
-- 63 novos testes em `test/runtests.jl` (48→111): invariância de `e`
-  sob deflator, conservação exata da mobilidade, sensibilidade do
-  racionamento a condições iniciais/ordem/tolerância, reconstrução de
-  output bruto, admissibilidade da reconstrução (caso normal e caso de
-  rescala), entre outros.
+### Added
+- `capital_transferido(d)` / fix to `valor_produto(d)` in
+  `estruturas.jl`: distinguishes constant capital *advanced* (a stock,
+  `d.c`) from constant capital *transferred* in a period (`δ·c`) — the
+  correct magnitude to add to annual flows.
+- `paper/` (new): a complete academic paper in LaTeX combining
+  methodology (the model, the three coupling mechanisms, rationing as a
+  fixed point with existence and antitonicity proofs) and an empirical
+  application to Portugal, with every figure/table reproducible from
+  real data (`gerar_resultados.jl`, `monte_carlo.jl` — systematic
+  convergence and dispersion sweeps, `matrix_audit.jl` — technical
+  matrix audit).
+- 63 new tests in `test/runtests.jl` (48→111): invariance of `e` under
+  deflator, exact conservation of mobility, rationing sensitivity to
+  initial conditions/ordering/tolerance, gross-output reconstruction,
+  reconstruction admissibility (normal case and rescale case), among
+  others.
 
 ## [0.5.0] — 2026-07-28
 
-### Adicionado
-- `_resolver_racionamento` (`src/nucleo.jl`) e o kwarg `racionamento=true`
-  em `sistema_Ndept_io!`/`simular_Ndept`/`simular_Ndept_customizado`
-  (tem precedência sobre `realização`): racionamento de quantidades exato
-  por setor à Bénassy/Barro-Grossman, com tecnologia Leontief — o
-  reinvestimento realizado de cada setor fica limitado pelo input mais
-  escasso, e o racionamento propaga-se entre fornecedores/compradores.
-  Resolvido por iteração de ponto fixo com sub-relaxação (necessária — a
-  versão sem relaxação oscila indefinidamente, confirmado num exemplo de 2
-  setores) dentro do cálculo do lado direito da EDO — sem transformar o
-  sistema numa DAE nem depender de `NonlinearSolve.jl`. Verificado com um
-  exemplo de solução fechada (`ρ₁=√0.8`) e por robustez em 20+ combinações
-  seed/μ e em N=19, sem falhas de convergência.
-- `calcular_stock_capital_pim` (`src/eurostat_sdmx.jl`) e o kwarg
-  `inventário_perpétuo=true` em `calibrar_modelo_portugal`/
-  `calibrar_com_ameco_v2`: stock de capital calculado pelo método do
-  inventário perpétuo (`Kₜ=(1-δ)Kₜ₋₁+FBCFₜ`, `δ` estimado por setor a
-  partir de CCF/stock no ano de referência), em vez do valor reportado
-  diretamente pelo Eurostat. Degrada por setor (não globalmente) quando a
-  série de FBCF de um setor não chega ao ano pedido. Verificado com dados
-  reais de Portugal: a série PIM acompanha o stock reportado ao longo de
-  22 anos, com desvio moderado e crescente (esperado — taxa de
-  depreciação única por setor, não diferenciada por tipo de ativo).
+### Added
+- `_resolver_racionamento` (`src/nucleo.jl`) and the `racionamento=true`
+  keyword in `sistema_Ndept_io!`/`simular_Ndept`/`simular_Ndept_customizado`
+  (takes precedence over `realização`): exact per-sector quantity
+  rationing à la Bénassy/Barro-Grossman, with Leontief technology — each
+  sector's realized reinvestment is bounded by its scarcest input, and
+  rationing propagates between suppliers/buyers. Solved by fixed-point
+  iteration with under-relaxation (necessary — the unrelaxed version
+  oscillates indefinitely, confirmed in a two-sector example) inside the
+  ODE right-hand-side calculation — without turning the system into a
+  DAE or depending on `NonlinearSolve.jl`. Verified with a closed-form
+  example (`ρ₁=√0.8`) and by robustness across 20+ seed/μ combinations
+  and at N=19, with no convergence failures.
+- `calcular_stock_capital_pim` (`src/eurostat_sdmx.jl`) and the
+  `inventário_perpétuo=true` keyword in `calibrar_modelo_portugal`/
+  `calibrar_com_ameco_v2`: capital stock computed via the
+  perpetual-inventory method (`Kₜ=(1-δ)Kₜ₋₁+FBCFₜ`, `δ` estimated per
+  sector from CCF/stock in the reference year), instead of the value
+  directly reported by Eurostat. Degrades per sector (not globally) when
+  a sector's GFCF series does not reach the requested year. Verified
+  with real Portuguese data: the PIM series tracks the reported stock
+  across 22 years, with a moderate, growing deviation (expected — a
+  single depreciation rate per sector, not differentiated by asset
+  type).
 
 ## [0.4.0] — 2026-07-28
 
-### Adicionado
-- CI headless via GitHub Actions (`.github/workflows/test.yml`), Julia 1.10 e 1.
-- `sistema_Ndept_io!` (opcional, `acoplado=true` em `simular_Ndept`/`simular_Ndept_customizado`):
-  acopla a matriz técnica A à dinâmica de N departamentos via um termo de
-  mobilidade de capital `μ·(rᵢ − r̄)·Cᵢ`, com `rᵢ` calculado sobre capital
-  valorizado a preços de produção de Sraffa. `sistema_Ndept!` mantém-se como
-  a versão "setores independentes" por omissão. Ver `docs/LIMITACOES.md` item 1.
-- `calcular_taxas_lucro_precos(sol, p)` em `src/analise.jl`, para reproduzir
-  fora da EDO as taxas de lucro ponderadas por preços usadas pelo sistema acoplado.
-- `src/ameco_sdmx.jl`: cliente para a API REST SDMX oficial da AMECO
+### Added
+- Headless CI via GitHub Actions (`.github/workflows/test.yml`), Julia 1.10 and 1.
+- `sistema_Ndept_io!` (optional, `acoplado=true` in `simular_Ndept`/`simular_Ndept_customizado`):
+  couples the technical matrix A to the N-department dynamics through a
+  capital-mobility term `μ·(rᵢ − r̄)·Cᵢ`, with `rᵢ` computed on capital
+  valued at Sraffian prices of production. `sistema_Ndept!` remains the
+  "independent sectors" version by default. See `docs/LIMITACOES.md`
+  item 1.
+- `calcular_taxas_lucro_precos(sol, p)` in `src/analise.jl`, to
+  reproduce outside the ODE the price-weighted profit rates used by the
+  coupled system.
+- `src/ameco_sdmx.jl`: client for the official AMECO SDMX REST API
   (`descarregar_ameco_sdmx`, `obter_dados_ameco(..., método=:sdmx)`),
-  substituindo o download do ficheiro TXT estático — descontinuado pela
-  Comissão Europeia (confirmado 2026-07). Verificado com dados reais de
-  Portugal (PIB, emprego, remunerações, FBCF, stock de capital líquido);
-  `verificar_sdmx_ameco()` faz uma verificação manual de sanidade. Métodos
-  `:auto`/`:download` passam a usar a API SDMX como caminho automático; os
-  fluxos `:local`/`:csv` (ficheiro TXT/CSV já descarregado) mantêm-se
-  disponíveis. Ver `docs/LIMITACOES.md` item 3.
-- `src/eurostat_sdmx.jl`: dados setoriais reais via API SDMX do Eurostat
-  (VAB, remunerações, consumo de capital fixo, emprego, FBCF, stock de
-  capital líquido — dataflows `NAMA_10_A64`, `NAMA_10_A64_E`,
-  `NAMA_10_A64_P5`, `NAMA_10_NFA_ST`), e matriz técnica `A` real a partir do
-  IOT simétrico (`NAIO_10_CP1620`). Opt-in em ambos os caminhos de
-  calibração:
-  - `calibrar_modelo_portugal(..., fonte_dados=:eurostat)` — 19 setores CAE,
-    dados reais e matriz `A` real; lança erro se indisponível (sem
-    fallback silencioso).
-  - `calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` — 3 setores
-    macro, dados reais e matriz `A` real (ver entrada seguinte); cai para
-    os pesos fixos e A aleatória com aviso se o país não tiver cobertura
-    Eurostat ou o pedido falhar.
-  - `verificar_eurostat_setorial()` faz uma verificação manual de sanidade.
-  - Comportamento por omissão em ambos os caminhos inalterado (sintético /
-    pesos fixos), suite de testes continua totalmente offline.
-- `MAPA_AMECO_SDMX` (`src/ameco_sdmx.jl`) alargado de 6 para 22 das 25
-  variáveis de `CÓDIGOS_AMECO_VARIÁVEIS` (consumo privado/público,
-  exportações, importações, emprego assalariado, taxa de desemprego,
-  população ativa, remunerações por assalariado, produtividade do
-  trabalho, IPC, receitas/despesas do governo, saldo orçamental, balança
-  corrente, custos unitários de trabalho, dívida pública), mais 2 séries
-  calculadas a partir de séries já mapeadas (deflator do PIB, balança
-  comercial de bens) — 24/25 no total. Stock de capital bruto confirmado
-  indisponível nesta API (não fica "pendente"). Todas verificadas com
-  chamadas reais contra Portugal (défice, desemprego e dívida pública 2022
-  batem com valores conhecidos).
-- `agregar_matriz_io` (`src/eurostat_sdmx.jl`): agregação de matrizes
-  técnicas pela fórmula padrão de Leontief (colunas ponderadas pelo VAB/
-  output dos setores finos), reutilizável com matrizes reais ou aleatórias.
-  Usada para (a) construir a matriz `A` real do caminho AMECO de 3 setores
-  a partir da matriz real de 19 setores já limpa — a via direta (agregar os
-  fluxos brutos do IOT) tinha sido tentada e rejeitada numa sessão anterior
-  por misturar margens de comércio/transporte com serviços genuínos; e (b)
-  as novas agregações `:macro`/`:média` do caminho INE (ver entrada
-  seguinte). Testada offline com um exemplo sintético verificado à mão.
-- `calibrar_modelo_portugal` ganha agregação real para `agregação=:macro`
-  (3 setores, mesmos grupos do caminho AMECO) e `:média` (10 setores, nível
-  padrão NACE Rev.2 "A10") via `agregar_setores`
-  (`src/calibracao_pt.jl`) — antes, ambos os valores eram aceites mas
-  silenciosamente ignorados, correndo sempre `:detalhada`. Funciona com
-  dados sintéticos ou reais (Eurostat), sem distinção de código.
-- `sistema_Ndept_io!` ganha um segundo mecanismo opcional, independente da
-  mobilidade de capital: `realização=true` acresce uma pressão de
-  realização agregada (`ρ_real = Σmin(Oᵢ,(A·O)ᵢ)/Σ(A·O)ᵢ`, output bruto vs.
-  procura intermédia implícita em A) que amortece o reinvestimento quando a
-  estrutura técnica não sustenta os outputs correntes — sem introduzir
-  variáveis de estado novas nem exigir um solver de equações
-  algébrico-diferenciais (DAE, explicitamente fora de alcance). Robustez
-  verificada em 20 combinações seed/μ sem falhas do solver.
-- `verificar_equilibrio_Ndept(sol, p)` (`src/analise.jl`): generalização a N
-  setores de `verificar_equilibrio_2dept`, verificação a posteriori (desvio
-  `Oᵢ−(A·O)ᵢ` por setor e `ρ_real` agregado).
+  replacing the static-TXT-file download — discontinued by the European
+  Commission (confirmed 2026-07). Verified with real Portuguese data
+  (GDP, employment, compensation, GFCF, net capital stock);
+  `verificar_sdmx_ameco()` performs a manual sanity check. The
+  `:auto`/`:download` methods now use the SDMX API as the automatic
+  path; the `:local`/`:csv` flows (an already-downloaded TXT/CSV file)
+  remain available. See `docs/LIMITACOES.md` item 3.
+- `src/eurostat_sdmx.jl`: real sectoral data via the Eurostat SDMX API
+  (VAB, compensation, consumption of fixed capital, employment, GFCF,
+  net capital stock — dataflows `NAMA_10_A64`, `NAMA_10_A64_E`,
+  `NAMA_10_A64_P5`, `NAMA_10_NFA_ST`), and a real technical matrix `A`
+  from the symmetric IOT (`NAIO_10_CP1620`). Opt-in on both calibration
+  paths:
+  - `calibrar_modelo_portugal(..., fonte_dados=:eurostat)` — 19 NACE
+    sectors, real data and a real matrix `A`; raises an error if
+    unavailable (no silent fallback).
+  - `calibrar_com_ameco_v2(..., dados_setoriais=:eurostat)` — 3 macro
+    sectors, real data and a real matrix `A` (see next entry); falls
+    back to fixed weights and a random A with a warning if the country
+    lacks Eurostat coverage or the request fails.
+  - `verificar_eurostat_setorial()` performs a manual sanity check.
+  - Default behavior on both paths unchanged (synthetic / fixed
+    weights); the test suite remains fully offline.
+- `MAPA_AMECO_SDMX` (`src/ameco_sdmx.jl`) expanded from 6 to 22 of the
+  25 variables in `CÓDIGOS_AMECO_VARIÁVEIS` (private/public consumption,
+  exports, imports, paid employment, unemployment rate, labor force,
+  compensation per employee, labor productivity, CPI, government
+  revenue/expenditure, budget balance, current-account balance, unit
+  labor costs, public debt), plus 2 series calculated from already
+  mapped series (GDP deflator, goods trade balance) — 24/25 in total.
+  Gross capital stock confirmed unavailable in this API (not left
+  "pending"). All verified with real calls against Portugal (2022
+  deficit, unemployment, and public debt match known values).
+- `agregar_matriz_io` (`src/eurostat_sdmx.jl`): aggregation of technical
+  matrices by the standard Leontief formula (columns weighted by the
+  fine sectors' VAB/output), reusable with real or random matrices. Used
+  to (a) build the real 3-sector AMECO matrix `A` from the already-clean
+  real 19-sector matrix — the direct route (aggregating raw IOT flows)
+  had been tried and rejected in an earlier session for mixing
+  trade/transport margins with genuine services; and (b) the new
+  `:macro`/`:média` aggregations of the INE path (see next entry). Tested
+  offline with a hand-verified synthetic example.
+- `calibrar_modelo_portugal` gains real aggregation for
+  `agregação=:macro` (3 sectors, same groups as the AMECO path) and
+  `:média` (10 sectors, standard NACE Rev.2 "A10" level) via
+  `agregar_setores` (`src/calibracao_pt.jl`) — previously both values
+  were accepted but silently ignored, always running `:detalhada`.
+  Works with synthetic or real (Eurostat) data, with no code
+  distinction.
+- `sistema_Ndept_io!` gains a second optional mechanism, independent of
+  capital mobility: `realização=true` adds an aggregate realization
+  pressure (`ρ_real = Σmin(Oᵢ,(A·O)ᵢ)/Σ(A·O)ᵢ`, gross output vs.
+  intermediate demand implied by A) that damps reinvestment when the
+  technical structure cannot sustain current outputs — without
+  introducing new state variables or requiring a
+  differential-algebraic-equation (DAE) solver (explicitly out of
+  scope). Robustness verified across 20 seed/μ combinations with no
+  solver failures.
+- `verificar_equilibrio_Ndept(sol, p)` (`src/analise.jl`):
+  generalization to N sectors of `verificar_equilibrio_2dept`, an
+  after-the-fact check (per-sector deviation `Oᵢ−(A·O)ᵢ` and aggregate
+  `ρ_real`).
 
-### Corrigido
-- `MAPA_AMECO_SDMX`: vários mnemónicos herdados de `CÓDIGOS_AMECO_VARIÁVEIS`
-  (nunca antes verificados contra a API) estavam errados — `receitas_governo`
-  e `despesas_governo` tinham os códigos trocados, e `consumo_privado`/
-  `exportações`/`importações` usavam mnemónicos já retirados da API
-  (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`). `_obter_série_sdmx` passa a
-  aceitar `transformação` e `unidade` (nem todos os capítulos AMECO usam
-  TRANSFORMATION=1/UNIT=0).
-- `calcular_precos_producao` agora rejeita corretamente `r̄ ≥ R_max` (antes só
-  detetava matriz literalmente singular, permitindo preços negativos silenciosos
-  acima de R_max apesar do que a docstring prometia).
-- `simular_choque_salarial`: `R_max` reportado passa a usar a matriz técnica e
-  os coeficientes de trabalho reais da simulação (`p_base.A`, `l ∝ V`), em vez
-  de uma matriz auxiliar `A_ref` e `l = ones(N)`. Ver `docs/LIMITACOES.md` item 2.
+### Fixed
+- `MAPA_AMECO_SDMX`: several mnemonics inherited from
+  `CÓDIGOS_AMECO_VARIÁVEIS` (never before verified against the API) were
+  wrong — `receitas_governo` (government revenue) and `despesas_governo`
+  (government expenditure) had their codes swapped, and
+  `consumo_privado`/`exportações`/`importações` used mnemonics already
+  retired from the API (`UNCT`/`UXTG`/`UMTG` → `UCPH`/`UXGS`/`UMGS`).
+  `_obter_série_sdmx` now accepts `transformação` and `unidade` (not
+  every AMECO chapter uses TRANSFORMATION=1/UNIT=0).
+- `calcular_precos_producao` now correctly rejects `r̄ ≥ R_max` (it used
+  to only detect a literally singular matrix, silently allowing negative
+  prices above R_max despite what the docstring promised).
+- `simular_choque_salarial`: the reported `R_max` now uses the
+  simulation's real technical matrix and labor coefficients (`p_base.A`,
+  `l ∝ V`), instead of an auxiliary matrix `A_ref` and `l = ones(N)`. See
+  `docs/LIMITACOES.md` item 2.
 
 ## [0.3.0]
 
-### Adicionado
-- Integração AMECO para todos os países da base (UE, Área do Euro, EUA, Japão).
-- `obter_dados_ameco` com métodos `:auto`, `:download`, `:local`, `:csv`, `:sintético`, `:manual`.
-- Download automático da base TXT (`descarregar_ameco_automatico`) e parser de largura fixa (`ler_ficheiro_ameco_txt`).
-- Processador de CSV AMECO (`processar_csv_ameco`).
-- Calibração a partir de dados AMECO (`calibrar_com_ameco_v2`, `calibrar_com_dados_ameco`).
-- Comparação internacional (`comparar_países_ameco`) e séries temporais (`analisar_série_temporal_ameco`).
-- Reorganização do código num repositório modular (src/, test/, examples/, docs/).
-- Suite de testes (`test/runtests.jl`) e demonstração (`examples/demo.jl`).
-- `docs/LIMITACOES.md` documentando limitações conhecidas.
+### Added
+- AMECO integration for every country in the database (EU, Euro Area, US, Japan).
+- `obter_dados_ameco` with methods `:auto`, `:download`, `:local`, `:csv`, `:sintético`, `:manual`.
+- Automatic download of the TXT database (`descarregar_ameco_automatico`) and a fixed-width parser (`ler_ficheiro_ameco_txt`).
+- AMECO CSV processor (`processar_csv_ameco`).
+- Calibration from AMECO data (`calibrar_com_ameco_v2`, `calibrar_com_dados_ameco`).
+- International comparison (`comparar_países_ameco`) and time series (`analisar_série_temporal_ameco`).
+- Reorganization of the code into a modular repository (src/, test/, examples/, docs/).
+- Test suite (`test/runtests.jl`) and demo (`examples/demo.jl`).
+- `docs/LIMITACOES.md` documenting known limitations.
 
-### Corrigido
-- `Statistics` importado explicitamente (mean/std/median/var/cor/quantile).
-- Parâmetros da EDO passados como `NamedTuple` (type-stable) em vez de `Dict`.
-- `matriz_identidade(N)` substitui usos incorretos da constante `I` do LinearAlgebra.
-- Validação de calibração usa histogramas robustos (sem dependência dura de boxplot).
-- Eliminado o bug `match_obj` não definido no fluxo de atualização AMECO (função de atualização removida/reescrita).
-- `seed` opcional e partilhada nas simulações para reprodutibilidade e comparabilidade base-vs-choque.
+### Fixed
+- `Statistics` explicitly imported (mean/std/median/var/cor/quantile).
+- ODE parameters passed as a `NamedTuple` (type-stable) instead of a `Dict`.
+- `matriz_identidade(N)` replaces incorrect uses of LinearAlgebra's `I` constant.
+- Calibration validation uses robust histograms (no hard dependency on boxplots).
+- Fixed the undefined-`match_obj` bug in the AMECO update flow (the update function was removed/rewritten).
+- Optional, shared `seed` across simulations for reproducibility and base-vs-shock comparability.
 
-### Conhecido (ver docs/LIMITACOES.md)
-- A matriz técnica A não realimenta a dinâmica de N departamentos.
-- `R_max` no choque salarial é ilustrativo (matriz auxiliar).
-- URLs e formato do parser AMECO são heurísticos.
-- Calibração AMECO limitada à agregação macro (3 setores) com pesos fixos.
-- Dados por omissão são sintéticos.
+### Known (see docs/LIMITACOES.md)
+- The technical matrix A did not feed back into the N-department dynamics.
+- `R_max` in the wage shock was illustrative (an auxiliary matrix).
+- The AMECO parser's URLs and format were heuristic.
+- AMECO calibration was limited to macro aggregation (3 sectors) with fixed weights.
+- Default data are synthetic.
 
 ## [0.2.0]
-- Calibração INE (Portugal) com 19 setores CAE (sintético).
-- Fronteira distributiva w-r e validação de taxas de lucro calibradas.
+- Portuguese national-accounts (INE) calibration with 19 NACE sectors (synthetic).
+- Wage-profit distributive frontier and validation of calibrated profit rates.
 
 ## [0.1.0]
-- Modelo de 2 e N departamentos, acumulação via EDOs.
-- Valores-trabalho, preços de produção de Sraffa, problema da transformação.
+- Two- and N-department model, accumulation via ODEs.
+- Labor values, Sraffian prices of production, the transformation problem.
