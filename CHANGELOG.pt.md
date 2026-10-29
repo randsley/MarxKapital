@@ -6,7 +6,7 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
-## [Por lançar]
+## [1.0.0] — 2026-10-29
 
 ### Adicionado
 - **Notebooks** (`notebooks/`, em inglês, offline): seis notebooks Jupyter
