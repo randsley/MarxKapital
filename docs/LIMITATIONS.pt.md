@@ -356,9 +356,11 @@ verificação manual, fora dos testes automáticos).
 
 ## 7. Stock de capital e depreciação são aproximados (corrigido, com ressalva)
 
-O capital constante é aproximado pelo stock de capital, e a depreciação é
-fixada em ~10% do stock em vários pontos (fora dos caminhos de dados reais,
-onde já se usa CCF/stock real). Por omissão, o caminho `:eurostat` usa o
+O capital constante é aproximado pelo stock de capital. A depreciação vem
+dos dados sempre que estes existem: os caminhos de dados reais e o caminho
+AMECO de pesos fixos usam o consumo de capital fixo (CCF) reportado, e os
+dados INE sintéticos fixam o CCF como uma parcela do VAB. Nenhum caminho
+usa ainda 10% fixos do stock. Por omissão, o caminho `:eurostat` usa o
 stock líquido reportado diretamente pelo Eurostat para o ano pedido.
 
 **Corrigido (opcional):** `perpetual_inventory=true`
@@ -366,13 +368,16 @@ stock líquido reportado diretamente pelo Eurostat para o ano pedido.
 `data_source`/`sector_data=:eurostat`) substitui essa leitura direta por
 uma série própria calculada pelo método do inventário perpétuo (PIM —
 `compute_pim_capital_stock`, `src/eurostat_sdmx.jl`):
-`Kₜ = (1-δ)·Kₜ₋₁ + FBCFₜ`, com `δ` estimado (`CFC/stock` no ano de
+`Kₜ = (1-δ)·Kₜ₋₁ + GFCFₜ`, com `δ` estimado (`CFC/stock` no ano de
 referência, não um valor fixo) e semeada a partir do ano mais antigo com
-stock e FBCF reportados. Verificado com dados reais de Portugal: a série PIM
-acompanha o stock reportado ao longo de 22 anos (2000-2022), com desvio
-crescente mas moderado até ao ano mais recente (setor C: ~10% em 2022) —
-esperado, já que o PIM aqui usa uma taxa de depreciação única por setor, não
-diferenciada por tipo de ativo (estruturas, máquinas, TIC, etc. têm vidas
+stock e FBCF reportados. Verificado com dados reais de Portugal (2026-10):
+a série PIM fica abaixo do stock reportado, 15% no agregado em 2010 e 28% em
+2022. Por setor, o desvio em 2022 vai de +11% (agricultura, A) a −36%
+(atividades imobiliárias, L); a indústria transformadora (C) está em −10%.
+Os maiores desvios estão nos setores dominados por edifícios e estruturas
+(L, O, G, K, Q), o que é coerente com a principal simplificação: o PIM aqui
+usa uma taxa de depreciação única por setor, estimada por CCF/stock, e não
+uma por tipo de ativo (estruturas, máquinas, TIC, etc. têm vidas
 úteis muito diferentes na prática — dados de FBCF por tipo de ativo já estão
 disponíveis no Eurostat, `NAMA_10_A64_P5` tem uma dimensão `asset10`, mas
 construir um PIM multi-ativo exigiria também perfis de depreciação por tipo
@@ -385,7 +390,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 168 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 221 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -508,3 +513,27 @@ afirmado algebricamente.
 - **Custo.** A continuação de ciclos por colocação é lenta para N = 6
   (≈100 s), e cada estimativa de expoentes de Lyapunov leva ≈100 s; os
   testes usam horizontes curtos.
+
+## 12. Anos de previsão da AMECO (corrigido)
+
+A AMECO publica as previsões da Comissão para o ano da edição e o seguinte
+nas mesmas séries que os dados observados, e nada na resposta SDMX as
+assinala: `OBS_STATUS` é `A` em todos os anos. Pedir anos até 2027 à edição
+da primavera de 2026 devolvia, sem aviso, as previsões de 2026 e 2027, pelo
+que uma calibração para 2026, ou uma série temporal que lá chegasse, usava
+previsões como se fossem dados.
+
+**Corrigido:** o ano da edição lê-se da coluna `LAST UPDATE` da resposta
+SDMX (`_release_year`) e, no caminho SDMX, `fetch_ameco_data` retira os
+anos a partir do ano da edição, com aviso (`_drop_forecast_years`). O
+último ano observado fica registado em `data.notes["last_actual_year"]`.
+Um ano de calibração para lá dele recua para esse ano, com aviso.
+`include_forecasts=true` (em `fetch_ameco_data`, `calibrate_with_ameco_v2`
+e `analyze_ameco_time_series`) mantém as previsões. Testado offline
+(`test/runtests.jl`, "AMECO forecast years").
+
+**Ressalva:** os ficheiros TXT/CSV legados não trazem data de edição, pelo
+que nesses caminhos não se retira nenhum ano. A regra assume o calendário
+habitual da AMECO (edições de primavera e outono, cada uma com previsões
+para o ano corrente e o seguinte). O último ano observado é ele próprio
+provisório e pode ser revisto em edições posteriores.

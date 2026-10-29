@@ -365,9 +365,11 @@ automated tests).
 
 ## 7. Capital stock and depreciation are approximated (fixed, with caveat)
 
-Constant capital is approximated by capital stock, and depreciation is
-fixed at ~10% of the stock in several places (outside the real-data
-paths, where real CCF/stock is already used). By default, the
+Constant capital is approximated by capital stock. Depreciation comes
+from data wherever data exist: the real-data paths and the AMECO
+fixed-weights path use the reported consumption of fixed capital (CFC),
+and the synthetic INE data set CFC as a share of value added. No path
+still uses a flat 10% of the stock. By default, the
 `:eurostat` path uses the net stock directly reported by Eurostat for
 the requested year.
 
@@ -376,13 +378,16 @@ the requested year.
 `data_source`/`sector_data=:eurostat`) replaces this direct reading
 with its own series computed via the perpetual-inventory method (PIM —
 `compute_pim_capital_stock`, `src/eurostat_sdmx.jl`):
-`Kₜ = (1-δ)·Kₜ₋₁ + FBCFₜ`, with `δ` estimated (`CFC/stock` in the
+`Kₜ = (1-δ)·Kₜ₋₁ + GFCFₜ`, with `δ` estimated (`CFC/stock` in the
 reference year, not a fixed value) and seeded from the earliest year with
-reported stock and GFCF. Verified with real Portuguese data: the PIM
-series tracks the reported stock across 22 years (2000-2022), with a
-growing but moderate deviation up to the most recent year (sector C:
-~10% in 2022) — expected, since the PIM here uses a single depreciation
-rate per sector, not differentiated by asset type (structures,
+reported stock and GFCF. Checked with real Portuguese data (2026-10):
+the PIM series runs below the reported stock, by 15% in aggregate in
+2010 and 28% in 2022. By sector, the 2022 gap ranges from +11%
+(agriculture, A) to −36% (real estate, L); manufacturing (C) is at −10%.
+The largest gaps are in sectors dominated by buildings and structures
+(L, O, G, K, Q), which fits the main simplification: the PIM here uses a
+single depreciation rate per sector, estimated from CFC/stock, not one
+per asset type (structures,
 machinery, ICT, etc. have very different useful lives in practice — GFCF
 data by asset type is already available in Eurostat, `NAMA_10_A64_P5`
 has an `asset10` dimension, but building a multi-asset PIM would also
@@ -396,7 +401,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 168 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 221 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -517,3 +522,28 @@ algebraically.
 - **Cost.** Collocation continuation of cycles is slow for N = 6 (≈100 s),
   and each Lyapunov-exponent estimate takes ≈100 s; the tests use short
   horizons.
+
+## 12. AMECO forecast years (fixed)
+
+AMECO publishes the Commission's forecasts for the release year and the
+next one in the same series as the observed data, and nothing in the
+SDMX response marks them: `OBS_STATUS` is `A` for every year. Requesting
+years up to 2027 from the spring 2026 release silently returned the 2026
+and 2027 forecasts, so a calibration for 2026, or a time series ending
+there, used forecasts as if they were data.
+
+**Fixed:** the release year is read from the `LAST UPDATE` column of the
+SDMX response (`_release_year`), and on the SDMX path `fetch_ameco_data`
+drops the years from the release year on, with a warning
+(`_drop_forecast_years`). The last actual year is recorded in
+`data.notes["last_actual_year"]`. A calibration year beyond it falls back
+to that year with a warning. `include_forecasts=true` (in
+`fetch_ameco_data`, `calibrate_with_ameco_v2` and
+`analyze_ameco_time_series`) keeps the forecasts. Tested offline
+(`test/runtests.jl`, "AMECO forecast years").
+
+**Caveat:** the legacy TXT/CSV files carry no release date, so no years
+are dropped on those paths. The rule assumes AMECO's usual calendar
+(spring and autumn releases, each forecasting the current and the next
+year). The most recent actual year is itself provisional and may be
+revised in later releases.

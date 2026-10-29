@@ -106,6 +106,37 @@ const AMECO_SDMX_MAP = Dict(
 )
 
 """
+    _release_year(last_update)
+
+Year of an AMECO release, from the `LAST UPDATE` field of the SDMX CSV
+(`"dd/mm/yy hh:mm:ss"`, e.g. `"03/06/26 09:37:05"` → 2026; a four-digit year
+is also accepted, as is an ISO date, in case CSV.jl parsed the field as a
+date). Returns `nothing` if the field cannot be read.
+"""
+function _release_year(last_update::AbstractString)
+    iso = match(r"^\s*(\d{4})-\d{2}-\d{2}", last_update)
+    iso === nothing || return parse(Int, iso[1])
+    m = match(r"^\s*\d{1,2}/\d{1,2}/(\d{2}|\d{4})\b", last_update)
+    m === nothing && return nothing
+    y = parse(Int, m[1])
+    return y < 100 ? 2000 + y : y
+end
+
+"""
+    _drop_forecast_years(years, series, release_year)
+
+AMECO publishes the Commission's forecasts in the same series as the
+observed data, with nothing marking them (`OBS_STATUS` is `A` for every
+year). Each release forecasts its own year and the next one, so the years
+`≥ release_year` are forecasts. Returns `(years, series)` without them,
+with every vector in `series` cut to the remaining years.
+"""
+function _drop_forecast_years(years::AbstractVector{Int}, series::Dict, release_year::Integer)
+    keep = findall(<(release_year), years)
+    return years[keep], Dict(k => v[keep] for (k, v) in series)
+end
+
+"""
 Calls the SDMX API for one (dataflow, item, area) and returns a
 Dict{Int,Float64} year→value. The SDMX key fixes TRANSFORMATION (1 by
 default), UNIT (0 by default) and REFERENCE=0 and leaves AGG_METHOD blank
@@ -117,9 +148,13 @@ other values (e.g. chapters 07-07/08-02 use TRANSFORMATION=3; chapter 11-01,
 external trade, uses UNIT=99), so pass them explicitly when needed
 (confirmed by trial: the API returns "incorrect number of filters"/empty if
 the wrong value is wildcarded instead of fixed).
+
+If `release` is a `Ref{Int}`, it is raised to the release year read from the
+series' `LAST UPDATE` column (see `_release_year`).
 """
 function _fetch_sdmx_series(dataflow::String, area_code::String, item::String;
-                           transformation::Int = 1, unit::Int = 0)
+                           transformation::Int = 1, unit::Int = 0,
+                           release::Union{Nothing, Base.RefValue{Int}} = nothing)
     url = "$AMECO_SDMX_BASE_URL/data/ECFIN,$dataflow,1.0/A.$area_code.$transformation..$unit.0.$item" *
           "?format=SDMX-CSV"
     try
@@ -128,6 +163,12 @@ function _fetch_sdmx_series(dataflow::String, area_code::String, item::String;
         df = CSV.read(IOBuffer(resp.body), DataFrame)
         (nrow(df) == 0 || !("TIME_PERIOD" in names(df)) || !("OBS_VALUE" in names(df))) &&
             return Dict{Int, Float64}()
+        if release !== nothing && "LAST UPDATE" in names(df)
+            for u in unique(skipmissing(df[!, "LAST UPDATE"]))
+                y = _release_year(string(u))
+                y === nothing || (release[] = max(release[], y))
+            end
+        end
         return Dict(Int(row.TIME_PERIOD) => Float64(row.OBS_VALUE) for row in eachrow(df))
     catch
         return Dict{Int, Float64}()
@@ -144,6 +185,9 @@ ready for `build_ameco_data` (`src/ameco.jl`). Variables with no mapping, or
 whose call fails, are simply missing from the dictionary; `build_ameco_data`
 fills in defaults (0.0 or NaN), so a partial failure never throws.
 
+With `release = Ref(0)`, the release year of the data is stored in
+`release[]` (see `_release_year`).
+
 Two extra series are computed (they do not come from `AMECO_SDMX_MAP`):
 `GDP_deflator` = `GDP_current/GDP_constant × 100` (from series already
 fetched, with no extra call); `trade_balance` = goods exports minus goods
@@ -151,12 +195,14 @@ imports (`AMECO_CHAPTER11-01`, items `DXGT`/`DMGT`, `UNIT=99`; note that this
 is goods trade only, unlike `exports`/`imports` above, which cover goods and
 services).
 """
-function download_ameco_sdmx(area_code::String, years)
+function download_ameco_sdmx(area_code::String, years;
+                             release::Union{Nothing, Base.RefValue{Int}} = nothing)
     println("\n🌐 Fetching AMECO data through the official SDMX API ($area_code)...")
     years_vec = collect(years)
     result = Dict{String, Vector{Float64}}()
     for (name, (dataflow, item, scale, transformation)) in AMECO_SDMX_MAP
-        series = _fetch_sdmx_series(dataflow, area_code, item; transformation = transformation)
+        series = _fetch_sdmx_series(dataflow, area_code, item; transformation = transformation,
+                                    release = release)
         if isempty(series)
             @warn "No AMECO SDMX data for '$name' ($dataflow, $item, $area_code)."
             continue

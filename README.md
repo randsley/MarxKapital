@@ -117,7 +117,10 @@ API](https://webgate.ec.europa.eu/ecfin/redisstat/api/dissemination/sdmx/2.1)
 that the `:local`/`:csv` methods still support was discontinued by the
 Commission. Run `check_ameco_sdmx()` to confirm access before a real
 analysis; see `docs/LIMITATIONS.md` item 3 for the exact status of each
-variable.
+variable. AMECO series also carry the Commission's forecasts for the
+release year and the next one, unmarked; the SDMX path drops those years
+by default, with a warning (`include_forecasts=true` keeps them; see item
+12).
 
 ## Automatic differentiation, TSSI and bifurcations
 
@@ -302,7 +305,7 @@ derived from the spectral radius of `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-213 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
+221 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
 every push to `main` — see `.github/workflows/test.yml`. CI then runs every
 notebook (`julia test/notebooks.jl`, see `notebooks/README.md`). The suite covers
 the default synthetic/opt-in paths and runs fully offline; the real-data

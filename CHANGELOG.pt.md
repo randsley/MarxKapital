@@ -62,6 +62,20 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   portugueses com que foram escritas.
 
 ### Corrigido
+- **Os anos de previsão da AMECO eram lidos como dados.** As séries AMECO
+  incluem as previsões da Comissão para o ano da edição e o seguinte, e a
+  resposta SDMX não as assinala, pelo que uma calibração para 2026 ou uma
+  série temporal até 2027 usava previsões sem aviso. `fetch_ameco_data` lê
+  agora o ano da edição de `LAST UPDATE` e retira esses anos no caminho
+  SDMX, com aviso, registando o último ano observado em
+  `data.notes["last_actual_year"]`; um ano de calibração para lá dele recua
+  para esse ano. `include_forecasts=true` mantém-nos (também em
+  `calibrate_with_ameco_v2` e `analyze_ameco_time_series`). Ver
+  `docs/LIMITATIONS.pt.md` item 12.
+- `docs/LIMITATIONS.pt.md` item 7 atualizado: nenhum caminho deduz ainda
+  10% fixos do stock, e o desvio do inventário perpétuo face ao stock
+  reportado é maior do que o documento dizia (−28% no agregado em 2022, de
+  +11% a −36% por setor).
 - **Calibração AMECO com pesos fixos** (`calibrate_with_ameco_data`,
   `sector_data=:fixed`, o caminho por omissão): deduzia como depreciação
   10% do stock de capital em vez do CCF real da AMECO, e repartia o stock

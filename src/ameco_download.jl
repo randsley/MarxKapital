@@ -182,7 +182,7 @@ function parse_ameco_csv(file::String, country_code::String, years)
 end
 
 """
-    fetch_ameco_data(country; years=1995:2023, method=:auto, directory="./ameco_data")
+    fetch_ameco_data(country; years=1995:2023, method=:auto, directory="./ameco_data", include_forecasts=false)
 
 Unified entry point. `method`:
 - `:auto`      — tries the official SDMX API; then a recent local file; then synthetic data
@@ -193,9 +193,16 @@ Unified entry point. `method`:
 - `:csv`       — processes a CSV (requires `file`; legacy workflow)
 - `:synthetic` — generates synthetic data
 - `:manual`    — shows instructions and returns synthetic data
+
+AMECO series include the Commission's forecasts for the release year and
+the next one, unmarked. On the SDMX path those years are dropped by default,
+with a warning, and the last actual year is recorded in
+`notes["last_actual_year"]`; `include_forecasts=true` keeps them. The legacy
+TXT/CSV files carry no release date, so no years are dropped there.
 """
 function fetch_ameco_data(country::String; years = 1995:2023, method = :auto,
-                           directory = "./ameco_data", file = nothing)
+                           directory = "./ameco_data", file = nothing,
+                           include_forecasts::Bool = false)
     code = _resolve_country_code(country)
     sdmx_code = get(AMECO_SDMX_COUNTRY_CODES, country, code)
 
@@ -209,8 +216,7 @@ function fetch_ameco_data(country::String; years = 1995:2023, method = :auto,
         isnothing(file) && error("Method :csv requires the file=... argument")
         return parse_ameco_csv(file, code, years)
     elseif method in (:sdmx, :download)
-        return build_ameco_data(code, collect(years),
-            download_ameco_sdmx(sdmx_code, years), "AMECO SDMX (official)")
+        return _ameco_sdmx_data(code, sdmx_code, years, include_forecasts)
     end
 
     local_txt = joinpath(directory, "ameco_full.txt")
@@ -222,8 +228,7 @@ function fetch_ameco_data(country::String; years = 1995:2023, method = :auto,
 
     # :auto: official SDMX API first; then a recent local file; then synthetic data
     try
-        return build_ameco_data(code, collect(years),
-            download_ameco_sdmx(sdmx_code, years), "AMECO SDMX (official)")
+        return _ameco_sdmx_data(code, sdmx_code, years, include_forecasts)
     catch e
         @warn "AMECO SDMX API failed: $(sprint(showerror, e))"
         if isfile(local_txt)
@@ -234,4 +239,25 @@ function fetch_ameco_data(country::String; years = 1995:2023, method = :auto,
         @warn "Using SYNTHETIC data as a last resort."
         return generate_synthetic_ameco_data(code, collect(years))
     end
+end
+
+"""Fetches through the SDMX API and builds the AMECOData, dropping forecast years
+unless `include_forecasts` (see `fetch_ameco_data`)."""
+function _ameco_sdmx_data(code, sdmx_code, years, include_forecasts::Bool)
+    release = Ref(0)
+    series = download_ameco_sdmx(sdmx_code, years; release = release)
+    years_vec = collect(Int, years)
+    notes = Dict{String, String}()
+    if release[] > 0
+        notes["release_year"] = string(release[])
+        if !include_forecasts && last(years_vec) >= release[]
+            years_vec, series = _drop_forecast_years(years_vec, series, release[])
+            isempty(years_vec) && error("Every requested year is an AMECO forecast " *
+                                        "(release $(release[])); use include_forecasts=true.")
+            @warn "Years from $(release[]) on are Commission forecasts in the AMECO " *
+                  "$(release[]) release; dropped (include_forecasts=true keeps them)."
+            notes["last_actual_year"] = string(last(years_vec))
+        end
+    end
+    return build_ameco_data(code, years_vec, series, "AMECO SDMX (official)"; notes = notes)
 end

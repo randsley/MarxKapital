@@ -276,6 +276,27 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test comp.table.GDP[1] ≈ round(data.GDP[end] / 1000, digits = 1)
     end
 
+    @testset "AMECO forecast years" begin
+        @test _release_year("03/06/26 09:37:05") == 2026
+        @test _release_year("15/11/2027 10:00:00") == 2027
+        @test _release_year("2026-06-03T09:37:05") == 2026
+        @test _release_year("n/a") === nothing
+        # the 2026 release forecasts 2026 and 2027: both are dropped
+        years, series = _drop_forecast_years(collect(2020:2027),
+                                             Dict("GDP_current" => collect(1.0:8.0)), 2026)
+        @test years == collect(2020:2025)
+        @test series["GDP_current"] == collect(1.0:6.0)
+        # a calibration year beyond the last actual year falls back to it
+        data = generate_synthetic_ameco_data("PT", collect(1995:2020))
+        data.notes["last_actual_year"] = "2020"
+        params, _ = calibrate_with_ameco_data(data, 2022, :macro)
+        p2020, _ = calibrate_with_ameco_data(data, 2020, :macro)
+        @test params.GVA ≈ p2020.GVA
+        # without the note (no forecast information) an unknown year is still an error
+        delete!(data.notes, "last_actual_year")
+        @test_throws ErrorException calibrate_with_ameco_data(data, 2022, :macro)
+    end
+
     @testset "AMECO time series — consistent vs. current valuation" begin
         # Hand-worked case: GDP_current=200, real_GDP=100 (GDP_deflator=200);
         # compensation=80, CFC=20 (both at current prices); C=400 (stock,

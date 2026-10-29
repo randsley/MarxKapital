@@ -122,7 +122,8 @@ function generate_synthetic_ameco_data(country_code::String, years::Vector{Int})
 end
 
 """Builds an AMECOData from extracted series (name → vector dictionary)."""
-function build_ameco_data(country_code, years, data::Dict, source)
+function build_ameco_data(country_code, years, data::Dict, source;
+                          notes = Dict{String, String}())
     country_name = something(findfirst(==(country_code), AMECO_COUNTRY_CODES), country_code)
     g(key, d = 0.0) = get(data, key, fill(d, length(years)))
     return AMECOData(country_name, country_code, years,
@@ -133,7 +134,7 @@ function build_ameco_data(country_code, years, data::Dict, source)
         g("GDP_deflator"), g("GFCF_deflator"), g("CPI"), g("CFC"), g("government_revenue"), g("government_expenditure"),
         g("budget_balance"), g("public_debt"), g("current_account"),
         g("trade_balance", NaN), g("net_capital_stock"),
-        source, now(), Dict{String, String}())
+        source, now(), notes)
 end
 
 # ----------------------------------------------------------------------------
@@ -197,6 +198,10 @@ more correct than recomputing from GFCF already summed into 3 groups. See
 function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symbol;
                                   sector_data::Symbol = :fixed,
                                   perpetual_inventory::Bool = false)
+    if year > data.years[end] && haskey(data.notes, "last_actual_year")
+        @warn "Year $year is beyond the last actual AMECO year; using $(data.years[end])."
+        year = data.years[end]
+    end
     println("\n" * "="^70)
     println("CALIBRATION WITH AMECO DATA — $(data.country) | Year: $year")
     println("Source: $(data.source)")
@@ -328,17 +333,20 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
 end
 
 """
-    calibrate_with_ameco_v2(country; year=2022, method=:auto, sector_data=:fixed, perpetual_inventory=false)
+    calibrate_with_ameco_v2(country; year=2022, method=:auto, sector_data=:fixed, perpetual_inventory=false, include_forecasts=false)
 
-Fetches AMECO data (see `fetch_ameco_data`) and calibrates the model.
+Fetches AMECO data (see `fetch_ameco_data`) and calibrates the model. A
+`year` that is still a Commission forecast falls back, with a warning, to
+the last actual year, unless `include_forecasts=true`.
 `method` ∈ (:auto, :sdmx, :download, :local, :csv, :synthetic, :manual).
 `sector_data` ∈ (:fixed, :eurostat), `perpetual_inventory`: see
 `calibrate_with_ameco_data`.
 """
 function calibrate_with_ameco_v2(country::String; year = 2022, method = :auto,
                                sector_aggregation = :macro, sector_data = :fixed,
-                               perpetual_inventory = false)
-    data = fetch_ameco_data(country, years = 1995:year, method = method)
+                               perpetual_inventory = false, include_forecasts = false)
+    data = fetch_ameco_data(country, years = 1995:year, method = method,
+                            include_forecasts = include_forecasts)
     return calibrate_with_ameco_data(data, year, sector_aggregation;
                                     sector_data = sector_data,
                                     perpetual_inventory = perpetual_inventory)
@@ -477,13 +485,14 @@ Fetches the data and produces the time-series analysis (4 panels) of the Marxian
 """
 function analyze_ameco_time_series(country::String; years = 1995:2023,
                                        method = :synthetic, file = nothing,
-                                       valuation::Symbol = :current)
+                                       valuation::Symbol = :current,
+                                       include_forecasts = false)
     println("\n" * "="^70)
     println("TIME-SERIES ANALYSIS — $country | $(first(years))-$(last(years))")
     println("="^70)
 
     data = fetch_ameco_data(country, years = years, method = method,
-                              file = file)
+                              file = file, include_forecasts = include_forecasts)
     st = analyze_time_series_with_data(data; valuation = valuation)
 
     p1 = plot(st.years, st.e, xlabel = "Year", ylabel = "e",

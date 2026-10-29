@@ -60,6 +60,20 @@ Format based on Keep a Changelog. Semantic versioning.
   Portuguese names they were written with.
 
 ### Fixed
+- **AMECO forecast years were read as data.** AMECO series include the
+  Commission's forecasts for the release year and the next one, and the
+  SDMX response doesn't mark them, so a calibration for 2026 or a time
+  series reaching 2027 used forecasts silently. `fetch_ameco_data` now
+  reads the release year from `LAST UPDATE` and drops those years on the
+  SDMX path, with a warning, recording the last actual year in
+  `data.notes["last_actual_year"]`; a calibration year beyond it falls back
+  to that year. `include_forecasts=true` keeps them (also in
+  `calibrate_with_ameco_v2` and `analyze_ameco_time_series`). See
+  `docs/LIMITATIONS.md` item 12.
+- `docs/LIMITATIONS.md` item 7 brought up to date: no path still deducts a
+  flat 10% of the stock, and the perpetual-inventory gap against the
+  reported stock is larger than the doc said (−28% in aggregate in 2022,
+  from +11% to −36% by sector).
 - **AMECO calibration with fixed weights** (`calibrate_with_ameco_data`,
   `sector_data=:fixed`, the default path): it deducted 10% of the capital
   stock as depreciation instead of AMECO's real CFC, and split the stock by

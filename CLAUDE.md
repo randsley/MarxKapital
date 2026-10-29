@@ -10,7 +10,7 @@ MarxKapital: a Julia model of Marxian economics (accumulation, exploitation, org
 
 ```bash
 julia install_deps.jl                         # one-time: Pkg.add the deps (see "Loading model" below)
-julia --project=. test/runtests.jl            # full suite (offline; 213 tests)
+julia --project=. test/runtests.jl            # full suite (offline; 221 tests)
 julia --project=. examples/demo.jl            # full demo
 julia --project=. paper/generate_results.jl   # regenerate paper figures/tables (needs network)
 julia --project=. paper/monte_carlo.jl        # Monte Carlo sweeps for the paper (offline)
