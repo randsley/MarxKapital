@@ -390,7 +390,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 221 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 224 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -399,7 +399,7 @@ verifique-os manualmente com `check_ameco_sdmx()`,
 `check_eurostat_sectoral()` e `paper/matrix_audit.jl` antes de os usar
 numa análise real.
 
-## 8. Piso imposto em `e` (rate of exploitation) na calibração setorial
+## 8. Piso imposto em `e` (taxa de exploração) na calibração setorial (documentado)
 
 `estimate_sector_parameters` (`src/calibration_pt.jl`) impõe `e =
 max(0.1, surplus_value_rate)`: setores cujo rendimento empresarial (após
@@ -408,10 +408,17 @@ produziriam `e` nulo ou negativo, que o modelo não aceita
 (`Department` exige `e>0`). Este é um valor imposto, não uma
 observação puramente empírica — a função agora reporta explicitamente
 quantos setores saturam no piso (ex.: 4/19 para Portugal 2022), em vez
-de o fazer silenciosamente. Não existe ainda uma tabela em anexo com os
-quatro valores brutos (não-piso) lado a lado com os valores impostos, o
-que fortaleceria a transparência — ver `paper/main.tex`, Secção 5.1, para
-a mesma ressalva no contexto do artigo.
+de o fazer silenciosamente.
+
+**Documentado:** `CalibratedParameters` traz agora também `e_raw`, o rácio
+antes do piso (nos caminhos INE e AMECO), e o artigo mostra os valores
+brutos e impostos lado a lado (`paper/main.tex`, Secção 5.1, Tabela 3,
+gerada por `paper/generate_results.jl`). Para Portugal 2022, os quatro
+setores no piso são a eletricidade (`e` bruto ≈ −0,53), a administração
+pública, a educação (ambas ligeiramente negativas) e a saúde (≈ 0,09). O
+piso quase não mexe no agregado: `r = ΣS/Σ(C+V)` é 6,12% com ele e 5,80%
+com os rácios brutos. O piso mantém-se, porque `Department` exige
+`e > 0`.
 
 ## 9. Formato da série de exploração/depreciação AMECO (corrigido)
 

@@ -226,7 +226,8 @@ function estimate_sector_parameters(df::DataFrame, A::Matrix{Float64})
     end
 
     println("  ✓ mean e: $(round(mean(e), digits=2)) | mean k: $(round(mean(k), digits=2)) | mean r: $(round(mean(r)*100, digits=1))%")
-    return (C = C, V = V, e = e, k = k, r = r, l = l, σ_c = σ_c, σ_v = σ_v, δ = δ)
+    return (C = C, V = V, e = e, e_raw = df.surplus_value_rate, k = k, r = r, l = l,
+            σ_c = σ_c, σ_v = σ_v, δ = δ)
 end
 
 """Names of the 10 groups of `NACE_MEDIUM_GROUPS` (same order)."""
@@ -329,7 +330,7 @@ function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
 
     source = data_source == :eurostat ? "INE/Eurostat (real data)" : "INE (synthetic)"
     result = CalibratedParameters(N, df.sector, df.nace_code,
-        p.C, p.V, df.GVA, p.e, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
+        p.C, p.V, df.GVA, p.e, p.e_raw, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
         source, year, now(), 0.85)
 
     println("\n✅ CALIBRATION COMPLETE — $N sectors | GDP: €$(round(sum(df.GVA)/1000, digits=1)) bn")

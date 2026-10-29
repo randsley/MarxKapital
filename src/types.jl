@@ -116,6 +116,7 @@ struct CalibratedParameters
     GVA::Vector{Float64}  # actual gross value added (from the data source), not C+V+e·V
 
     e::Vector{Float64}
+    e_raw::Vector{Float64}  # e before the 0.1 floor (docs/LIMITATIONS.md item 8); equals e where the floor does not bind
     k::Vector{Float64}
     r::Vector{Float64}
 

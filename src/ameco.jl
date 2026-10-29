@@ -324,7 +324,7 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
     δ = CFC ./ capital_stock
 
     sector_source = real_sectoral ? " + Eurostat (real sectoral)" : ""
-    result = CalibratedParameters(N, sectors, codes, C, V, GVA, e, k, r, A, l,
+    result = CalibratedParameters(N, sectors, codes, C, V, GVA, e, e_raw, k, r, A, l,
         σ_c, σ_v, δ, "AMECO — $(data.source)$sector_source", year, now(), 0.80)
 
     println("\n✅ CALIBRATION COMPLETE — mean e $(round(mean(e), digits=2)) | mean r $(round(mean(r)*100, digits=2))%")

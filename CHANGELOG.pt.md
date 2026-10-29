@@ -6,7 +6,20 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [Por lançar]
+
+### Adicionado
+- `CalibratedParameters.e_raw`: a taxa de exploração antes do piso de 0,1,
+  nos caminhos INE e AMECO (`e == max.(0.1, e_raw)`).
+- Artigo, Secção 5.1: a Tabela 3 lista os setores no piso com `e` e `r`
+  brutos e impostos, e o texto dá a taxa de lucro agregada com e sem o piso
+  (6,12% e 5,80% para Portugal 2022), tudo gerado por
+  `paper/generate_results.jl` (`figures/table3_floor.tex`,
+  `figures/floor_stats.tex`). Ver `docs/LIMITATIONS.pt.md` item 8.
+
 ## [1.0.0] — 2026-10-29
+
+DOI desta versão (Zenodo): [10.5281/zenodo.23750616](https://doi.org/10.5281/zenodo.23750616). Para citar todas as versões, use o DOI conceptual acima.
 
 ### Adicionado
 - **Notebooks** (`notebooks/`, em inglês, offline): seis notebooks Jupyter

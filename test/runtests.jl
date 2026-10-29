@@ -242,6 +242,11 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test params.N == 19
         @test size(params.A) == (19, 19)
         @test all(params.e .> 0)
+        # e is the raw ratio with a 0.1 floor; e_raw keeps the value before it
+        @test params.e == max.(0.1, params.e_raw)
+        @test params.r ≈ params.e ./ (params.k .+ 1)
+        pa, _ = calibrate_with_ameco_v2("Portugal", year = 2022, method = :synthetic)
+        @test pa.e == max.(0.1, pa.e_raw)
     end
 
     @testset "Wage-profit frontier" begin
