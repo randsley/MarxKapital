@@ -223,6 +223,15 @@ params_real, data = calibrate_with_ameco_v2("Portugal", year = 2022, sector_data
 # reported figure (optional)
 params_pim = calibrate_portugal_model(year = 2022, data_source = :eurostat, perpetual_inventory = true)
 
+# Real final demand (from the same input-output table) in the dynamics:
+# real A, household consumption basket, and rationing net of final
+# consumption and exports (params_real.final_demand is nothing on synthetic data)
+depts = departments_from_params(params_real)
+simulate_Ndept_custom(depts; coupled = true, market_prices = true, A = params_real.A,
+                      basket = consumption_basket(params_real.final_demand))
+simulate_Ndept_custom(depts; coupled = true, rationing = true, A = params_real.A,
+                      final_demand_share = exogenous_demand_share(params_real.final_demand))
+
 # Manual check of Eurostat access (not run in the automated test suite)
 check_eurostat_sectoral()
 ```
@@ -305,7 +314,7 @@ derived from the spectral radius of `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-224 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
+239 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
 every push to `main` — see `.github/workflows/test.yml`. CI then runs every
 notebook (`julia test/notebooks.jl`, see `notebooks/README.md`). The suite covers
 the default synthetic/opt-in paths and runs fully offline; the real-data

@@ -134,13 +134,26 @@ que aplicava `A[i,j]` diretamente à despesa de investimento planeada
 inputs que uma unidade de output físico — um problema dimensional
 identificado em revisão externa. `Δxⱼ=σ_c,ⱼSⱼ·xⱼ/Cⱼ` converte a despesa
 para uma expansão de output via o rácio capital-output corrente do
-setor, antes de `A` ser aplicada. Continua por resolver: todo o `xᵢ`
-reconstruído é tratado como disponível para a procura de investimento
-`Dᵢ`, sem descontar a reposição de inputs intermédios (já contada em
-`zᵢ`) nem outra procura final — não há fonte de dados no pipeline atual
-com a alocação de consumo por setor de origem, pelo que `Dᵢ≤xᵢ` deve
-ler-se como um limite superior à oferta investível, não um balanço de
-reprodução totalmente líquido.
+setor, antes de `A` ser aplicada. Por omissão, todo o `xᵢ` reconstruído
+é tratado como disponível para a procura de investimento `Dᵢ`, sem
+descontar a reposição de inputs intermédios (já contada em `zᵢ`) nem
+outra procura final.
+
+**Corrigido em parte (opcional):** as colunas de utilização final da
+mesma IOT (`NAIO_10_CP1700`, uso doméstico) dão a procura final por
+produto (`final_demand_from_iot`, `fetch_eurostat_final_demand`), agora
+guardada em `params.final_demand` nos caminhos Eurostat. Com
+`final_demand_share = exogenous_demand_share(params.final_demand)` em
+`simulate_Ndept_custom` (e `A = params.A`), o racionamento compara `Dᵢ`
+com `(1 − φᵢ)·xᵢ`, onde `φᵢ` é a parcela do output que vai para consumo
+final e exportações. Para Portugal 2022 (artigo, Secção 5.7, Tabela 4),
+isto não altera a parcela de setores racionados e reduz a acumulação em
+cerca de um quinto com 10 e 19 setores. Continua em aberto: a reposição
+intermédia não é descontada, pelo que `Dᵢ≤(1−φᵢ)xᵢ` continua a ser um
+limite superior à oferta investível, não um balanço de reprodução
+totalmente líquido. E a matriz do Eurostat só cobre inputs domésticos,
+pelo que o `xᵢ` reconstruído a partir dela deixa de fora os inputs
+intermédios importados.
 
 ## 2. R_max no choque salarial usa uma matriz auxiliar (corrigido)
 
@@ -390,7 +403,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 224 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 239 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -488,8 +501,12 @@ afirmado algebricamente.
 - **Hipóteses do modelo cruzado.** Os preços de mercado respondem ao
   excesso de procura relativo com velocidade única `β`; os bens de capital
   são comprados na composição das colunas de A e todo o consumo num cabaz
-  fixo `basket` (por omissão, as quotas do output líquido inicial — não há
-  dados de procura final por setor de origem no pipeline). Os preços são
+  fixo `basket`: por omissão, as quotas do output líquido inicial, uma
+  hipótese; numa calibração com dados reais,
+  `consumption_basket(params.final_demand)` dá as quotas reais do consumo
+  das famílias (com `A = params.A`). Para Portugal 2022, o cabaz real sobe
+  a taxa de crescimento equilibrado de cerca de 0,14 para 0,19 com 10 e 19
+  setores e não altera a estabilidade (artigo, Secção 5.7). Os preços são
   normalizados para que o lucro total iguale a mais-valia total. Não se
   combina com `realization` nem com `rationing`.
 - **`μ_v` (mobilidade do capital variável) está desligado por omissão.**

@@ -280,6 +280,9 @@ function system_Ndept_io!(dX, X, p, t)
         x = W ./ (1 .- colsum)
         O = x  # genuine gross output, not W: fixes the external review's
                 # criticism that O left out circulating intermediate consumption.
+        # Optional (`final_demand_share`): the part of output taken by final
+        # consumption and exports is not available to investment demand.
+        haskey(p, :final_demand_share) && (O = (1 .- p.final_demand_share) .* x)
         if p.rationing
             # Desired output expansion implied by planned reinvestment
             # σ_c,ⱼSⱼ, via the current capital/output ratio Cⱼ/xⱼ
@@ -519,7 +522,8 @@ end
 """
     simulate_Ndept_custom(depts; T=100.0, seed=nothing, coupled=false, μ=0.3, μ_v=0.0,
                               realization=false, rationing=false,
-                              market_prices=false, β=0.5, basket=nothing)
+                              market_prices=false, β=0.5, basket=nothing,
+                              A=nothing, final_demand_share=nothing)
 
 Simulates the N-department model from pre-configured departments. With
 `coupled=true` it uses `system_Ndept_io!` instead of `system_Ndept!` (`μ_v`,
@@ -530,14 +534,38 @@ cannot be combined with `realization`/`rationing`.
 aggregate realization pressure; `rationing=true` (takes precedence over
 `realization`) uses per-sector rationing; see the docstring of
 `system_Ndept_io!`.
+
+Real-data options, typically from a calibration (`departments_from_params`):
+
+- `A`: a given technical matrix (e.g. `params.A`) instead of a random one
+  (`seed` is then ignored). Eurostat's matrix covers domestic inputs only,
+  so the gross output the coupled mechanisms reconstruct,
+  `xⱼ = Wⱼ/(1 − Σᵢ A[i,j])`, leaves out imported intermediate inputs.
+- `basket`: e.g. `consumption_basket(params.final_demand)`, real household
+  consumption shares in place of `basket_initial`.
+- `final_demand_share` (only with `rationing=true`): the share `φ` of each
+  sector's output taken by final consumption and exports
+  (`exogenous_demand_share(params.final_demand)`); rationing then allocates
+  only `(1 − φ)·x` to investment demand.
 """
 function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
                                    realization = false, rationing = false,
-                                   market_prices = false, β = 0.5, basket = nothing)
+                                   market_prices = false, β = 0.5, basket = nothing,
+                                   A = nothing, final_demand_share = nothing)
     N = length(depts)
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
-    A = create_technical_matrix(N, seed = seed)
+    if isnothing(A)
+        A = create_technical_matrix(N, seed = seed)
+    else
+        size(A) == (N, N) || error("A must be $N×$N, got $(size(A))")
+        A = Matrix{Float64}(A)
+    end
+    if !isnothing(final_demand_share)
+        (coupled && rationing) || error("final_demand_share requires coupled=true and rationing=true")
+        length(final_demand_share) == N || error("final_demand_share must have $N elements")
+        all(0 .<= final_demand_share .< 1) || error("final_demand_share must be in [0, 1)")
+    end
     (coupled && (realization || rationing || market_prices)) &&
         (A, _ = _ensure_output_admissibility(A))
 
@@ -569,6 +597,8 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
             realization  = realization,
             rationing = rationing,
         )
+        isnothing(final_demand_share) ||
+            (p = merge(p, (final_demand_share = collect(Float64, final_demand_share),)))
         prob = ODEProblem(system_Ndept_io!, X0, (0.0, T), p)
     else
         p = (

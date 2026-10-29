@@ -313,6 +313,16 @@ function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
         build_eurostat_io_matrix("PT", year, [[c] for c in df19.nace_code],
                                      Dict(zip(df19.nace_code, df19.GVA))) :
         create_technical_matrix(N19, density = 0.4)
+    fd19 = data_source == :eurostat ?
+        aggregate_final_demand(fetch_eurostat_final_demand("PT", year),
+                               [[c] for c in df19.nace_code], df19.nace_code) : nothing
+    fd = if isnothing(fd19) || aggregation == :detailed
+        fd19
+    elseif aggregation == :macro
+        aggregate_final_demand(fd19, NACE_MACRO_GROUPS, ["PRIM", "SEC", "TER"])
+    elseif aggregation == :medium
+        aggregate_final_demand(fd19, NACE_MEDIUM_GROUPS, MEDIUM_GROUP_CODES)
+    end
 
     df, A = if aggregation == :detailed
         df19, A19
@@ -331,7 +341,7 @@ function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
     source = data_source == :eurostat ? "INE/Eurostat (real data)" : "INE (synthetic)"
     result = CalibratedParameters(N, df.sector, df.nace_code,
         p.C, p.V, df.GVA, p.e, p.e_raw, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
-        source, year, now(), 0.85)
+        source, year, now(), 0.85, fd)
 
     println("\n✅ CALIBRATION COMPLETE — $N sectors | GDP: €$(round(sum(df.GVA)/1000, digits=1)) bn")
     return result

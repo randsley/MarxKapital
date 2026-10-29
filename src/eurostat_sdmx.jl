@@ -193,6 +193,119 @@ function _nearest_iot_year(country_code::String, year::Int)
     return years[argmin(abs.(years .- year))]
 end
 
+"""IOT DataFrames already downloaded in this session, by (country, year)."""
+const _IOT_CACHE = Dict{Tuple{String, Int}, DataFrame}()
+
+"""
+    _fetch_iot(country_code, iot_year)
+
+Downloads the domestic-use symmetric IOT (`NAIO_10_CP1700`, `stk_flow=DOM`)
+for one benchmark year, caching it for the session: the technical matrix
+(`build_eurostat_io_matrix`) and final demand (`fetch_eurostat_final_demand`)
+read the same table.
+"""
+function _fetch_iot(country_code::String, iot_year::Int)
+    get!(_IOT_CACHE, (country_code, iot_year)) do
+        url = "$EUROSTAT_SDMX_BASE_URL/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR.DOM...$country_code" *
+              "?format=SDMX-CSV&startPeriod=$iot_year&endPeriod=$iot_year"
+        resp = HTTP.get(url, ["Accept-Encoding" => "identity"],
+                        retry = true, readtimeout = 60, status_exception = false)
+        resp.status == 200 || error("Eurostat IOT unavailable for $country_code/$iot_year (status $(resp.status)).")
+        df = CSV.read(IOBuffer(resp.body), DataFrame)
+        nrow(df) == 0 && error("Eurostat IOT has no data for $country_code/$iot_year.")
+        df
+    end
+end
+
+"""
+    final_demand_from_iot(df, sections = NACE_SECTIONS)
+
+Final demand for domestic output by product, read from the final-use columns
+of the domestic-use IOT (`prd_use`), summed from A64 products to NACE
+sections (million euros). Returns a NamedTuple of vectors in the order of
+`sections`:
+
+- `household`: final consumption of households and NPISH (`P3_S14 + P3_S15`);
+- `government`: government final consumption (`P3_S13`);
+- `investment`: gross capital formation (`P5`: fixed capital, inventories
+  and valuables);
+- `exports` (`P6`);
+- `output`: total use of the product (`TU`, intermediate plus final use),
+  which equals its domestic output.
+
+Pure (no network), so that it can be tested on a small DataFrame.
+"""
+function final_demand_from_iot(df::DataFrame, sections::Vector{String} = NACE_SECTIONS)
+    idx = Dict(s => i for (i, s) in enumerate(sections))
+    G = length(sections)
+    columns = Dict("P3_S14" => :household, "P3_S15" => :household, "P3_S13" => :government,
+                   "P5" => :investment, "P6" => :exports, "TU" => :output)
+    totals = Dict(k => zeros(G) for k in (:household, :government, :investment, :exports, :output))
+    for row in eachrow(df)
+        ismissing(row.OBS_VALUE) && continue
+        pu, pa = String(row.prd_use), String(row.prd_ava)
+        (haskey(columns, pu) && startswith(pa, "CPA_")) || continue
+        s = _section_of_a64_code(pa)
+        haskey(idx, s) && (totals[columns[pu]][idx[s]] += Float64(row.OBS_VALUE))
+    end
+    return (sections = copy(sections), household = totals[:household],
+            government = totals[:government], investment = totals[:investment],
+            exports = totals[:exports], output = totals[:output])
+end
+
+"""
+    fetch_eurostat_final_demand(country_code, year)
+
+Final demand by NACE section (see `final_demand_from_iot`) from the IOT of
+the benchmark year nearest to `year` (the same vintage rule as
+`build_eurostat_io_matrix`). Needs the network.
+"""
+function fetch_eurostat_final_demand(country_code::String, year::Int)
+    iot_year = _nearest_iot_year(country_code, year)
+    isnothing(iot_year) && error("Eurostat IOT (NAIO_10_CP1700) unavailable for $country_code.")
+    return final_demand_from_iot(_fetch_iot(country_code, iot_year))
+end
+
+"""
+    aggregate_final_demand(fd, groups, codes)
+
+Sums final demand (see `final_demand_from_iot`) over groups of sections
+(e.g. `NACE_MACRO_GROUPS`); final demand is additive, unlike the technical
+coefficients (`aggregate_io_matrix`). `codes` names the groups.
+"""
+function aggregate_final_demand(fd, groups::Vector{Vector{String}}, codes::Vector{String})
+    idx = Dict(s => i for (i, s) in enumerate(fd.sections))
+    agg(v) = [sum(v[idx[s]] for s in g if haskey(idx, s); init = 0.0) for g in groups]
+    return (sections = copy(codes), household = agg(fd.household),
+            government = agg(fd.government), investment = agg(fd.investment),
+            exports = agg(fd.exports), output = agg(fd.output))
+end
+
+"""
+    consumption_basket(fd)
+
+Consumption basket of the cross-dual model (`basket` in `simulate_Ndept`)
+from real final demand: each sector's share of household and NPISH final
+consumption of domestic output. Replaces `basket_initial`, which assumes
+shares of initial net output.
+"""
+consumption_basket(fd) = fd.household ./ sum(fd.household)
+
+"""
+    exogenous_demand_share(fd; cap = 0.95)
+
+Share of each sector's output that goes to final consumption (households,
+NPISH, government) and exports, `φᵢ = (P3ᵢ + P6ᵢ)/TUᵢ`, capped at `cap`.
+The rationing step (`final_demand_share` in `simulate_Ndept_custom`) nets
+it out of the supply available to investment, `O = (1 − φ)·x`. Gross
+capital formation is left out, because rationing models investment demand
+itself. Unit-free, so it carries over to the model's value units.
+"""
+function exogenous_demand_share(fd; cap = 0.95)
+    φ = (fd.household .+ fd.government .+ fd.exports) ./ max.(fd.output, 1e-12)
+    return clamp.(φ, 0.0, cap)
+end
+
 """
     build_eurostat_io_matrix(country_code, year, groups, gva_by_section)
 
@@ -265,13 +378,7 @@ function build_eurostat_io_matrix(country_code::String, year::Int,
     iot_year != year && @warn "NAIO_10_CP1700 does not publish $year for $country_code; using the " *
                             "nearest benchmark year, $iot_year (see the docstring on vintage)."
 
-    url = "$EUROSTAT_SDMX_BASE_URL/data/ESTAT,NAIO_10_CP1700,1.0/A.MIO_EUR.DOM...$country_code" *
-          "?format=SDMX-CSV&startPeriod=$iot_year&endPeriod=$iot_year"
-    resp = HTTP.get(url, ["Accept-Encoding" => "identity"],
-                    retry = true, readtimeout = 60, status_exception = false)
-    resp.status == 200 || error("Eurostat IOT unavailable for $country_code/$iot_year (status $(resp.status)).")
-    df = CSV.read(IOBuffer(resp.body), DataFrame)
-    nrow(df) == 0 && error("Eurostat IOT has no data for $country_code/$iot_year.")
+    df = _fetch_iot(country_code, iot_year)
 
     F = zeros(G, G)
     P1 = zeros(G)

@@ -84,8 +84,9 @@ end
     basket_initial(A, X0, p)
 
 Default consumption basket: shares of initial net output `((I − A)x₀)⁺`,
-normalized. This is an assumption (the pipeline has no final-demand data by
-sector of origin; see `docs/LIMITATIONS.md`).
+normalized. This is an assumption; on a real-data calibration,
+`consumption_basket(params.final_demand)` gives real household consumption
+shares instead (`src/eurostat_sdmx.jl`).
 """
 function basket_initial(A, X0, p)
     N = size(A, 1)

@@ -206,6 +206,57 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test all(A_coarse .>= 0)
     end
 
+    @testset "Final demand from the IOT" begin
+        # hand-built rows in the layout of NAIO_10_CP1700 (product rows prd_ava,
+        # use columns prd_use); two A64 products map to section C
+        rows = [("CPA_A01", "P3_S14", 10.0), ("CPA_A01", "P3_S15", 2.0), ("CPA_A01", "P3_S13", 0.0),
+                ("CPA_A01", "P5", 1.0), ("CPA_A01", "P6", 3.0), ("CPA_A01", "TU", 40.0),
+                ("CPA_C10-12", "P3_S14", 20.0), ("CPA_C10-12", "P6", 30.0), ("CPA_C10-12", "TU", 80.0),
+                ("CPA_C13-15", "P3_S14", 5.0), ("CPA_C13-15", "P6", 5.0), ("CPA_C13-15", "TU", 20.0),
+                ("CPA_C10-12", "CPA_A01", 7.0),   # intermediate flow: not final demand
+                ("B1G", "P3_S14", 99.0),          # value-added row: ignored
+                ("CPA_A01", "TFU", 16.0)]         # total final use: ignored
+        df = DataFrame(prd_ava = first.(rows), prd_use = getindex.(rows, 2),
+                       OBS_VALUE = Union{Missing, Float64}[last.(rows)...])
+        push!(df, ("CPA_A01", "P6", missing))
+        fd = final_demand_from_iot(df, ["A", "C"])
+        @test fd.household == [12.0, 25.0]
+        @test fd.government == [0.0, 0.0]
+        @test fd.investment == [1.0, 0.0]
+        @test fd.exports == [3.0, 35.0]
+        @test fd.output == [40.0, 100.0]
+        @test consumption_basket(fd) ≈ [12, 25] ./ 37
+        @test exogenous_demand_share(fd) ≈ [15 / 40, 60 / 100]
+        @test exogenous_demand_share(fd; cap = 0.5) ≈ [15 / 40, 0.5]
+        fa = aggregate_final_demand(fd, [["A", "C"]], ["ALL"])
+        @test fa.sections == ["ALL"] && fa.household == [37.0] && fa.output == [140.0]
+    end
+
+    @testset "Real-data options in the simulation" begin
+        Random.seed!(11)
+        depts = create_departments(4)
+        A = create_technical_matrix(4, seed = 3)
+        sol, _, p = simulate_Ndept_custom(depts; T = 5.0, coupled = true, A = A)
+        @test p.A == A
+        # with rationing, φ = 0 is the default; φ > 0 leaves less output to
+        # investment, so accumulation can only fall
+        Random.seed!(11); depts = create_departments(4)
+        s0, _, _ = simulate_Ndept_custom(depts; T = 20.0, coupled = true, rationing = true, A = A)
+        sz, _, _ = simulate_Ndept_custom(depts; T = 20.0, coupled = true, rationing = true, A = A,
+                                         final_demand_share = zeros(4))
+        sφ, _, _ = simulate_Ndept_custom(depts; T = 20.0, coupled = true, rationing = true, A = A,
+                                         final_demand_share = fill(0.9, 4))
+        @test sz.u[end] ≈ s0.u[end]
+        @test sum(sφ.u[end][1:4]) <= sum(s0.u[end][1:4]) + 1e-9
+        b = [0.1, 0.2, 0.3, 0.4]
+        _, _, pb = simulate_Ndept_custom(depts; T = 1.0, coupled = true, market_prices = true,
+                                         A = A, basket = b)
+        @test pb.basket == b
+        @test_throws ErrorException simulate_Ndept_custom(depts; A = zeros(3, 3))
+        @test_throws ErrorException simulate_Ndept_custom(depts; coupled = true,
+                                                          final_demand_share = zeros(4))
+    end
+
     @testset "Perpetual inventory capital stock" begin
         # constant GFCF=10, δ=0.2, K₀=100 ⟹ K₁=0.8·100+10=90, K₂=0.8·90+10=82
         gfcf = Dict(2000 => 10.0, 2001 => 10.0, 2002 => 10.0)

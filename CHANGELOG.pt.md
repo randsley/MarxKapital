@@ -16,6 +16,19 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   (6,12% e 5,80% para Portugal 2022), tudo gerado por
   `paper/generate_results.jl` (`figures/table3_floor.tex`,
   `figures/floor_stats.tex`). Ver `docs/LIMITATIONS.pt.md` item 8.
+- **Procura final real** a partir das colunas de utilização final da IOT já
+  usada para `A` (`NAIO_10_CP1700`, uso doméstico): `final_demand_from_iot`,
+  `fetch_eurostat_final_demand`, `aggregate_final_demand` e o campo
+  `CalibratedParameters.final_demand` (nos caminhos Eurostat; `nothing` nos
+  restantes). Dois usos na dinâmica: `consumption_basket` (quotas reais do
+  consumo das famílias como cabaz do modelo cruzado) e
+  `exogenous_demand_share` (racionamento líquido do consumo final e das
+  exportações, novo argumento `final_demand_share`). O download da IOT fica
+  em cache durante a sessão.
+- `simulate_Ndept_custom(...; A = ...)`: simula com uma matriz técnica dada
+  (por exemplo, a `A` real de uma calibração) em vez de uma aleatória.
+- Artigo, Secção 5.7 e Tabela 4: os dois usos na calibração portuguesa. Ver
+  `docs/LIMITATIONS.pt.md` itens 1 e 11.
 
 ## [1.0.0] — 2026-10-29
 

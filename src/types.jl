@@ -131,6 +131,10 @@ struct CalibratedParameters
     base_year::Int
     calibration_date::DateTime
     fit_quality::Float64
+
+    # Real final demand by sector (`final_demand_from_iot`, `src/eurostat_sdmx.jl`)
+    # on the Eurostat paths; `nothing` with synthetic data or fixed weights.
+    final_demand::Union{Nothing, NamedTuple}
 end
 
 # ----------------------------------------------------------------------------

@@ -136,13 +136,25 @@ that applied `A[i,j]` directly to planned investment expenditure
 composition as a unit of physical output — a dimensional problem
 identified in external review. `Δxⱼ=σ_c,ⱼSⱼ·xⱼ/Cⱼ` converts expenditure
 into an output expansion via the sector's current capital-output ratio,
-before `A` is applied. Still open: the entire reconstructed `xᵢ` is
+before `A` is applied. By default the entire reconstructed `xᵢ` is
 treated as available for investment demand `Dᵢ`, without netting out the
 replacement of intermediate inputs (already counted in `zᵢ`) or other
-final demand — no data source in the current pipeline provides
-sector-of-origin consumption allocation, so `Dᵢ≤xᵢ` should be read as an
-upper bound on investable supply, not a fully netted reproduction
-balance.
+final demand.
+
+**Partly fixed (optional):** the final-use columns of the same IOT
+(`NAIO_10_CP1700`, domestic use) give final demand by product
+(`final_demand_from_iot`, `fetch_eurostat_final_demand`), now stored in
+`params.final_demand` on the Eurostat paths. With
+`final_demand_share = exogenous_demand_share(params.final_demand)` in
+`simulate_Ndept_custom` (and `A = params.A`), rationing compares `Dᵢ` with
+`(1 − φᵢ)·xᵢ`, where `φᵢ` is the share of output going to final
+consumption and exports. For Portugal 2022 (paper, Section 5.7, Table 4)
+this leaves the share of rationed sectors unchanged and lowers
+accumulation by about a fifth at 10 and 19 sectors. Still open:
+intermediate replacement is not netted, so `Dᵢ≤(1−φᵢ)xᵢ` remains an upper
+bound on investable supply, not a fully netted reproduction balance. And
+Eurostat's matrix covers domestic inputs only, so the `xᵢ` reconstructed
+from it leaves out imported intermediate inputs.
 
 ## 2. R_max in the wage shock used an auxiliary matrix (fixed)
 
@@ -401,7 +413,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 224 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 239 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -497,8 +509,12 @@ algebraically.
 - **Assumptions of the cross-dual model.** Market prices respond to
   relative excess demand with a single speed `β`; capital goods are
   bought in the composition of A's columns and all consumption in a fixed
-  basket `basket` (by default, initial net-output shares — the pipeline
-  has no final demand by sector of origin). Prices are normalized so that
+  basket `basket`: by default initial net-output shares, an assumption;
+  on a real-data calibration, `consumption_basket(params.final_demand)`
+  gives real household consumption shares (with `A = params.A`). For
+  Portugal 2022 the real basket raises the balanced-growth rate from about
+  0.14 to 0.19 at 10 and 19 sectors and leaves stability unchanged (paper,
+  Section 5.7). Prices are normalized so that
   total profit equals total surplus value. It cannot be combined with
   `realization` or `rationing`.
 - **`μ_v` (mobility of variable capital) is off by default.** Accumulation
