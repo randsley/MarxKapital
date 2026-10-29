@@ -33,6 +33,14 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   histórico, a partir de um valor contabilístico do capital fixo por setor
   comprado a preços TSSI desfasados (devolvido como `book_value`). O valor
   por omissão `:base` não muda. Ver `docs/LIMITATIONS.pt.md` item 10.
+- **Fricção de saída** (`exit_friction = ε`, modelos acoplado e
+  cross-dual, por omissão 0 = desligada): as saídas de capital de um setor
+  são amortecidas por `sᵢ/(sᵢ + ε)` à medida que a sua quota `sᵢ` diminui,
+  com as entradas reescaladas para que os termos de mobilidade continuem a
+  somar exatamente 0 (`_mobility_flow`). Também parâmetro de continuação
+  (`with_parameter(p, :exit_friction, θ)`). Artigo, Secção 5.6 e tabela da
+  fricção de saída: menores quotas setoriais com e sem fricção. Ver
+  `docs/LIMITATIONS.pt.md` item 11.
 
 ## [1.0.0] — 2026-10-29
 

@@ -72,6 +72,23 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         mobility_term = dX_with_mobility[1:N] .- dX_without_mobility[1:N]
         @test abs(sum(mobility_term)) < 1e-10
         @test !all(iszero, mobility_term)  # the term is active, not trivially zero
+
+        # Exit friction: still conservative, outflows damped by s/(s+ε),
+        # inflows scaled by a common factor, homogeneous of degree 1.
+        r, K = [0.1, 0.2, 0.05, 0.3], [10.0, 1.0, 0.01, 5.0]
+        m0 = _mobility_flow(r, K, 0.5, 0.0)
+        m = _mobility_flow(r, K, 0.5, 0.05)
+        @test abs(sum(m)) < 1e-12
+        s = K ./ sum(K)
+        @test m[m0 .< 0] ≈ m0[m0 .< 0] .* s[m0 .< 0] ./ (s[m0 .< 0] .+ 0.05)
+        ratio = m[m0 .> 0] ./ m0[m0 .> 0]
+        @test length(ratio) >= 2 && all(ratio .≈ ratio[1]) && 0 < ratio[1] < 1
+        @test _mobility_flow(r, 3 .* K, 0.5, 0.05) ≈ 3 .* m
+        system_Ndept_io!(dX_with_mobility, X0, merge(p, (exit_friction = 0.05,)), 0.0)
+        @test abs(sum(dX_with_mobility[1:N] .- dX_without_mobility[1:N])) < 1e-10
+        @test with_parameter(p, :exit_friction, 0.1).exit_friction == 0.1
+        @test_throws ErrorException simulate_Ndept(3, T = 1.0, exit_friction = 0.1)
+        @test_throws ErrorException simulate_Ndept(3, T = 1.0, coupled = true, exit_friction = -0.1)
     end
 
     @testset "N-dept simulation with realization pressure" begin

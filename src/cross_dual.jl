@@ -42,7 +42,7 @@ function cross_dual_state(C, V, q, p)
     Π = (P .- p.A' * P) .* x .- V .- p.δ .* C
     r = Π ./ (C .+ V)
     r̄ = sum(r .* C) / sum(C)
-    mobility_C = p.μ .* (r .- r̄) .* C
+    mobility_C = _mobility_flow(r, C, p.μ, get(p, :exit_friction, 0.0))
     investment = p.σ_c .* Π .+ p.δ .* C .+ mobility_C
     γ = 1 .- p.σ_c .- p.σ_v
     consumption = sum(V) + sum((p.σ_v .+ γ) .* Π)
@@ -66,7 +66,7 @@ Cross-dual dynamics (`market_prices=true`), state `X = [C; V; q]`:
 
 with profits and profit rates at market prices (`cross_dual_state`). The
 accumulation equations are those of `system_Ndept_io!` with `Π` in place of
-`S`. The right-hand side is homogeneous of degree 1 in `(C, V)` and
+`S`, including the optional exit friction (`p.exit_friction`, `_mobility_flow`). The right-hand side is homogeneous of degree 1 in `(C, V)` and
 invariant to adding a constant to `q` (only relative prices matter).
 """
 function cross_dual_system!(dX, X, p, t)
@@ -76,7 +76,7 @@ function cross_dual_system!(dX, X, p, t)
     dX[1:N] = p.σ_c .* ec.Π .- p.δ .* C .+ ec.mobility_C
     μ_v = get(p, :μ_v, 0.0)
     dX[N+1:2N] = iszero(μ_v) ? p.σ_v .* ec.Π :
-                 p.σ_v .* ec.Π .+ μ_v .* (ec.r .- sum(ec.r .* V) / sum(V)) .* V
+                 p.σ_v .* ec.Π .+ _mobility_flow(ec.r, V, μ_v, get(p, :exit_friction, 0.0))
     dX[2N+1:3N] = p.β .* ec.excess
 end
 

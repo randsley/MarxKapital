@@ -179,6 +179,36 @@ function system_Ndept!(dX, X, p, t)
 end
 
 """
+    _mobility_flow(r, K, μ, ε)
+
+Capital-mobility term `μ·(rᵢ − r̄)·Kᵢ`, with `r̄` the `K`-weighted mean of
+`r`, so that the flows sum to exactly 0 (they reallocate `K`, they don't
+create it).
+
+With exit friction `ε > 0`, capital leaves a sector more slowly as its share
+`sᵢ = Kᵢ/ΣK` shrinks: each outflow (`rᵢ < r̄`) is multiplied by
+`sᵢ/(sᵢ + ε)`, and all inflows by the common factor (damped total outflow) /
+(undamped total outflow), so the term still sums to 0. Shares are
+scale-free, so the right-hand side stays homogeneous of degree 1.
+`ε = 0` gives the plain term.
+"""
+function _mobility_flow(r, K, μ, ε)
+    # r̄ weighted by K (the same weight that multiplies the term), not
+    # ΣS/Σ(C+V), the aggregate ratio used before: the only choice for which
+    # Σμ(rᵢ-r̄)Kᵢ = 0 exactly (see paper/main.tex, conservation of the
+    # mobility term).
+    r̄ = sum(r .* K) / sum(K)
+    m = μ .* (r .- r̄) .* K
+    iszero(ε) && return m
+    s = K ./ sum(K)
+    outflow = min.(m, 0)
+    total_out = -sum(outflow)
+    total_out > 0 || return m
+    damped = outflow .* s ./ (s .+ ε)
+    return damped .- sum(damped) / total_out .* max.(m, 0)
+end
+
+"""
     system_Ndept_io!(dX, X, p, t)
 
 ODE system for N departments, with the technical matrix `p.A` feeding back
@@ -237,6 +267,10 @@ sectors: `dVᵢ/dt = σ_v,ᵢ·Sᵢ + μ_v·(rᵢ − r̄_V)·Vᵢ`, with `r̄_V
 `σ_v,ᵢ·eᵢ` and there is no interior balanced growth (the sector with the
 highest rate ends up with all the variable capital); see `src/growth.jl`.
 
+If `p.exit_friction = ε > 0` (optional field, default 0), outflows from a
+sector are damped as its share shrinks, for both mobility terms; see
+`_mobility_flow`.
+
 The right-hand side is homogeneous of degree 1 in the state
 (`f(λX) = λf(X)`): only proportions matter, and the relevant steady states
 are balanced-growth rays, `f(X★) = g★·X★`.
@@ -248,13 +282,6 @@ function system_Ndept_io!(dX, X, p, t)
     S = p.e .* V
 
     r = _io_profit_rates(C, V, S, p)
-    # r̄ is the C-weighted mean of r (the book stock, the same weight that
-    # multiplies the mobility term below), not ΣS/Σ(C+V), the aggregate
-    # ratio used before. It is the only choice for which Σμ(rᵢ-r̄)Cᵢ = 0
-    # exactly, so the mobility term reallocates aggregate constant capital
-    # instead of creating or destroying it (see paper/main.tex, discussion
-    # of the conservation of the mobility term).
-    r̄ = sum(r .* C) / sum(C)
 
     # `κ` inherits the type of `S` (not `ones(N)`, Float64): under automatic
     # differentiation (ForwardDiff, `src/differentiation.jl`) the state is `Dual`.
@@ -299,7 +326,8 @@ function system_Ndept_io!(dX, X, p, t)
         end
     end
 
-    dX[1:N]    = κ .* p.σ_c .* S .- p.δ .* C .+ p.μ .* (r .- r̄) .* C
+    ε = get(p, :exit_friction, 0.0)
+    dX[1:N]    = κ .* p.σ_c .* S .- p.δ .* C .+ _mobility_flow(r, C, p.μ, ε)
     # Mobility of variable capital (optional, `p.μ_v`; absent or 0 = off,
     # dynamics identical to before). With r̄_V weighted by V, Σᵢ μ_v(rᵢ-r̄_V)Vᵢ = 0
     # exactly: the term reallocates variable capital between sectors without creating it.
@@ -307,8 +335,7 @@ function system_Ndept_io!(dX, X, p, t)
     if iszero(μ_v)
         dX[N+1:2N] = p.σ_v .* S
     else
-        r̄_V = sum(r .* V) / sum(V)
-        dX[N+1:2N] = p.σ_v .* S .+ μ_v .* (r .- r̄_V) .* V
+        dX[N+1:2N] = p.σ_v .* S .+ _mobility_flow(r, V, μ_v, ε)
     end
 end
 
@@ -495,7 +522,8 @@ end
 
 """
     simulate_Ndept(N; T=100.0, name_list=String[], seed=nothing, coupled=false, μ=0.3, μ_v=0.0,
-                  realization=false, rationing=false, market_prices=false, β=0.5, basket=nothing)
+                  realization=false, rationing=false, market_prices=false, β=0.5, basket=nothing,
+                  exit_friction=0.0)
 
 Simulates the N-department model with randomly generated departments. With
 `coupled=true` it uses `system_Ndept_io!` (capital mobility via A and
@@ -506,24 +534,28 @@ effect with `coupled=true`) adds the aggregate realization pressure;
 rationing; see the `system_Ndept_io!` docstring. `market_prices=true`
 (requires `coupled=true`) uses the cross-dual dynamics of
 `cross_dual_system!`: market prices with adjustment speed `β` and consumption
-basket `basket` (`basket_initial` by default).
+basket `basket` (`basket_initial` by default). `exit_friction` (coupled
+only, 0 = off) damps capital outflows from sectors with small shares; see
+`_mobility_flow`.
 """
 function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
                        realization = false, rationing = false,
-                       market_prices = false, β = 0.5, basket = nothing)
+                       market_prices = false, β = 0.5, basket = nothing,
+                       exit_friction = 0.0)
     depts = create_departments(N, name_list)
     return simulate_Ndept_custom(depts, T = T, seed = seed, coupled = coupled, μ = μ,
                                      μ_v = μ_v, realization = realization,
                                      rationing = rationing,
-                                     market_prices = market_prices, β = β, basket = basket)
+                                     market_prices = market_prices, β = β, basket = basket,
+                                     exit_friction = exit_friction)
 end
 
 """
     simulate_Ndept_custom(depts; T=100.0, seed=nothing, coupled=false, μ=0.3, μ_v=0.0,
                               realization=false, rationing=false,
                               market_prices=false, β=0.5, basket=nothing,
-                              A=nothing, final_demand_share=nothing)
+                              A=nothing, final_demand_share=nothing, exit_friction=0.0)
 
 Simulates the N-department model from pre-configured departments. With
 `coupled=true` it uses `system_Ndept_io!` instead of `system_Ndept!` (`μ_v`,
@@ -533,7 +565,9 @@ cannot be combined with `realization`/`rationing`.
 `realization=true` (only has an effect with `coupled=true`) adds the
 aggregate realization pressure; `rationing=true` (takes precedence over
 `realization`) uses per-sector rationing; see the docstring of
-`system_Ndept_io!`.
+`system_Ndept_io!`. `exit_friction = ε ≥ 0` (needs `coupled=true`; 0 = off)
+damps capital outflows from a sector by `sᵢ/(sᵢ + ε)`, `sᵢ` its share of
+the stock, keeping the mobility term conservative (`_mobility_flow`).
 
 Real-data options, typically from a calibration (`departments_from_params`):
 
@@ -552,8 +586,11 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
                                    realization = false, rationing = false,
                                    market_prices = false, β = 0.5, basket = nothing,
-                                   A = nothing, final_demand_share = nothing)
+                                   A = nothing, final_demand_share = nothing,
+                                   exit_friction = 0.0)
     N = length(depts)
+    exit_friction >= 0 || error("exit_friction must be ≥ 0")
+    (iszero(exit_friction) || coupled) || error("exit_friction requires coupled=true")
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
     if isnothing(A)
         A = create_technical_matrix(N, seed = seed)
@@ -576,6 +613,7 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
         p = (e = [d.e for d in depts], σ_c = [d.σ_c for d in depts],
              σ_v = [d.σ_v for d in depts], δ = [d.δ for d in depts],
              A = A, μ = μ, μ_v = μ_v, β = β)
+        iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
         p = merge(p, (basket = isnothing(basket) ? basket_initial(A, X0, p) : basket,))
         prob = ODEProblem(cross_dual_system!, [X0; zeros(N)], (0.0, T), p)
         return solve(prob, Tsit5(), saveat = 0.5), depts, p
@@ -599,6 +637,7 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
         )
         isnothing(final_demand_share) ||
             (p = merge(p, (final_demand_share = collect(Float64, final_demand_share),)))
+        iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
         prob = ODEProblem(system_Ndept_io!, X0, (0.0, T), p)
     else
         p = (

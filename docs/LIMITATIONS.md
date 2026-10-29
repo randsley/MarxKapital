@@ -413,7 +413,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 246 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 254 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -530,10 +530,22 @@ algebraically.
   cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random
   economies tested, with `β = 0.1`); the empirical value of `μ_v` is not
   calibrated.
-- **The cycles approach the boundary of the simplex.** Away from the
-  Hopf point, sector shares fall to 10⁻³–10⁻⁴: the oscillations nearly
-  wipe out sectors, which is economically implausible and points to a
-  missing braking mechanism (e.g. entry of new capital or limits to exit).
+- **The cycles approach the boundary of the simplex (partly fixed:
+  optional exit friction).** Away from the Hopf point, sector shares fall
+  to 10⁻³–10⁻⁴ (10⁻⁵ at `μ_v = 2.4`): the oscillations nearly wipe out
+  sectors, which is economically implausible. `exit_friction = ε > 0`
+  (`simulate_Ndept`, `simulate_Ndept_custom`, or `p.exit_friction`;
+  continuation parameter `:exit_friction` in `with_parameter`) damps each
+  outflow of the mobility terms by `sᵢ/(sᵢ + ε)`, `sᵢ` the sector's share,
+  and scales inflows by a common factor so the term still sums to exactly
+  0 (`_mobility_flow`). In the paper's
+  reference economy (β = 0.1), `ε = 0.05` raises the smallest share at
+  `μ_v = 2.4` from 9.5·10⁻⁶ to 4.3·10⁻³ (from 5.8·10⁻⁴ to 5.8·10⁻³ at
+  `μ_v = 2.0`), moves the first Hopf point up (stability is lost near
+  `μ_v ≈ 1.2` instead of 1.05) and changes which regime prevails at a
+  given `μ_v`, but the cycles remain (paper, Section 5.6). The default is `ε = 0`, so the
+  paper's other results are unchanged. The functional form and `ε` are
+  assumptions, not estimates, and entry of new capital is not modeled.
 - **Bifurcation detection.** Two Hopf points in the same continuation
   step escape detection (`dsmax = 0.01` by default; `accumulation_bifurcation`
   warns when its count of unstable eigenvalues disagrees). Bifurcations

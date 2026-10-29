@@ -167,6 +167,7 @@ end
 `p` with the bifurcation parameter set to `θ`:
 
 - `:μ`, `:μ_v`: mobility coefficients of constant / variable capital;
+- `:exit_friction`: the exit friction `ε` of the mobility terms;
 - `:ω`: uniform wage share, `eᵢ = (1−θ)/θ` in every sector;
 - `:e_scale`: proportional exploitation, `eᵢ = θ·e_ref,ᵢ` (keeps the
   heterogeneity across sectors; the resulting aggregate wage share is
@@ -175,9 +176,10 @@ end
 function with_parameter(p, parameter::Symbol, θ; e_ref = p.e)
     parameter === :μ && return merge(p, (μ = θ,))
     parameter === :μ_v && return merge(p, (μ_v = θ,))
+    parameter === :exit_friction && return merge(p, (exit_friction = θ,))
     parameter === :ω && return merge(p, (e = fill((1 - θ) / θ, length(p.e)),))
     parameter === :e_scale && return merge(p, (e = θ .* e_ref,))
-    error("unknown parameter: $parameter (use :μ, :μ_v, :ω or :e_scale)")
+    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :ω or :e_scale)")
 end
 
 """

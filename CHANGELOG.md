@@ -32,6 +32,13 @@ Format based on Keep a Changelog. Semantic versioning.
   historical cost, from a per-sector book value of fixed capital bought at
   lagged TSSI prices (returned as `book_value`). The default `:base` is
   unchanged. See `docs/LIMITATIONS.md` item 10.
+- **Exit friction** (`exit_friction = ε`, coupled and cross-dual models,
+  default 0 = off): capital outflows from a sector are damped by
+  `sᵢ/(sᵢ + ε)` as its share `sᵢ` shrinks, with inflows rescaled so the
+  mobility terms still sum to exactly 0 (`_mobility_flow`). Also a
+  continuation parameter (`with_parameter(p, :exit_friction, θ)`). Paper,
+  Section 5.6 and the exit-friction table: smallest sector shares with and
+  without friction. See `docs/LIMITATIONS.md` item 11.
 
 ## [1.0.0] — 2026-10-29
 

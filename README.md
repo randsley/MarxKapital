@@ -198,6 +198,8 @@ simulated_cycle(pb, :μ_v, 1.1, X0)        # check the cycle by direct simulatio
 hopf_curve(pb, X0)                        # Hopf boundary μ_v,H(ω)
 lyapunov_exponents(pb, :μ_v, 1.9, X0)     # λ₁ > 0: chaos
 simulated_hysteresis(pb, :μ_v, 1.30:0.01:1.56, X0)   # coexisting attractors
+# exit friction (off by default): outflows damped as a sector's share shrinks
+simulated_cycle(merge(pb, (exit_friction = 0.05,)), :μ_v, 2.4, X0).min_share
 ```
 
 In every random economy tested, balanced growth loses stability at a
@@ -316,7 +318,7 @@ derived from the spectral radius of `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-246 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
+254 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
 every push to `main` — see `.github/workflows/test.yml`. CI then runs every
 notebook (`julia test/notebooks.jl`, see `notebooks/README.md`). The suite covers
 the default synthetic/opt-in paths and runs fully offline; the real-data

@@ -403,7 +403,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 246 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 254 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -522,11 +522,24 @@ afirmado algebricamente.
   Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
   supercrítico em todas as 30 economias aleatórias testadas, com
   `β = 0.1`); o valor empírico de `μ_v` não está calibrado.
-- **Os ciclos aproximam-se da fronteira do simplex.** Longe do Hopf, as
-  quotas setoriais descem a 10⁻³–10⁻⁴: as oscilações quase eliminam
-  setores, o que é pouco plausível economicamente e indica que falta um
-  mecanismo de travagem (p.ex. entrada de capital novo ou limites à
-  saída).
+- **Os ciclos aproximam-se da fronteira do simplex (resolvido em parte:
+  fricção de saída opcional).** Longe do Hopf, as quotas setoriais descem
+  a 10⁻³–10⁻⁴ (10⁻⁵ em `μ_v = 2.4`): as oscilações quase eliminam
+  setores, o que é pouco plausível economicamente. `exit_friction = ε > 0`
+  (`simulate_Ndept`, `simulate_Ndept_custom`, ou `p.exit_friction`;
+  parâmetro de continuação `:exit_friction` em `with_parameter`) amortece
+  cada saída dos termos de mobilidade por `sᵢ/(sᵢ + ε)`, `sᵢ` a quota do
+  setor, e escala as entradas por um fator comum para que o termo continue
+  a somar exatamente 0 (`_mobility_flow`). Na economia de
+  referência do artigo (β = 0.1), `ε = 0.05` eleva a menor quota em
+  `μ_v = 2.4` de 9,5·10⁻⁶ para 4,3·10⁻³ (de 5,8·10⁻⁴ para 5,8·10⁻³ em
+  `μ_v = 2.0`), desloca para cima o primeiro ponto de Hopf (a estabilidade
+  perde-se perto de `μ_v ≈ 1.2` em vez de 1.05) e muda o regime que
+  prevalece para um dado `μ_v`, mas os ciclos mantêm-se (artigo, Secção
+  5.6). Por omissão
+  `ε = 0`, pelo que os restantes resultados do artigo não mudam. A forma
+  funcional e `ε` são hipóteses, não estimativas, e a entrada de capital
+  novo não é modelada.
 - **Deteção de bifurcações.** Dois Hopf no mesmo passo de continuação
   escapam à deteção (`dsmax = 0.01` por omissão; `accumulation_bifurcation`
   avisa quando a contagem de valores próprios instáveis discorda). As

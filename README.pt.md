@@ -197,6 +197,8 @@ simulated_cycle(pb, :μ_v, 1.1, X0)         # verificar o ciclo por simulação 
 hopf_curve(pb, X0)                        # fronteira de Hopf μ_v,H(ω)
 lyapunov_exponents(pb, :μ_v, 1.9, X0)     # λ₁ > 0: caos
 simulated_hysteresis(pb, :μ_v, 1.30:0.01:1.56, X0)   # atratores coexistentes
+# fricção de saída (desligada por omissão): saídas amortecidas quando a quota do setor diminui
+simulated_cycle(merge(pb, (exit_friction = 0.05,)), :μ_v, 2.4, X0).min_share
 ```
 
 Em todas as economias aleatórias testadas, o crescimento equilibrado perde
@@ -311,7 +313,7 @@ raio espectral de `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-246 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
+254 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
 em cada push a `main` — ver `.github/workflows/test.yml`. A CI corre depois
 todos os notebooks (`julia test/notebooks.jl`, ver `notebooks/README.md`). A suite cobre os
 caminhos sintéticos/opt-in por omissão e corre totalmente offline; os
