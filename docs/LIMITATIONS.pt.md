@@ -403,7 +403,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 239 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 246 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -474,9 +474,18 @@ afirmado algebricamente.
 - **A TSSI é só uma camada de valorização.** O termo de mobilidade de
   capital continua a usar taxas de lucro simultaneístas (Sraffa); não há
   uma variante da dinâmica conduzida pela TSSI. O desfasamento τ é um só
-  e fixo (não uma distribuição de tempos de rotação por setor), e a
-  depreciação `d = δC/x` é valorizada a preços-base, não a preços
-  históricos de aquisição.
+  e fixo (não uma distribuição de tempos de rotação por setor).
+- **Depreciação a custo histórico (resolvido, opcional).** Por omissão, a
+  depreciação `d = δC/x` é valorizada a preços-base.
+  `tssi_valuation(...; depreciation = :historical)` mantém em vez disso um
+  valor contabilístico do capital fixo por setor: o investimento bruto é
+  comprado ao preço TSSI do passo anterior do bem de capital do setor (o
+  preço ponderado pela coluna de `A`), a depreciação retira `δh` do valor
+  contabilístico e as alienações saem ao custo médio contabilístico. `d`
+  passa a ser o valor contabilístico consumido por unidade de produto. Os
+  invariantes continuam a valer à precisão da máquina; numa simulação
+  acoplada de 6 setores, o rácio valor contabilístico/`C` fica entre 0,95
+  e 1,16 e a taxa de lucro TSSI muda menos de 0,2 pontos.
 - **Bifurcações da EDO de acumulação: só no modelo cruzado (corrigido em
   parte).** `system_Ndept!` e `system_Ndept_io!` crescem sem limite e
   não têm equilíbrios em níveis; os estados estacionários são raios de

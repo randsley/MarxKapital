@@ -1906,9 +1906,11 @@ narrow scope.} TSSI is implemented as a valuation of trajectories, not
 as a driver of them: the mobility term of Section~3.3 still uses
 simultaneist (Sraffian) profit rates, and a TSSI-driven variant of the
 dynamics is not implemented. The production lag $\tau$ is a single
-fixed constant, not a distribution of turnover times by sector, and
-depreciation $d_j$ is valued at base prices rather than at historical
-acquisition prices. The bifurcation analysis concerns the two maps of
+fixed constant, not a distribution of turnover times by sector.
+Depreciation $d_j$ is valued at base prices by default; an optional
+historical-cost variant keeps a book value of fixed capital per sector,
+bought at lagged TSSI prices of each sector's capital good, and leaves
+the invariants intact. The bifurcation analysis concerns the two maps of
 Section~3.5; the accumulation ODEs themselves have no equilibria in
 levels and would need rewriting in normalized variables (capital
 shares, organic compositions) before their own bifurcations could be

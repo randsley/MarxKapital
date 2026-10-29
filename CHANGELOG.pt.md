@@ -29,6 +29,10 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   (por exemplo, a `A` real de uma calibração) em vez de uma aleatória.
 - Artigo, Secção 5.7 e Tabela 4: os dois usos na calibração portuguesa. Ver
   `docs/LIMITATIONS.pt.md` itens 1 e 11.
+- `tssi_valuation(...; depreciation = :historical)`: depreciação a custo
+  histórico, a partir de um valor contabilístico do capital fixo por setor
+  comprado a preços TSSI desfasados (devolvido como `book_value`). O valor
+  por omissão `:base` não muda. Ver `docs/LIMITATIONS.pt.md` item 10.
 
 ## [1.0.0] — 2026-10-29
 

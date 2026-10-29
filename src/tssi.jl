@@ -94,7 +94,36 @@ function simultaneous_prices(data; tol = 1e-12)
 end
 
 """
-    tssi_valuation(sol, p; τ=1.0, h=0.5, p_initial=:simultaneous)
+    _capital_goods_price(prices, A)
+
+Price of the capital goods each sector buys: the price index of column `j`
+of `A` (capital goods are bought in the composition of the sector's inputs,
+as in the cross-dual model), or the mean price for a column with no inputs.
+"""
+function _capital_goods_price(prices, A)
+    colsum = vec(sum(A, dims = 1))
+    return [colsum[j] > 0 ? sum(A[:, j] .* prices) / colsum[j] : sum(prices) / length(prices)
+            for j in axes(A, 2)]
+end
+
+"""
+    _book_value_step(K, C_old, C_new, δ, h, π)
+
+One step of the book value of fixed capital at historical cost. Gross
+purchases over the step are `G = C_new − (1 − δh)·C_old` (in base-value
+units) and are bought at the price `π`; depreciation removes `δh` of the
+book value. If `G < 0` (net disposal), the capital that leaves is valued at
+the current average acquisition price `K/C_old`, which then does not change.
+With `π` equal to that average price, the average stays exactly where it is.
+"""
+function _book_value_step(K, C_old, C_new, δ, h, π)
+    G = C_new .- (1 .- δ .* h) .* C_old
+    return [G[j] >= 0 ? (1 - δ[j] * h) * K[j] + π[j] * G[j] : K[j] / C_old[j] * C_new[j]
+            for j in eachindex(K)]
+end
+
+"""
+    tssi_valuation(sol, p; τ=1.0, h=0.5, p_initial=:simultaneous, depreciation=:base)
 
 TSSI valuation along a trajectory `sol` (from `simulate_Ndept`/
 `simulate_Ndept_custom`; `p` with fields `e, δ, A`), with a fixed production
@@ -103,6 +132,17 @@ recursion, `p(t) = tssi_map(p(t − τ), data(t))`: a continuous-time delay
 difference equation, discretized at `h`. Before `t₀ + τ` the inputs were
 bought at `p_initial`: `:simultaneous` (simultaneist prices at t₀, the
 default), `:base` (base price 1) or a vector.
+
+`depreciation` sets how fixed capital used up, `dⱼ`, is valued:
+
+- `:base` (default): at base prices, `d = δC/x`, as before.
+- `:historical`: at historical acquisition cost, the TSSI treatment of
+  fixed capital. Each sector's book value `K` starts at `C` valued at the
+  initial capital-goods prices and is updated on the grid by
+  `_book_value_step`, with purchases made at the previous step's TSSI prices
+  (`_capital_goods_price`); then `d = δK/x`. Fixed capital bought when prices
+  were lower keeps being depreciated at those prices. The returned
+  `book_value` is `K` (N × K grid points); with `:base` it is `C`.
 
 Returns `t`, the TSSI prices `p` and unit values `λ` (N × K), the profit rates
 `r_tssi` and `r_simultaneous` (inputs at current prices, `simultaneous_prices`),
@@ -115,25 +155,39 @@ spectral radius of `∂tssi_map/∂p` at the fixed point is < 1; see
 `tssi_stability`. With accumulation the two valuations diverge: TSSI values
 the advanced capital at the prices it was actually bought at.
 """
-function tssi_valuation(sol, p; τ = 1.0, h = 0.5, p_initial = :simultaneous)
+function tssi_valuation(sol, p; τ = 1.0, h = 0.5, p_initial = :simultaneous,
+                        depreciation::Symbol = :base)
     m = round(Int, τ / h)
     (m >= 1 && isapprox(m * h, τ; rtol = 1e-9)) ||
         error("τ=$τ must be a positive multiple of h=$h")
+    depreciation in (:base, :historical) ||
+        error("depreciation must be :base or :historical, got :$depreciation")
     N = length(p.e)
     ts = collect(sol.t[1]:h:sol.t[end])
     K = length(ts)
-    data = [tssi_data(sol(t), p) for t in ts]
+    states = [sol(t) for t in ts]
+    data = [tssi_data(X, p) for X in states]
+    data_simultaneous = copy(data)   # simultaneism values inputs at current, not historical, cost
 
     p0 = p_initial === :simultaneous ? simultaneous_prices(data[1]).p :
          p_initial === :base ? ones(N) : collect(Float64, p_initial)
 
-    P = zeros(N, K); Λ = zeros(N, K); P_sim = zeros(N, K)
+    P = zeros(N, K); Λ = zeros(N, K); P_sim = zeros(N, K); book = zeros(N, K)
     r_tssi = zeros(K); r_sim = zeros(K); error_ = 0.0
     for k in 1:K
+        C = states[k][1:N]
+        if depreciation === :historical
+            book[:, k] = k == 1 ? C .* _capital_goods_price(p0, p.A) :
+                _book_value_step(book[:, k - 1], states[k - 1][1:N], C, p.δ, h,
+                                 _capital_goods_price(P[:, k - 1], p.A))
+            data[k] = merge(data[k], (d = p.δ .* book[:, k] ./ data[k].x,))
+        else
+            book[:, k] = C
+        end
         p_past = k > m ? P[:, k - m] : p0
         step = tssi_map(p_past, data[k])
         P[:, k] = step.p; Λ[:, k] = step.λ; r_tssi[k] = step.r
-        sim = simultaneous_prices(data[k])
+        sim = simultaneous_prices(data_simultaneous[k])
         P_sim[:, k] = sim.p; r_sim[k] = sim.r
 
         x = data[k].x
@@ -143,7 +197,7 @@ function tssi_valuation(sol, p; τ = 1.0, h = 0.5, p_initial = :simultaneous)
                    abs((total_price - cost) - data[k].S_total) / data[k].S_total)
     end
     return (t = ts, τ = τ, p = P, λ = Λ, r_tssi = r_tssi, r_simultaneous = r_sim,
-            p_simultaneous = P_sim, invariance_error = error_)
+            p_simultaneous = P_sim, invariance_error = error_, book_value = book)
 end
 
 """

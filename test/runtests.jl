@@ -532,6 +532,22 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         # Fixed point ⇒ TSSI and simultaneism coincide.
         step = tssi_map(est.p★, d)
         @test step.r ≈ est.r★
+
+        # Historical-cost depreciation: invariants still hold, and the book
+        # value of a stock bought at constant prices equals its value at
+        # those prices.
+        vh = tssi_valuation(sol, p; τ = 1.0, h = 0.5, depreciation = :historical)
+        @test vh.invariance_error < 1e-12
+        @test size(vh.book_value) == (6, length(vh.t))
+        @test all(vh.book_value .> 0)
+        @test vh.r_simultaneous ≈ v.r_simultaneous
+        @test_throws ErrorException tssi_valuation(sol, p; τ = 1.0, h = 0.5,
+                                                   depreciation = :replacement)
+        Ab = [0.2 0.0; 0.2 0.0]                          # column 2 empty: mean price
+        @test _capital_goods_price([1.0, 3.0], Ab) ≈ [2.0, 2.0]
+        K, C0, C1, δ = [2.0, 4.0], [1.0, 2.0], [1.5, 1.0], [0.1, 0.1]
+        K1 = _book_value_step(K, C0, C1, δ, 0.5, [2.0, 2.0])
+        @test K1 ≈ 2.0 .* C1                             # gross investment and disinvestment
     end
 
     @testset "Bifurcations — rationing" begin

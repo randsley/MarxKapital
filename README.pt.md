@@ -144,6 +144,8 @@ rationing_jacobian(A, σ_c, S, O)
 # TSSI: inputs comprados em t−τ custam os preços de t−τ (desfasamento τ fixo),
 # comparado com a valorização simultaneísta (preços correntes)
 v = tssi_valuation(sol, p; τ = 1.0, h = 0.5)
+# depreciação a custo histórico (valor contabilístico do capital fixo, v.book_value)
+tssi_valuation(sol, p; τ = 1.0, h = 0.5, depreciation = :historical)
 tssi_stability(tssi_data(X, p))   # a TSSI converge para os preços simultaneístas?
 
 # Bifurcações: iteração amortecida do racionamento na escala da procura s, e
@@ -309,7 +311,7 @@ raio espectral de `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-239 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
+246 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
 em cada push a `main` — ver `.github/workflows/test.yml`. A CI corre depois
 todos os notebooks (`julia test/notebooks.jl`, ver `notebooks/README.md`). A suite cobre os
 caminhos sintéticos/opt-in por omissão e corre totalmente offline; os

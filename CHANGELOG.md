@@ -28,6 +28,10 @@ Format based on Keep a Changelog. Semantic versioning.
   matrix (e.g. a calibration's real `A`) instead of a random one.
 - Paper, Section 5.7 and Table 4: both uses on the Portuguese calibration.
   See `docs/LIMITATIONS.md` items 1 and 11.
+- `tssi_valuation(...; depreciation = :historical)`: depreciation valued at
+  historical cost, from a per-sector book value of fixed capital bought at
+  lagged TSSI prices (returned as `book_value`). The default `:base` is
+  unchanged. See `docs/LIMITATIONS.md` item 10.
 
 ## [1.0.0] — 2026-10-29
 

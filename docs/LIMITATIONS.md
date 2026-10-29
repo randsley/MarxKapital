@@ -413,7 +413,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 239 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 246 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -482,8 +482,17 @@ algebraically.
 - **TSSI is a valuation layer only.** The capital-mobility term still
   uses simultaneist (Sraffian) profit rates; there is no TSSI-driven
   variant of the dynamics. The lag τ is a single fixed constant (not a
-  distribution of turnover times by sector), and depreciation
-  `d = δC/x` is valued at base prices, not historical acquisition prices.
+  distribution of turnover times by sector).
+- **Depreciation at historical cost (fixed, optional).** By default
+  depreciation `d = δC/x` is valued at base prices.
+  `tssi_valuation(...; depreciation = :historical)` instead keeps a book
+  value of fixed capital per sector: gross investment is bought at the
+  previous step's TSSI price of the sector's capital good (the
+  `A`-column-weighted price), depreciation removes `δh` of the book value,
+  and disposals leave at average book cost. `d` is then the book value
+  used up per unit of output. The invariants still hold to machine
+  precision; on a 6-sector coupled run, book value/`C` stays between 0.95
+  and 1.16 and the TSSI profit rate moves by under 0.2 points.
 - **Bifurcations of the accumulation ODE: only in the cross-dual model
   (partly fixed).** `system_Ndept!` and `system_Ndept_io!` grow without
   bound and have no equilibria in levels; their steady states are
