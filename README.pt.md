@@ -1,6 +1,6 @@
 # MarxKapital
 
-*[🇬🇧 Read this in English](README.md)*
+*[🇬🇧 Read this in English](README.md)* · *Site: <https://randsley.github.io/MarxKapital/index.pt.html>*
 
 Modelação matemática da teoria económica marxista em Julia: acumulação,
 exploração, composição orgânica, lei tendencial da queda da taxa de lucro,

@@ -1,6 +1,6 @@
 # MarxKapital
 
-*[🇵🇹 Ler em português](README.pt.md)*
+*[🇵🇹 Ler em português](README.pt.md)* · *Website: <https://randsley.github.io/MarxKapital/>*
 
 Mathematical modeling of Marxian economic theory in Julia: accumulation,
 exploitation, organic composition, the tendential fall in the rate of

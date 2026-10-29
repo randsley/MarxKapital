@@ -9,6 +9,11 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Por lançar]
 
 ### Adicionado
+- **Site** no GitHub Pages (<https://randsley.github.io/MarxKapital/>), em
+  inglês e português: o README, as limitações, o estado do projeto, o
+  glossário e o registo de alterações, os seis notebooks Jupyter em HTML e
+  o PDF do artigo. Gerado a cada push para `main` por
+  `.github/workflows/pages.yml` (`.github/pages/build_site.py`).
 - `CalibratedParameters.e_raw`: a taxa de exploração antes do piso de 0,1,
   nos caminhos INE e AMECO (`e == max.(0.1, e_raw)`).
 - Artigo, Secção 5.1: a Tabela 3 lista os setores no piso com `e` e `r`

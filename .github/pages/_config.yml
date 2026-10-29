@@ -1,0 +1,6 @@
+title: MarxKapital
+description: A Julia model of Marxian economics, calibrated to Portuguese and European data
+theme: jekyll-theme-primer
+markdown: kramdown
+kramdown:
+  input: GFM

@@ -9,6 +9,11 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- **Website** on GitHub Pages (<https://randsley.github.io/MarxKapital/>),
+  in English and Portuguese: the README, limitations, project status,
+  glossary and changelog, the six Jupyter notebooks rendered to HTML, and
+  the paper PDF. Built on every push to `main` by
+  `.github/workflows/pages.yml` (`.github/pages/build_site.py`).
 - `CalibratedParameters.e_raw`: the rate of exploitation before the 0.1
   floor, on both the INE and AMECO paths (`e == max.(0.1, e_raw)`).
 - Paper, Section 5.1: Table 3 lists the sectors at the floor with their raw
