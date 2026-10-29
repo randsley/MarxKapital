@@ -1,4 +1,4 @@
-name: Testes
+name: Tests
 
 on:
   push:
@@ -18,17 +18,17 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v2
-      - name: Instalar dependências
+      - name: Install dependencies
         run: julia install_deps.jl
         env:
           GKSwstype: "100"
-      - name: Correr testes
+      - name: Run tests
         run: julia test/runtests.jl
         env:
           GKSwstype: "100"
-      - name: Dependências dos notebooks
+      - name: Notebook dependencies
         run: julia -e 'using Pkg; Pkg.add(["PlutoUI", "JSON"])'
-      - name: Correr notebooks
+      - name: Run notebooks
         run: julia test/notebooks.jl
         env:
           GKSwstype: "100"
