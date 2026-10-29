@@ -8,7 +8,7 @@ profit, the transformation of values into prices, the wage-profit
 distributive frontier, and empirical calibration with national (Portuguese
 INE) and European (**AMECO**, all countries in the database) data.
 
-> Status: **v1.0.0** — functional for demonstration,
+> Status: **v1.1.0** — functional for demonstration,
 > methodological development, and an academic paper in `paper/`, with
 > automated tests in CI
 > ([![Tests](https://github.com/randsley/MarxKapital/actions/workflows/test.yml/badge.svg)](https://github.com/randsley/MarxKapital/actions/workflows/test.yml))

@@ -6,7 +6,7 @@
 
 Format based on Keep a Changelog. Semantic versioning.
 
-## [Unreleased]
+## [1.1.0] — 2026-10-29
 
 ### Added
 - **Website** on GitHub Pages (<https://randsley.github.io/MarxKapital/>),
