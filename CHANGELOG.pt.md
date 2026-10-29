@@ -8,6 +8,8 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 
 ## [1.1.0] — 2026-10-29
 
+DOI desta versão (Zenodo): [10.5281/zenodo.23769203](https://doi.org/10.5281/zenodo.23769203). Para citar todas as versões, use o DOI conceptual acima.
+
 ### Adicionado
 - **Site** no GitHub Pages (<https://randsley.github.io/MarxKapital/>), em
   inglês e português: o README, as limitações, o estado do projeto, o
