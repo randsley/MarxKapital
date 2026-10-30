@@ -1,6 +1,32 @@
 title: MarxKapital
 description: A Julia model of Marxian economics, calibrated to Portuguese and European data
-theme: jekyll-theme-primer
+remote_theme: just-the-docs/just-the-docs@v0.10.1
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
 markdown: kramdown
 kramdown:
   input: GFM
+  math_engine: mathjax
+
+color_scheme: light
+search_enabled: true
+heading_anchors: true
+back_to_top: true
+back_to_top_text: "Back to top"
+image: /assets/figures/fig10b_accumulation_cycles.png
+
+aux_links:
+  "GitHub": "https://github.com/randsley/MarxKapital"
+  "English": "/MarxKapital/"
+  "Português": "/MarxKapital/index.pt.html"
+aux_links_new_tab: false
+
+nav_external_links:
+  - title: "Paper (PDF)"
+    url: "https://randsley.github.io/MarxKapital/paper/main.pdf"
+    hide_icon: false
+
+footer_content: >-
+  MarxKapital is MIT-licensed. Every number and figure in the paper is
+  generated from the code.
