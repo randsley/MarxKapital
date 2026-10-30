@@ -22,7 +22,7 @@ md"""
 
 Simulate N departments and change, interactively, the rate of exploitation, how the sectors are coupled, and a wage-policy shock. Each department accumulates part of its surplus value as constant and variable capital. With coupling, capital moves between sectors through the technical matrix `A`.
 
-The code uses the MarxKapital API, whose names are Portuguese.
+The code uses the MarxKapital API.
 """
 
 # ╔═╡ b2f480be-d316-11f1-a90b-cd5d4ad6332e

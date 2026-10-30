@@ -26,7 +26,7 @@ Pick an economy (number of sectors, random seed, density of the technical matrix
 - Prices of production: `p = w(1 + r̄)[I − (1 + r̄)Aᵀ]⁻¹ l`, with wage `w = 1`
 - Maximum rate of profit: `R = 1/ρ(A) − 1`
 
-The code uses the MarxKapital API, whose names are Portuguese.
+The code uses the MarxKapital API.
 """
 
 # ╔═╡ b2fd1062-d316-11f1-b1a8-9be77f58258e

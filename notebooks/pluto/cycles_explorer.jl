@@ -34,7 +34,7 @@ The cross-dual model (`market_prices = true`): market prices respond to sectoral
 
 Move the sliders and watch the eigenvalues of balanced growth cross the imaginary axis and the trajectory change from a point, to a cycle, to irregular motion. The economy is the paper's: six sectors, seed 5.
 
-The code uses the MarxKapital API, whose names are Portuguese.
+The code uses the MarxKapital API.
 """
 
 # ╔═╡ b2fcf8fc-d316-11f1-9e7e-49cd356c53e4
