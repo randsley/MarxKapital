@@ -139,7 +139,7 @@ packaging environment, verification was static only (balanced
 delimiters, no function called without a definition, argument counts in
 positional constructors). Since then, the test suite runs by real
 compilation — locally and in CI (GitHub Actions, Julia 1.10 and 1, on
-every push to `main`, see `.github/workflows/test.yml`) — 271 tests, all
+every push to `main`, see `.github/workflows/test.yml`) — 275 tests, all
 passing. The real-data (network) paths are checked manually with
 `check_ameco_sdmx()`/`check_eurostat_sectoral()`, outside the
 automated suite by design (see `docs/LIMITATIONS.md`).
@@ -253,7 +253,7 @@ demonstration and testing, not empirical analysis.
 
 ### 3.8 Resolved: tests now run in CI
 
-The `test/runtests.jl` suite (271 tests) runs locally and in CI (GitHub
+The `test/runtests.jl` suite (275 tests) runs locally and in CI (GitHub
 Actions, Julia 1.10 and 1, `.github/workflows/test.yml`) on every push
 to `main`. Covers the default synthetic/opt-in paths; the real-data
 (network) paths are left out by design — see §3.3/§4.3.

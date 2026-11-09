@@ -21,6 +21,17 @@ Format based on Keep a Changelog. Semantic versioning.
   `calibrate_with_ameco_v2` and `analyze_time_series_with_data`: counts each
   self-employed worker at the average employee's compensation. Opt-in; see
   `docs/LIMITATIONS.md` item 4.
+- Notebook 8, `08_capital_mobility`: estimates the model's capital-mobility
+  coefficient `μ` from EU27 capital flows (net foreign financing against
+  the lagged profit-rate gap), 1996–2024. Between countries `μ̂` ≈ 0.33
+  without the financial centres, close to the default of 0.3; within
+  countries it is zero on average, 0.15 before 2008 and −0.27 after.
+- SpatialEconometrics.jl as a notebook-only dependency of notebook 8,
+  pinned to a commit in `install_deps.jl`; `--notebook-test` installs only
+  what `test/notebooks.jl` needs, and CI uses it.
+- `valuation = :current_cost` in `analyze_time_series_with_data`: current
+  prices with the capital stock at current replacement cost, the
+  calibration's own price basis.
 
 ### Fixed
 - `calibrate_with_ameco_data` (`sector_data = :fixed`) divided AMECO's

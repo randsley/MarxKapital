@@ -428,7 +428,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 271 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 275 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -541,6 +541,14 @@ algebraically.
   Section 5.7). Prices are normalized so that
   total profit equals total surplus value. It cannot be combined with
   `realization` or `rationing`.
+- **`μ` is constant; the data say it is not.** Notebook 8 estimates the
+  capital-mobility coefficient from EU27 capital flows (net foreign
+  financing against the lagged profit-rate gap, 1996–2024). Between
+  countries, over the whole period, `μ̂` ≈ 0.33 without the financial
+  centres, close to the default of 0.3. Year to year within countries it is
+  zero on average: 0.15 before 2008 and −0.27 after. The model's constant
+  `μ` matches the long-run pattern, not the response in a credit crisis.
+  The estimate is between countries, not between the model's sectors.
 - **`μ_v` (mobility of variable capital) is off by default.** Accumulation
   cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random
   economies tested, with `β = 0.1`); the empirical value of `μ_v` is not

@@ -10,7 +10,7 @@ MarxKapital: a Julia model of Marxian economics (accumulation, exploitation, org
 
 ```bash
 julia install_deps.jl                         # one-time: Pkg.add the deps (see "Loading model" below)
-julia --project=. test/runtests.jl            # full suite (offline; 271 tests)
+julia --project=. test/runtests.jl            # full suite (offline; 275 tests)
 julia --project=. examples/demo.jl            # full demo
 julia --project=. paper/generate_results.jl   # regenerate paper figures/tables (needs network)
 julia --project=. paper/monte_carlo.jl        # Monte Carlo sweeps for the paper (offline)
@@ -18,7 +18,8 @@ julia --project=. paper/matrix_audit.jl       # audit of real matrix A (needs ne
 julia --project=. paper/jacobian_bifurcation.jl  # Jacobian/bifurcation/TSSI figures + figures/jacobian_stats.tex (offline)
 julia --project=. paper/accumulation_bifurcation.jl # balanced growth/Hopf/cycles/chaos figures + figures/accumulation_stats.tex (offline, ~30 min)
 latexmk -pdf paper/main.tex                   # build the paper
-julia install_deps.jl --notebooks             # also IJulia, Pluto, PlutoUI, JSON (for notebooks/)
+julia install_deps.jl --notebooks             # also IJulia, Pluto, PlutoUI, JSON, SpatialEconometrics (for notebooks/)
+julia install_deps.jl --notebook-test         # only PlutoUI, JSON, SpatialEconometrics (what test/notebooks.jl needs; CI)
 julia test/notebooks.jl                       # smoke-run every notebook offline (--all: include "slow" cells)
 julia notebooks/strip_outputs.jl              # after re-executing Jupyter notebooks: keep only PNG plot outputs
 ```
@@ -32,7 +33,7 @@ using Test; include("src/MarxKapital.jl")
 # paste the @testset from test/runtests.jl
 ```
 
-CI (`.github/workflows/test.yml`) runs `julia install_deps.jl` then `julia test/runtests.jl` on Julia 1.10 and 1, on push/PR to `main`, then installs PlutoUI and JSON and runs `julia test/notebooks.jl`.
+CI (`.github/workflows/test.yml`) runs `julia install_deps.jl` then `julia test/runtests.jl` on Julia 1.10 and 1, on push/PR to `main`, then runs `julia install_deps.jl --notebook-test` and `julia test/notebooks.jl`.
 
 ## Loading model (important)
 
@@ -59,7 +60,7 @@ This is **not** a registered package and is not loaded with `using MarxKapital`.
 - `growth.jl`: the RHS is homogeneous of degree 1, so steady states are balanced-growth rays. They are fixed points of `normalized_system` in free simplex coordinates (`_from_free`/`_to_free`; prices mean-zero). Also `balanced_growth` (warm-up + Newton), `with_parameter` (`:μ`, `:μ_v`, `:ω`, `:e_scale`) and `wage_sweep`.
 - `tssi.jl`: TSSI valuation layer (fixed lag τ) over trajectories; does not change the dynamics. `bifurcation.jl`: BifurcationKit continuation of fixed points of *maps* (rationing step, TSSI price map), with fold/flip/Neimark–Sacker classified from multipliers (BK's own detectors assume ODEs and miss flips). `accumulation_bifurcation` continues balanced growth of the cross-dual ODE (BK's own Hopf detection; `dsmax` ≤ 0.01 or close Hopf pairs are missed). It seeds limit-cycle collocation from the Hopf normal-form predictor (`BK.predictor`), because BK's automatic branch switching hits a singular Jacobian here. Check cycles with `simulated_cycle`. `lyapunov_exponents` (Benettin method, exact Jacobian; ≈100 s at N=6) classifies irregular motion, and `simulated_hysteresis` detects coexisting attractors with up/down sweeps. BifurcationKit is imported as `BK` (prefixed) to avoid name clashes; in 0.8.8 the collocation type is `BK.Collocation`.
 - `examples.jl` holds the ready-made examples, `model_help()`, and `test_model()` (internal battery, also called from the tests). `plotting.jl` holds the plots.
-- `notebooks/` (English prose only, not bilingual): `jupyter/*.ipynb` are committed **executed**, with PNG-only plot outputs, and load the model with a relative `include` from their own folder. `pluto/*.jl` activate the repo environment in their first cell (which disables Pluto's package manager) and must `using` every package they call directly, because Pluto doesn't see packages loaded inside the `include`. Edit Pluto notebooks in Pluto, so the file format and cell order stay valid. When the API changes, `test/notebooks.jl` catches broken notebooks; re-execute and strip the Jupyter ones.
+- `notebooks/` (English prose only, not bilingual): `jupyter/*.ipynb` are committed **executed**, with PNG-only plot outputs, and load the model with a relative `include` from their own folder. Notebooks 7 and 8 read the static AMECO extract `data/ameco_eu27.csv` (rebuilt by `data/build_ameco_eu.jl`, which needs network). Notebook 8 also loads SpatialEconometrics.jl, a notebook-only dependency pinned to a commit in `install_deps.jl` (`SPATIALECONOMETRICS`); `src/` must never load it. To move the pin, change it there, re-execute notebook 8 and check its numbers. `pluto/*.jl` activate the repo environment in their first cell (which disables Pluto's package manager) and must `using` every package they call directly, because Pluto doesn't see packages loaded inside the `include`. Edit Pluto notebooks in Pluto, so the file format and cell order stay valid. When the API changes, `test/notebooks.jl` catches broken notebooks; re-execute and strip the Jupyter ones.
 
 ## Data and testing invariants
 

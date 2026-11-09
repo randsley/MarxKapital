@@ -82,11 +82,13 @@ antigo com o novo.*
 [`notebooks/`](notebooks/README.md) tem exemplos resolvidos, em inglês, que
 correm offline:
 
-- sete notebooks Jupyter, gravados com as saídas para se lerem no GitHub:
+- oito notebooks Jupyter, gravados com as saídas para se lerem no GitHub:
   fundamentos da acumulação, valores e preços, calibração e choques
   salariais, setores acoplados e diferenciação automática, valorização
-  TSSI, crescimento equilibrado, ciclos e caos, e taxas de lucro na UE27 a
-  partir de dados reais do AMECO (um extrato estático em `data/`);
+  TSSI, crescimento equilibrado, ciclos e caos, taxas de lucro na UE27 a
+  partir de dados reais do AMECO (um extrato estático em `data/`), e o
+  coeficiente de mobilidade do capital `μ` estimado a partir dos fluxos de
+  capital na UE;
 - três notebooks Pluto interativos, com sliders: a fronteira
   salário-lucro, a acumulação com acoplamento e choques salariais, e os
   ciclos de acumulação no modelo cruzado.
@@ -279,7 +281,7 @@ marxkapital/
 │   └── notebooks.jl        # teste de fumo: corre todos os notebooks offline
 ├── examples/demo.jl
 ├── notebooks/              # exemplos resolvidos (ver notebooks/README.md)
-│   ├── jupyter/            # sete notebooks narrativos, com saídas
+│   ├── jupyter/            # oito notebooks narrativos, com saídas
 │   └── pluto/              # três notebooks interativos
 ├── docs/LIMITATIONS.md     # leitura obrigatória (+ .pt.md em português)
 ├── paper/                  # artigo académico (LaTeX), reproduzível a partir de dados reais
@@ -314,7 +316,7 @@ raio espectral de `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-271 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
+275 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
 em cada push a `main` — ver `.github/workflows/test.yml`. A CI corre depois
 todos os notebooks (`julia test/notebooks.jl`, ver `notebooks/README.md`). A suite cobre os
 caminhos sintéticos/opt-in por omissão e corre totalmente offline; os

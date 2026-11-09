@@ -27,7 +27,7 @@ jobs:
         env:
           GKSwstype: "100"
       - name: Notebook dependencies
-        run: julia -e 'using Pkg; Pkg.add(["PlutoUI", "JSON"])'
+        run: julia install_deps.jl --notebook-test
       - name: Run notebooks
         run: julia test/notebooks.jl
         env:

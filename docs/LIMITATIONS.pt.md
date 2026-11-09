@@ -420,7 +420,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 271 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 275 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -535,6 +535,15 @@ afirmado algebricamente.
   setores e não altera a estabilidade (artigo, Secção 5.7). Os preços são
   normalizados para que o lucro total iguale a mais-valia total. Não se
   combina com `realization` nem com `rationing`.
+- **`μ` é constante; os dados dizem que não é.** O notebook 8 estima o
+  coeficiente de mobilidade do capital a partir dos fluxos de capital na
+  UE27 (financiamento externo líquido contra o diferencial de taxa de lucro
+  desfasado, 1996–2024). Entre países, no período inteiro, `μ̂` ≈ 0,33 sem
+  os centros financeiros, perto do valor por omissão de 0,3. De ano para
+  ano dentro de cada país é nulo em média: 0,15 antes de 2008 e −0,27
+  depois. O `μ` constante do modelo corresponde ao padrão de longo prazo,
+  não à resposta numa crise de crédito. A estimativa é entre países, não
+  entre os setores do modelo.
 - **`μ_v` (mobilidade do capital variável) está desligado por omissão.**
   Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
   supercrítico em todas as 30 economias aleatórias testadas, com

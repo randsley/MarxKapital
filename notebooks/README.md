@@ -2,10 +2,10 @@
 
 Worked examples of MarxKapital in two formats:
 
-- **`jupyter/`**: seven narrative notebooks, committed with their outputs, so they can be read on GitHub without running anything.
+- **`jupyter/`**: eight narrative notebooks, committed with their outputs, so they can be read on GitHub without running anything.
 - **`pluto/`**: three interactive [Pluto](https://plutojl.org) notebooks with sliders, which recompute as you change the parameters.
 
-Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthetic defaults; notebook 7 uses real AMECO data from a static extract, `data/ameco_eu27.csv` (rebuild it with `julia data/build_ameco_eu.jl`, which needs network; provenance in `data/ameco_eu27_PROVENANCE.md`). The prose and the MarxKapital API are both in English.
+Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthetic defaults; notebooks 7 and 8 use real AMECO data from a static extract, `data/ameco_eu27.csv` (rebuild it with `julia data/build_ameco_eu.jl`, which needs network; provenance in `data/ameco_eu27_PROVENANCE.md`). The prose and the MarxKapital API are both in English.
 
 ## Jupyter
 
@@ -18,6 +18,7 @@ Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthet
 | [05_tssi_valuation](jupyter/05_tssi_valuation.ipynb) | TSSI against simultaneist valuation, the production lag, stability and bifurcation of TSSI prices |
 | [06_growth_cycles_chaos](jupyter/06_growth_cycles_chaos.ipynb) | Balanced growth, the wage-share sweep, the Hopf bifurcation and limit cycles, the Hopf boundary, Lyapunov exponents, hysteresis |
 | [07_eu_profit_rates](jupyter/07_eu_profit_rates.ipynb) | **Real data.** `e`, `k` and `r` for the EU27 member states, 1995–2024: the self-employment adjustment, trends, an exact split of the change in `r` into exploitation and composition, and why the valuation decides the trend in `k` |
+| [08_capital_mobility](jupyter/08_capital_mobility.ipynb) | **Real data.** The model's capital-mobility coefficient `μ` estimated from EU27 capital flows, 1996–2024: between and within countries, common shocks, a spatial panel with Driscoll–Kraay errors and spatial CCE (via [SpatialEconometrics.jl](https://github.com/randsley/SpatialEconometrics.jl)), before and after 2008, and the estimates back in the model |
 
 ## Pluto
 
@@ -32,8 +33,10 @@ Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthet
 Install the model's dependencies, plus the notebook tools, from the repository root:
 
 ```bash
-julia install_deps.jl --notebooks     # adds IJulia, Pluto, PlutoUI and JSON
+julia install_deps.jl --notebooks     # adds IJulia, Pluto, PlutoUI, JSON and SpatialEconometrics
 ```
+
+Notebook 8 uses [SpatialEconometrics.jl](https://github.com/randsley/SpatialEconometrics.jl), which is not registered: `install_deps.jl` adds it from GitHub at the commit pinned in `SPATIALECONOMETRICS`, so the notebook's results do not move with the package. It is a notebook-only dependency; `src/` never loads it.
 
 **Jupyter.** Start Jupyter from the repository and open a notebook in `notebooks/jupyter/`. The notebooks load the model with `include(joinpath("..", "..", "src", "MarxKapital.jl"))`, so the working directory must be the notebook's folder (the Jupyter default).
 
@@ -56,6 +59,7 @@ The first run of each notebook takes a minute or so while Julia compiles. In not
 `test/notebooks.jl` runs the code cells of every notebook offline, skipping cells tagged `slow`. CI runs it after the main test suite.
 
 ```bash
+julia install_deps.jl --notebook-test   # only what the smoke test needs (as in CI)
 julia test/notebooks.jl          # as in CI
 julia test/notebooks.jl --all    # including the slow cells
 ```

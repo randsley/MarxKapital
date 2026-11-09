@@ -414,6 +414,14 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test pim.e_raw[1] < p125.e_raw[1]
         ts = analyze_time_series_with_data(data; valuation = :consistent_gfcf, self_employed = :imputed)
         @test sum(pim.C) / sum(pim.V) ≈ ts.k[i]
+        # :current_cost is the calibration's own valuation: e as at current
+        # prices, k as under :consistent_gfcf, and r = e/(1+k)
+        cc = analyze_time_series_with_data(data; valuation = :current_cost, self_employed = :imputed)
+        cur = analyze_time_series_with_data(data; valuation = :current, self_employed = :imputed)
+        @test cc.e ≈ cur.e && cc.wage_share ≈ cur.wage_share
+        @test cc.k ≈ ts.k
+        @test cc.r ≈ cc.e ./ (1 .+ cc.k)
+        @test mean(pim.e_raw) ≈ cc.e[i] && sum(pim.C) / sum(pim.V) ≈ cc.k[i]
         ts0 = analyze_time_series_with_data(data; valuation = :current)
         ts1 = analyze_time_series_with_data(data; valuation = :current, self_employed = :imputed)
         @test ts1.wage_share ≈ ts0.wage_share .* (data.employment ./ data.employees)

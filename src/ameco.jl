@@ -482,7 +482,15 @@ current-price capital stock equivalent. `compensation` (`UWCD`) and `GDP`
   the general GDP deflator, is what actually sets the price basis of `C`.
   This variant tests whether the conclusion of `:consistent` is sensitive to
   that choice (capital goods prices have historically tended to fall
-  relative to the general GDP deflator).
+  relative to the general GDP deflator). Because `GVA` is deflated by the
+  GDP deflator and `V` by the investment deflator, `e` here differs from
+  its current-price value.
+- `valuation=:current_cost`: everything at current prices, with `C` revalued
+  to current replacement cost, `C × GFCF_deflator / 100`. `e` and the wage
+  share are exactly their current-price values, `k` equals the
+  `:consistent_gfcf` one, and `e`, `k` and `r` are the ones
+  `calibrate_with_ameco_data` uses on its `:fixed` path. This is the
+  valuation of the model's own profit rate.
 
 A period's surplus/surplus value uses `inc = GVA - V - CFC`, where `CFC`
 (AMECO item `UKCT`, "Consumption of fixed capital... total economy") is the
@@ -527,8 +535,13 @@ function analyze_time_series_with_data(data::AMECOData; valuation::Symbol = :cur
             def = data.GFCF_deflator[i]
             factor = (!isnan(def) && def > 0) ? 100 / def : NaN
             V, GVA, CFC = comp * factor, data.real_GDP[i], data.CFC[i] * factor
+        elseif valuation == :current_cost
+            def = data.GFCF_deflator[i]
+            C = (!isnan(def) && def > 0) ? C * def / 100 : NaN
+            V, GVA, CFC = comp, data.GDP[i], data.CFC[i]
         else
-            error("unknown valuation: $valuation (use :current, :consistent or :consistent_gfcf)")
+            error("unknown valuation: $valuation (use :current, :consistent, :consistent_gfcf " *
+                  "or :current_cost)")
         end
         if !isnan(V) && !isnan(C) && !isnan(GVA) && !isnan(CFC) && V > 0 && C > 0
             inc = GVA - V - CFC

@@ -21,6 +21,18 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   `calibrate_with_ameco_v2` e `analyze_time_series_with_data`: conta cada
   trabalhador por conta própria com a remuneração média de um empregado.
   Opcional; ver `docs/LIMITATIONS.md` item 4.
+- Notebook 8, `08_capital_mobility`: estima o coeficiente de mobilidade do
+  capital do modelo, `μ`, a partir dos fluxos de capital na UE27
+  (financiamento externo líquido contra o diferencial de taxa de lucro
+  desfasado), 1996–2024. Entre países `μ̂` ≈ 0,33 sem os centros
+  financeiros, perto do valor por omissão de 0,3; dentro de cada país é
+  nulo em média, 0,15 antes de 2008 e −0,27 depois.
+- SpatialEconometrics.jl como dependência só do notebook 8, fixada num
+  commit em `install_deps.jl`; `--notebook-test` instala só o que
+  `test/notebooks.jl` precisa, e é o que a CI usa.
+- `valuation = :current_cost` em `analyze_time_series_with_data`: preços
+  correntes com o stock de capital ao custo de substituição corrente, a
+  base de preços da própria calibração.
 
 ### Corrigido
 - `calibrate_with_ameco_data` (`sector_data = :fixed`) dividia o stock de
