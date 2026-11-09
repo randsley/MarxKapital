@@ -413,7 +413,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 254 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 259 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -589,4 +589,7 @@ to that year with a warning. `include_forecasts=true` (in
 are dropped on those paths. The rule assumes AMECO's usual calendar
 (spring and autumn releases, each forecasting the current and the next
 year). The most recent actual year is itself provisional and may be
-revised in later releases.
+revised in later releases. If no release year can be read from
+`LAST UPDATE` (the column is missing or in an unknown format), no year is
+dropped and `fetch_ameco_data` warns that forecasts cannot be identified,
+rather than keeping them silently (`_apply_forecast_rule`).

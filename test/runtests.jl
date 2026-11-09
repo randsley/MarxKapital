@@ -359,6 +359,18 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
                                              Dict("GDP_current" => collect(1.0:8.0)), 2026)
         @test years == collect(2020:2025)
         @test series["GDP_current"] == collect(1.0:6.0)
+        # the same rule end to end, and the case with no readable release year:
+        # nothing can be dropped, so it must warn rather than keep forecasts silently
+        y, sr, notes = _apply_forecast_rule(collect(2020:2027),
+                                            Dict("GDP_current" => collect(1.0:8.0)), 2026, false)
+        @test y == collect(2020:2025) && notes["last_actual_year"] == "2025"
+        y, _, notes = _apply_forecast_rule(collect(2020:2027),
+                                           Dict("GDP_current" => collect(1.0:8.0)), 2026, true)
+        @test y == collect(2020:2027) && !haskey(notes, "last_actual_year")
+        y, _, notes = @test_logs (:warn, r"No AMECO release year") _apply_forecast_rule(
+            collect(2020:2027), Dict("GDP_current" => collect(1.0:8.0)), 0, false)
+        @test y == collect(2020:2027) && isempty(notes)
+        @test_logs _apply_forecast_rule(collect(2020:2027), Dict{String, Vector{Float64}}(), 0, true)
         # a calibration year beyond the last actual year falls back to it
         data = generate_synthetic_ameco_data("PT", collect(1995:2020))
         data.notes["last_actual_year"] = "2020"

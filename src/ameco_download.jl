@@ -241,23 +241,42 @@ function fetch_ameco_data(country::String; years = 1995:2023, method = :auto,
     end
 end
 
+"""
+    _apply_forecast_rule(years, series, release_year, include_forecasts)
+
+Drops the AMECO forecast years (the release year on) from `years` and
+`series`, unless `include_forecasts`, and returns `(years, series, notes)`.
+`release_year = 0` means no release year could be read from `LAST UPDATE`:
+the forecast years cannot be told apart, so nothing is dropped and a
+warning says so instead of keeping forecasts silently. Pure (no network).
+"""
+function _apply_forecast_rule(years::AbstractVector{Int}, series::Dict,
+                              release_year::Integer, include_forecasts::Bool)
+    notes = Dict{String, String}()
+    if release_year <= 0
+        include_forecasts ||
+            @warn "No AMECO release year found in LAST UPDATE; forecast years cannot " *
+                  "be identified and are kept. Treat the last two years as possible forecasts."
+        return years, series, notes
+    end
+    notes["release_year"] = string(release_year)
+    if !include_forecasts && last(years) >= release_year
+        years, series = _drop_forecast_years(years, series, release_year)
+        isempty(years) && error("Every requested year is an AMECO forecast " *
+                                "(release $release_year); use include_forecasts=true.")
+        @warn "Years from $release_year on are Commission forecasts in the AMECO " *
+              "$release_year release; dropped (include_forecasts=true keeps them)."
+        notes["last_actual_year"] = string(last(years))
+    end
+    return years, series, notes
+end
+
 """Fetches through the SDMX API and builds the AMECOData, dropping forecast years
-unless `include_forecasts` (see `fetch_ameco_data`)."""
+unless `include_forecasts` (see `fetch_ameco_data`, `_apply_forecast_rule`)."""
 function _ameco_sdmx_data(code, sdmx_code, years, include_forecasts::Bool)
     release = Ref(0)
     series = download_ameco_sdmx(sdmx_code, years; release = release)
-    years_vec = collect(Int, years)
-    notes = Dict{String, String}()
-    if release[] > 0
-        notes["release_year"] = string(release[])
-        if !include_forecasts && last(years_vec) >= release[]
-            years_vec, series = _drop_forecast_years(years_vec, series, release[])
-            isempty(years_vec) && error("Every requested year is an AMECO forecast " *
-                                        "(release $(release[])); use include_forecasts=true.")
-            @warn "Years from $(release[]) on are Commission forecasts in the AMECO " *
-                  "$(release[]) release; dropped (include_forecasts=true keeps them)."
-            notes["last_actual_year"] = string(last(years_vec))
-        end
-    end
+    years_vec, series, notes = _apply_forecast_rule(collect(Int, years), series,
+                                                    release[], include_forecasts)
     return build_ameco_data(code, years_vec, series, "AMECO SDMX (official)"; notes = notes)
 end

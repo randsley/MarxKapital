@@ -6,6 +6,21 @@
 
 Format based on Keep a Changelog. Semantic versioning.
 
+## [Unreleased]
+
+### Fixed
+- AMECO forecast years: when no release year can be read from the SDMX
+  `LAST UPDATE` column, `fetch_ameco_data` now warns that forecasts cannot
+  be identified instead of keeping them silently. The rule is a pure
+  function, `_apply_forecast_rule`, tested offline. See
+  `docs/LIMITATIONS.md` item 12.
+- Paper: the abstract and Sections 5.4 and 6.2 said that no real per-sector accumulation
+  series exists. Eurostat publishes per-sector investment, net capital
+  stock and consumption of fixed capital, and the pipeline already fetches
+  them; the text now says the coupling mechanisms have not been calibrated
+  against them, and why that is a separate problem.
+- `docs/PROJECT_STATUS.md`: the current test count, in place of 111.
+
 ## [1.1.0] — 2026-10-29
 
 DOI of this version (Zenodo): [10.5281/zenodo.23769203](https://doi.org/10.5281/zenodo.23769203). To cite all versions, use the concept DOI above.

@@ -403,7 +403,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 254 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 259 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -582,4 +582,8 @@ e `analyze_ameco_time_series`) mantém as previsões. Testado offline
 que nesses caminhos não se retira nenhum ano. A regra assume o calendário
 habitual da AMECO (edições de primavera e outono, cada uma com previsões
 para o ano corrente e o seguinte). O último ano observado é ele próprio
-provisório e pode ser revisto em edições posteriores.
+provisório e pode ser revisto em edições posteriores. Se não for possível
+ler o ano da edição de `LAST UPDATE` (coluna em falta ou num formato
+desconhecido), não se retira nenhum ano e `fetch_ameco_data` avisa que as
+previsões não podem ser identificadas, em vez de as manter em silêncio
+(`_apply_forecast_rule`).

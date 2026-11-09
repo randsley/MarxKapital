@@ -6,6 +6,21 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [Não publicado]
+
+### Corrigido
+- Anos de previsão da AMECO: quando não se consegue ler o ano da edição na
+  coluna `LAST UPDATE` do SDMX, `fetch_ameco_data` avisa agora que as
+  previsões não podem ser identificadas, em vez de as manter em silêncio.
+  A regra é uma função pura, `_apply_forecast_rule`, testada offline. Ver
+  `docs/LIMITATIONS.pt.md` item 12.
+- Artigo: o resumo e as Secções 5.4 e 6.2 diziam que não existem séries reais de
+  acumulação por setor. O Eurostat publica investimento, stock de capital
+  líquido e consumo de capital fixo por setor, e o pipeline já os obtém; o
+  texto diz agora que os mecanismos de acoplamento não foram calibrados com
+  essas séries, e porque é que isso é um problema à parte.
+- `docs/PROJECT_STATUS.pt.md`: o número atual de testes, em vez de 111.
+
 ## [1.1.0] — 2026-10-29
 
 DOI desta versão (Zenodo): [10.5281/zenodo.23769203](https://doi.org/10.5281/zenodo.23769203). Para citar todas as versões, use o DOI conceptual acima.

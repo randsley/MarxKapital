@@ -53,8 +53,11 @@ before the technical matrix is applied to it. The rationing
 mechanism's convergence (270 random trials, $N\in\{6,12,19\}$) and its
 effect on cross-sector dispersion (50 random economies) are checked
 systematically rather than on a single hand-picked example, though not
-yet against real per-sector accumulation data, for which no suitable
-time series currently exists. Computing the rationing map's Jacobian
+yet against real per-sector accumulation data. Eurostat publishes
+per-sector investment, net capital stock and consumption of fixed
+capital as annual series, and the pipeline already fetches them for the
+perpetual-inventory option, but calibrating the coupling mechanisms
+against them has not been attempted. Computing the rationing map's Jacobian
 exactly by automatic differentiation reveals structure the earlier
 hand derivation could not: ordered by rationing severity, the Jacobian is
 triangular, its spectrum is real and contained in $[-1,0]$, and $-1$ is
@@ -1212,8 +1215,14 @@ calibration --- Section~4.2), at three illustrative profit rates.}
 
 \subsection{Comparison of coupling mechanisms: one illustration, then a systematic sweep}
 
-Because no real per-sector accumulation time series exists to calibrate
-the dynamic coupling mechanisms of Section~3.3 empirically, Figure~\ref{fig:coupling}
+The dynamic coupling mechanisms of Section~3.3 are not calibrated
+empirically here. Eurostat does publish annual per-sector investment, net
+capital stock and consumption of fixed capital, which the pipeline fetches
+for the perpetual-inventory option (Section~4.3), but estimating the
+mobility coefficient $\mu$ from them is a separate problem: profit rates at
+prices of production need the input-output table, published only for
+benchmark years, and investment flows respond to profit-rate gaps while
+also changing them. We leave that estimation for future work. Figure~\ref{fig:coupling}
 first illustrates their qualitative behavior on a single synthetic
 six-sector economy under one random technical matrix and seed. Capital
 mobility alone reduces cross-sector profit-rate dispersion over time, as
@@ -1836,8 +1845,8 @@ produces higher dispersion than mobility alone systematically
 ($50/50$ seeds), not as an artifact of one draw. What these sweeps do
 not cover: a fixed $\mu$ and fixed relaxation parameter throughout, and
 only random (not empirically calibrated) technical matrices for the
-dynamic comparison, since no real per-sector accumulation series exists
-to calibrate it against (Section~5.4). Section~3.3
+dynamic comparison, since the mechanisms have not been calibrated against
+the per-sector accumulation series that Eurostat publishes (Section~5.4). Section~3.3
 establishes that a fixed point always exists (Brouwer), explains
 structurally why undamped iteration oscillates rather than converges
 (the map is antitone, and Proposition~\ref{prop:triangular} shows
