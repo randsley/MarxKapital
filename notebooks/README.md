@@ -2,10 +2,10 @@
 
 Worked examples of MarxKapital in two formats:
 
-- **`jupyter/`**: six narrative notebooks, committed with their outputs, so they can be read on GitHub without running anything.
+- **`jupyter/`**: seven narrative notebooks, committed with their outputs, so they can be read on GitHub without running anything.
 - **`pluto/`**: three interactive [Pluto](https://plutojl.org) notebooks with sliders, which recompute as you change the parameters.
 
-Everything runs offline on the synthetic defaults. The prose and the MarxKapital API are both in English.
+Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthetic defaults; notebook 7 uses real AMECO data from a static extract, `data/ameco_eu27.csv` (rebuild it with `julia data/build_ameco_eu.jl`, which needs network; provenance in `data/ameco_eu27_PROVENANCE.md`). The prose and the MarxKapital API are both in English.
 
 ## Jupyter
 
@@ -17,6 +17,7 @@ Everything runs offline on the synthetic defaults. The prose and the MarxKapital
 | [04_coupled_sectors_and_ad](jupyter/04_coupled_sectors_and_ad.ipynb) | Capital mobility, realization and rationing, exact Jacobians, the rationing map's spectrum and its bifurcation |
 | [05_tssi_valuation](jupyter/05_tssi_valuation.ipynb) | TSSI against simultaneist valuation, the production lag, stability and bifurcation of TSSI prices |
 | [06_growth_cycles_chaos](jupyter/06_growth_cycles_chaos.ipynb) | Balanced growth, the wage-share sweep, the Hopf bifurcation and limit cycles, the Hopf boundary, Lyapunov exponents, hysteresis |
+| [07_eu_profit_rates](jupyter/07_eu_profit_rates.ipynb) | **Real data.** `e`, `k` and `r` for the EU27 member states, 1995–2024: the self-employment adjustment, trends, an exact split of the change in `r` into exploitation and composition, and why the valuation decides the trend in `k` |
 
 ## Pluto
 

@@ -272,6 +272,21 @@ floored `e`, and sectors hitting the floor are reported, as in the INE path
 actually measured capital advanced `Σ(C+V)` and `ΣV/Σ(C+V)`; they now
 measure value added and `ΣV/ΣVAB`.
 
+**Fixed (capital valuation):** this path divided AMECO's net capital stock
+(`OKND`, at constant 2020 prices) by compensation at current prices, so `k`
+fell with every year of inflation after 2020: for 2024 it was 17–25% too
+low in Germany, Portugal and Poland. The stock is now revalued to current
+replacement cost with the GFCF deflator (`PIGT`, 2020 = 100), the price
+basis of Eurostat's stock on the `:eurostat` path, and the calibrated `k`
+equals `analyze_time_series_with_data(...; valuation = :consistent_gfcf)`
+exactly. **Self-employment (optional):** compensation of employees leaves
+out the self-employed, whose income then counts as surplus value and
+overstates `e` (in 2024 by a factor of about 1.8 in Greece and Italy).
+`self_employed = :imputed` counts each of them at the average employee's
+compensation, as AMECO's adjusted wage share does; it is opt-in, because the
+INE path uses published compensation too, and only on the `:fixed` path,
+since imputing by sector would need sectoral employee counts.
+
 **Fixed (optional):** `sector_data=:eurostat` uses **real** VAB,
 compensation, consumption of fixed capital, employment, GFCF, and
 capital stock from Eurostat (`src/eurostat_sdmx.jl`, dataflows
@@ -413,7 +428,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 259 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 271 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,

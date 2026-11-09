@@ -382,6 +382,46 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ErrorException calibrate_with_ameco_data(data, 2022, :macro)
     end
 
+    @testset "AMECO aggregation method" begin
+        # an aggregate (EU27) returns one row per year and aggregation method;
+        # the standard aggregation (0) must win, whatever the row order
+        agg = DataFrame(AGG_METHOD = [2, 0, 1, 1, 2, 0], TIME_PERIOD = [2000, 2000, 2000, 2001, 2001, 2001],
+                        OBS_VALUE = [7348.0, 7885.0, 7743.0, 8100.0, 8000.0, 8200.0])
+        @test sort(_select_agg_method(agg).OBS_VALUE) == [7885.0, 8200.0]
+        # series with only the growth-rate means (OVGD, PIGT): the euro-weighted one (1)
+        @test _select_agg_method(agg[agg.AGG_METHOD .!= 0, :]).OBS_VALUE == [7743.0, 8100.0]
+        # a single country, or a response without the column, passes through
+        @test nrow(_select_agg_method(agg[agg.AGG_METHOD .== 0, :])) == 2
+        @test nrow(_select_agg_method(select(agg, Not(:AGG_METHOD)))) == 6
+    end
+
+    @testset "AMECO calibration: capital valuation and self-employed" begin
+        # OKND is at constant 2020 prices: with the GFCF deflator at 125 the
+        # stock is revalued by 1.25, so k scales by 1.25 and e does not move
+        data = generate_synthetic_ameco_data("PT", collect(2015:2020))
+        i = findfirst(==(2020), data.years)
+        data.GFCF_deflator[i] = 100.0
+        p100, _ = calibrate_with_ameco_data(data, 2020, :macro)
+        data.GFCF_deflator[i] = 125.0
+        p125, _ = calibrate_with_ameco_data(data, 2020, :macro)
+        @test p125.k ≈ 1.25 .* p100.k
+        @test p125.e ≈ p100.e
+        # self-employed imputed: V scales by employment/employees, and the
+        # calibration's k matches the :consistent_gfcf time series exactly
+        pim, _ = calibrate_with_ameco_data(data, 2020, :macro; self_employed = :imputed)
+        ratio = data.employment[i] / data.employees[i]
+        @test sum(pim.V) ≈ ratio * sum(p125.V)
+        @test pim.e_raw[1] < p125.e_raw[1]
+        ts = analyze_time_series_with_data(data; valuation = :consistent_gfcf, self_employed = :imputed)
+        @test sum(pim.C) / sum(pim.V) ≈ ts.k[i]
+        ts0 = analyze_time_series_with_data(data; valuation = :current)
+        ts1 = analyze_time_series_with_data(data; valuation = :current, self_employed = :imputed)
+        @test ts1.wage_share ≈ ts0.wage_share .* (data.employment ./ data.employees)
+        @test_throws ArgumentError calibrate_with_ameco_data(data, 2020, :macro;
+                                                             sector_data = :eurostat, self_employed = :imputed)
+        @test_throws ArgumentError analyze_time_series_with_data(data; self_employed = :other)
+    end
+
     @testset "AMECO time series — consistent vs. current valuation" begin
         # Hand-worked case: GDP_current=200, real_GDP=100 (GDP_deflator=200);
         # compensation=80, CFC=20 (both at current prices); C=400 (stock,

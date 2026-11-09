@@ -8,7 +8,32 @@ Format based on Keep a Changelog. Semantic versioning.
 
 ## [Unreleased]
 
+### Added
+- Notebook 7, `07_eu_profit_rates`: `e`, `k` and `r` for the 27 EU member
+  states and the EU27 aggregate, 1995–2024, from real AMECO data, offline.
+  It adjusts compensation for the self-employed, splits the change in `r`
+  exactly into exploitation and composition, and shows that the
+  `:current` valuation reverses the trend in `k`.
+- `data/ameco_eu27.csv`, the static AMECO extract the notebook reads (2026
+  release, forecast years removed), with `data/build_ameco_eu.jl` to
+  rebuild it and `data/ameco_eu27_PROVENANCE.md`.
+- `self_employed = :imputed` in `calibrate_with_ameco_data`,
+  `calibrate_with_ameco_v2` and `analyze_time_series_with_data`: counts each
+  self-employed worker at the average employee's compensation. Opt-in; see
+  `docs/LIMITATIONS.md` item 4.
+
 ### Fixed
+- `calibrate_with_ameco_data` (`sector_data = :fixed`) divided AMECO's
+  capital stock at constant 2020 prices by compensation at current prices,
+  so `k` was too low in every year after 2020 (17–25% in 2024 for Germany,
+  Portugal and Poland). The stock is now revalued with the GFCF deflator,
+  and the calibrated `k` equals the `:consistent_gfcf` time series.
+- AMECO aggregates (EU27, euro area): the SDMX API returns up to three
+  aggregation methods per year, and `_fetch_sdmx_series` kept whichever row
+  came last, often the PPS-weighted mean of growth rates (EU27 GDP in 2000:
+  7,348 bn instead of the standard 7,885 bn). `_select_agg_method` now keeps
+  the standard aggregation, or the euro-weighted mean where that is the only
+  one. Single countries were not affected. Tested offline.
 - AMECO forecast years: when no release year can be read from the SDMX
   `LAST UPDATE` column, `fetch_ameco_data` now warns that forecasts cannot
   be identified instead of keeping them silently. The rule is a pure

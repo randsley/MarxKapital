@@ -137,13 +137,36 @@ function _drop_forecast_years(years::AbstractVector{Int}, series::Dict, release_
 end
 
 """
+    _select_agg_method(df)
+
+Keeps one aggregation method from an SDMX response. For an aggregate area
+(EU27, EA21), AMECO returns up to three rows per year that differ only in
+`AGG_METHOD`: 0 is the standard aggregation, 1 and 2 are means of national
+growth rates weighted by euros and by PPS. Away from the base year they
+differ by several percent (EU27 GDP in 2000: 7,885, 7,743 and 7,348 bn), and
+a year→value dictionary built from all of them keeps whichever row came
+last. The lowest code present is kept: the standard aggregation where it
+exists, the euro-weighted mean otherwise (the only methods some series,
+such as `OVGD` and `PIGT`, have). A single country has one method, so its
+rows pass through unchanged. Pure (no network).
+"""
+function _select_agg_method(df::DataFrame)
+    "AGG_METHOD" in names(df) || return df
+    codes = [tryparse(Int, string(x)) for x in df[!, "AGG_METHOD"]]
+    valid = filter(!isnothing, codes)
+    isempty(valid) && return df
+    return df[codes .== minimum(valid), :]
+end
+
+"""
 Calls the SDMX API for one (dataflow, item, area) and returns a
 Dict{Int,Float64} year→value. The SDMX key fixes TRANSFORMATION (1 by
-default), UNIT (0 by default) and REFERENCE=0 and leaves AGG_METHOD blank
-(`.`): without this, the API returns several series per year for the same
-item (e.g. UVGD without a fixed UNIT returns current prices, PPS and ECU/EUR
-at once) and the year→value dictionary would depend on the order in which
-the rows arrive. Most chapters use TRANSFORMATION=1 and UNIT=0; some need
+default), UNIT (0 by default) and REFERENCE=0: without this, the API returns
+several series per year for the same item (e.g. UVGD without a fixed UNIT
+returns current prices, PPS and ECU/EUR at once) and the year→value
+dictionary would depend on the order in which the rows arrive. AGG_METHOD is
+left blank (`.`), because aggregates do not all offer the same methods, and
+`_select_agg_method` then keeps one. Most chapters use TRANSFORMATION=1 and UNIT=0; some need
 other values (e.g. chapters 07-07/08-02 use TRANSFORMATION=3; chapter 11-01,
 external trade, uses UNIT=99), so pass them explicitly when needed
 (confirmed by trial: the API returns "incorrect number of filters"/empty if
@@ -169,6 +192,7 @@ function _fetch_sdmx_series(dataflow::String, area_code::String, item::String;
                 y === nothing || (release[] = max(release[], y))
             end
         end
+        df = _select_agg_method(df)
         return Dict(Int(row.TIME_PERIOD) => Float64(row.OBS_VALUE) for row in eachrow(df))
     catch
         return Dict{Int, Float64}()

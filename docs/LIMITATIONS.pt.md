@@ -267,6 +267,23 @@ caminho INE (item 8). Em `compare_ameco_countries`, as colunas `GDP` e
 `Wage_Share` mediam afinal o capital adiantado `Σ(C+V)` e `ΣV/Σ(C+V)`;
 medem agora o VAB e `ΣV/ΣVAB`.
 
+**Corrigido (valorização do capital):** este caminho dividia o stock de
+capital líquido do AMECO (`OKND`, a preços constantes de 2020) pelas
+remunerações a preços correntes, pelo que `k` descia a cada ano de inflação
+depois de 2020: em 2024 ficava 17–25% abaixo do valor certo na Alemanha, em
+Portugal e na Polónia. O stock é agora revalorizado ao custo de substituição
+corrente com o deflator da FBCF (`PIGT`, 2020 = 100), a base de preços do
+stock do Eurostat no caminho `:eurostat`, e o `k` calibrado é igual a
+`analyze_time_series_with_data(...; valuation = :consistent_gfcf)`.
+**Trabalhadores por conta própria (opcional):** as remunerações dos
+empregados deixam de fora os trabalhadores por conta própria, cujo
+rendimento passa a contar como mais-valia e sobrestima `e` (em 2024, cerca
+de 1,8 vezes na Grécia e em Itália). `self_employed = :imputed` conta cada um
+deles com a remuneração média de um empregado, como faz a parte salarial
+ajustada do AMECO; é opcional, porque o caminho INE também usa as
+remunerações publicadas, e só no caminho `:fixed`, porque imputar por setor
+exigiria o número de empregados de cada setor.
+
 **Corrigido (opcional):** `sector_data=:eurostat` usa VAB, remunerações,
 consumo de capital fixo, emprego, FBCF e stock de capital **reais** do
 Eurostat (`src/eurostat_sdmx.jl`, dataflows `NAMA_10_A64`, `NAMA_10_A64_E`,
@@ -403,7 +420,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 259 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 271 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,

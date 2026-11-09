@@ -131,7 +131,7 @@ empacotamento, a verificação era só estática (delimitadores equilibrados,
 nenhuma função chamada sem definição, contagem de argumentos nos
 construtores posicionais). Desde então, a suite de testes corre por
 compilação real — localmente e em CI (GitHub Actions, Julia 1.10 e 1, em
-cada push a `main`, ver `.github/workflows/test.yml`) — 259 testes, todos a
+cada push a `main`, ver `.github/workflows/test.yml`) — 271 testes, todos a
 passar. Os caminhos de dados reais (rede) são verificados manualmente com
 `check_ameco_sdmx()`/`check_eurostat_sectoral()`, fora da suite
 automática por design (ver `docs/LIMITATIONS.pt.md`).
@@ -244,7 +244,7 @@ demonstração e testes, não para análise empírica.
 
 ### 3.8 Resolvido: testes agora executados em CI
 
-A suite `test/runtests.jl` (259 testes) corre localmente e em CI (GitHub
+A suite `test/runtests.jl` (271 testes) corre localmente e em CI (GitHub
 Actions, Julia 1.10 e 1, `.github/workflows/test.yml`) em cada push a
 `main`. Cobre os caminhos sintéticos/opt-in por omissão; os caminhos de
 dados reais (rede) ficam de fora por design — ver §3.3/§4.3.

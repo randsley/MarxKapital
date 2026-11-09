@@ -12,6 +12,8 @@ data/*.txt
 data/*.csv
 data/*.xlsx
 !data/.gitkeep
+# ...except the small static extract the notebooks read (data/build_ameco_eu.jl)
+!data/ameco_eu27.csv
 
 # Saídas / gráficos
 *.png

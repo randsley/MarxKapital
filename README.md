@@ -84,10 +84,11 @@ one.*
 [`notebooks/`](notebooks/README.md) has worked examples, in English, that
 run offline:
 
-- six Jupyter notebooks, committed with their outputs so they can be read on
+- seven Jupyter notebooks, committed with their outputs so they can be read on
   GitHub: accumulation basics, values and prices, calibration and wage
   shocks, coupled sectors and automatic differentiation, TSSI valuation,
-  and balanced growth, cycles and chaos;
+  balanced growth, cycles and chaos, and profit rates across the EU27 from
+  real AMECO data (a static extract in `data/`);
 - three interactive Pluto notebooks with sliders: the wage–profit frontier,
   accumulation with coupling and wage shocks, and accumulation cycles in
   the cross-dual model.
@@ -283,7 +284,7 @@ marxkapital/
 │   └── notebooks.jl        # smoke test: runs every notebook offline
 ├── examples/demo.jl
 ├── notebooks/              # worked examples (see notebooks/README.md)
-│   ├── jupyter/            # six narrative notebooks, with outputs
+│   ├── jupyter/            # seven narrative notebooks, with outputs
 │   └── pluto/              # three interactive notebooks
 ├── docs/LIMITATIONS.md     # required reading (+ .pt.md in Portuguese)
 ├── paper/                  # academic paper (LaTeX), reproducible from real data
@@ -318,7 +319,7 @@ derived from the spectral radius of `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-259 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
+271 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
 every push to `main` — see `.github/workflows/test.yml`. CI then runs every
 notebook (`julia test/notebooks.jl`, see `notebooks/README.md`). The suite covers
 the default synthetic/opt-in paths and runs fully offline; the real-data

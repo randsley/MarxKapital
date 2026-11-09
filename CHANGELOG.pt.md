@@ -8,7 +8,34 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 
 ## [Não publicado]
 
+### Acrescentado
+- Notebook 7, `07_eu_profit_rates`: `e`, `k` e `r` para os 27 Estados-Membros
+  da UE e o agregado UE27, 1995–2024, a partir de dados reais do AMECO, sem
+  rede. Ajusta as remunerações aos trabalhadores por conta própria, decompõe
+  exatamente a variação de `r` em exploração e composição, e mostra que a
+  valorização `:current` inverte a tendência de `k`.
+- `data/ameco_eu27.csv`, o extrato estático do AMECO que o notebook lê
+  (edição de 2026, sem os anos de previsão), com `data/build_ameco_eu.jl`
+  para o reconstruir e `data/ameco_eu27_PROVENANCE.md`.
+- `self_employed = :imputed` em `calibrate_with_ameco_data`,
+  `calibrate_with_ameco_v2` e `analyze_time_series_with_data`: conta cada
+  trabalhador por conta própria com a remuneração média de um empregado.
+  Opcional; ver `docs/LIMITATIONS.md` item 4.
+
 ### Corrigido
+- `calibrate_with_ameco_data` (`sector_data = :fixed`) dividia o stock de
+  capital do AMECO a preços constantes de 2020 pelas remunerações a preços
+  correntes, pelo que `k` ficava baixo em todos os anos depois de 2020
+  (17–25% em 2024 na Alemanha, em Portugal e na Polónia). O stock é agora
+  revalorizado com o deflator da FBCF, e o `k` calibrado é igual à série
+  temporal `:consistent_gfcf`.
+- Agregados do AMECO (UE27, área do euro): a API SDMX devolve até três
+  métodos de agregação por ano, e `_fetch_sdmx_series` ficava com a última
+  linha recebida, muitas vezes a média de taxas de crescimento ponderada em
+  PPS (PIB da UE27 em 2000: 7 348 mil milhões em vez dos 7 885 mil milhões
+  da agregação padrão). `_select_agg_method` mantém agora a agregação padrão,
+  ou a média ponderada em euros quando é a única. Os países individuais não
+  eram afetados. Testado sem rede.
 - Anos de previsão da AMECO: quando não se consegue ler o ano da edição na
   coluna `LAST UPDATE` do SDMX, `fetch_ameco_data` avisa agora que as
   previsões não podem ser identificadas, em vez de as manter em silêncio.

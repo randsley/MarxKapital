@@ -194,10 +194,35 @@ the perpetual inventory method at the 19 fine sectors
 3 macro sectors only afterwards: aggregating the already computed series is
 more correct than recomputing from GFCF already summed into 3 groups. See
 `docs/LIMITATIONS.md` item 7.
+
+**Capital stock valuation (`:fixed`).** AMECO's net capital stock (`OKND`)
+is at constant 2020 prices, while compensation, value added and CFC are at
+current prices. The stock is revalued to current replacement cost with the
+GFCF deflator (`PIGT`, 2020 = 100), so that `k = C/V` compares like with
+like; this is the price basis of Eurostat's stock (`CRC_MEUR`) on the
+`:eurostat` path. Without the revaluation, `k` fell with every year of
+inflation after 2020 (by 17–25% in 2024 for Germany, Portugal and Poland).
+If the deflator is missing for the year, the stock stays at constant prices
+with a warning.
+
+`self_employed`:
+- `:excluded` (default): `V` is compensation of employees, as published.
+  The income of the self-employed then counts as surplus value, which
+  overstates `e` where self-employment is common.
+- `:imputed`: each self-employed worker is counted as earning the average
+  employee's compensation, `V × employment / employees`, as in AMECO's
+  adjusted wage share. Only on the `:fixed` path: imputing by sector would
+  need sectoral employee counts, so `sector_data=:eurostat` refuses it.
 """
 function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symbol;
                                   sector_data::Symbol = :fixed,
-                                  perpetual_inventory::Bool = false)
+                                  perpetual_inventory::Bool = false,
+                                  self_employed::Symbol = :excluded)
+    self_employed in (:excluded, :imputed) ||
+        throw(ArgumentError("self_employed must be :excluded or :imputed, got :$self_employed"))
+    (self_employed == :imputed && sector_data == :eurostat) &&
+        throw(ArgumentError("self_employed=:imputed needs sectoral employee counts and is " *
+                            "only implemented for sector_data=:fixed"))
     if year > data.years[end] && haskey(data.notes, "last_actual_year")
         @warn "Year $year is beyond the last actual AMECO year; using $(data.years[end])."
         year = data.years[end]
@@ -230,9 +255,28 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
     GFCF_total   = data.GFCF[idx]
     stock_total    = data.total_capital_stock[idx]
 
+    # OKND is at constant 2020 prices; revalue it to current replacement cost
+    # with the GFCF deflator (2020 = 100), the price basis of V, GVA and CFC.
+    pigt = data.GFCF_deflator[idx]
+    if isfinite(pigt) && pigt > 0
+        stock_total *= pigt / 100
+    else
+        @warn "AMECO GFCF deflator unavailable in $year; the capital stock stays at " *
+              "constant prices, so k = C/V mixes price bases."
+    end
+
+    if self_employed == :imputed
+        ratio = employment_total / data.employees[idx]
+        (isfinite(ratio) && ratio >= 1) ||
+            error("self_employed=:imputed needs employment ≥ employees in $year (got ratio $ratio)")
+        comp_total *= ratio
+        println("  ✓ self-employed imputed at the average employee's compensation " *
+                "(V × $(round(ratio, digits = 3)))")
+    end
+
     println("\n📊 Data ($year): GDP $(round(GDP_total/1000, digits=1)) bn | " *
             "Employment $(round(employment_total/1000, digits=2)) M | " *
-            "Stock K $(round(stock_total/1000, digits=1)) bn")
+            "Stock K $(round(stock_total/1000, digits=1)) bn (current prices)")
 
     GVA = employment = compensation = capital_stock = GFCF_sectoral = CFC = Float64[]
     A_real = zeros(0, 0)
@@ -336,23 +380,25 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
 end
 
 """
-    calibrate_with_ameco_v2(country; year=2022, method=:auto, sector_data=:fixed, perpetual_inventory=false, include_forecasts=false)
+    calibrate_with_ameco_v2(country; year=2022, method=:auto, sector_data=:fixed, perpetual_inventory=false, include_forecasts=false, self_employed=:excluded)
 
 Fetches AMECO data (see `fetch_ameco_data`) and calibrates the model. A
 `year` that is still a Commission forecast falls back, with a warning, to
 the last actual year, unless `include_forecasts=true`.
 `method` ∈ (:auto, :sdmx, :download, :local, :csv, :synthetic, :manual).
-`sector_data` ∈ (:fixed, :eurostat), `perpetual_inventory`: see
-`calibrate_with_ameco_data`.
+`sector_data` ∈ (:fixed, :eurostat), `perpetual_inventory`, `self_employed`
+∈ (:excluded, :imputed): see `calibrate_with_ameco_data`.
 """
 function calibrate_with_ameco_v2(country::String; year = 2022, method = :auto,
                                sector_aggregation = :macro, sector_data = :fixed,
-                               perpetual_inventory = false, include_forecasts = false)
+                               perpetual_inventory = false, include_forecasts = false,
+                               self_employed = :excluded)
     data = fetch_ameco_data(country, years = 1995:year, method = method,
                             include_forecasts = include_forecasts)
     return calibrate_with_ameco_data(data, year, sector_aggregation;
                                     sector_data = sector_data,
-                                    perpetual_inventory = perpetual_inventory)
+                                    perpetual_inventory = perpetual_inventory,
+                                    self_employed = self_employed)
 end
 
 # ----------------------------------------------------------------------------
@@ -451,22 +497,36 @@ correctly isolates the effect of the depreciation deduction. The profit rate
 `r=inc/(C+V)` still divides by `C` (the advanced stock), Marx's classic
 formula (profit on capital advanced), which is distinct from the
 composition of the numerator `inc`.
+
+`self_employed=:imputed` counts each self-employed worker as earning the
+average employee's compensation, scaling `V` by `employment / employees`
+each year (AMECO's adjusted wage share makes the same imputation). The
+default, `:excluded`, uses compensation of employees as published, so the
+income of the self-employed counts as surplus value.
 """
-function analyze_time_series_with_data(data::AMECOData; valuation::Symbol = :current)
+function analyze_time_series_with_data(data::AMECOData; valuation::Symbol = :current,
+                                       self_employed::Symbol = :excluded)
+    self_employed in (:excluded, :imputed) ||
+        throw(ArgumentError("self_employed must be :excluded or :imputed, got :$self_employed"))
     n = length(data.years)
     e_t = fill(NaN, n); k_t = fill(NaN, n); r_t = fill(NaN, n); q_t = fill(NaN, n)
     for i in 1:n
         C = data.total_capital_stock[i]
+        comp = data.compensation[i]
+        if self_employed == :imputed
+            ratio = data.employment[i] / data.employees[i]
+            comp = (isfinite(ratio) && ratio >= 1) ? comp * ratio : NaN
+        end
         if valuation == :current
-            V, GVA, CFC = data.compensation[i], data.GDP[i], data.CFC[i]
+            V, GVA, CFC = comp, data.GDP[i], data.CFC[i]
         elseif valuation == :consistent
             def = data.GDP_deflator[i]
             factor = (!isnan(def) && def > 0) ? 100 / def : NaN
-            V, GVA, CFC = data.compensation[i] * factor, data.real_GDP[i], data.CFC[i] * factor
+            V, GVA, CFC = comp * factor, data.real_GDP[i], data.CFC[i] * factor
         elseif valuation == :consistent_gfcf
             def = data.GFCF_deflator[i]
             factor = (!isnan(def) && def > 0) ? 100 / def : NaN
-            V, GVA, CFC = data.compensation[i] * factor, data.real_GDP[i], data.CFC[i] * factor
+            V, GVA, CFC = comp * factor, data.real_GDP[i], data.CFC[i] * factor
         else
             error("unknown valuation: $valuation (use :current, :consistent or :consistent_gfcf)")
         end
