@@ -21,6 +21,16 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   `calibrate_with_ameco_v2` e `analyze_time_series_with_data`: conta cada
   trabalhador por conta própria com a remuneração média de um empregado.
   Opcional; ver `docs/LIMITATIONS.md` item 4.
+- `self_employed = :imputed` também nos caminhos setoriais:
+  `calibrate_portugal_model(...; data_source = :eurostat)`,
+  `fetch_portugal_eurostat_data` e `calibrate_with_ameco_data(...;
+  sector_data = :eurostat)`, que antes o recusava. A imputação é feita por
+  secção NACE, nas 19 secções antes da agregação, a partir dos empregados do
+  Eurostat (`fetch_eurostat_sector_employees`, `SAL_DC`), com
+  `impute_self_employed`. Para Portugal, 2022, o fator é 2,98 na agricultura
+  e 1,05 na indústria transformadora, e o `r` agregado desce de 5,8% para
+  3,7%. `check_eurostat_sectoral()` verifica o número de empregados.
+  290 testes.
 - Notebook 8, `08_capital_mobility`: estima o coeficiente de mobilidade do
   capital do modelo, `μ`, a partir dos fluxos de capital na UE27
   (financiamento externo líquido contra o diferencial de taxa de lucro

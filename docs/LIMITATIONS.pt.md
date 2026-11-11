@@ -280,9 +280,19 @@ empregados deixam de fora os trabalhadores por conta própria, cujo
 rendimento passa a contar como mais-valia e sobrestima `e` (em 2024, cerca
 de 1,8 vezes na Grécia e em Itália). `self_employed = :imputed` conta cada um
 deles com a remuneração média de um empregado, como faz a parte salarial
-ajustada do AMECO; é opcional, porque o caminho INE também usa as
-remunerações publicadas, e só no caminho `:fixed`, porque imputar por setor
-exigiria o número de empregados de cada setor.
+ajustada do AMECO. É opcional e está disponível em todos os caminhos de
+dados reais: em `:fixed` com o rácio agregado do AMECO; em `sector_data =
+:eurostat` e em `calibrate_portugal_model(...; data_source = :eurostat)` por
+secção NACE, a partir dos empregados (`SAL_DC`) e do emprego (`EMP_DC`) do
+Eurostat, imputado nas 19 secções antes de qualquer agregação
+(`impute_self_employed`). O trabalho por conta própria é muito desigual: em
+Portugal, 2022, o fator é 2,98 na agricultura, 1,84 nos outros serviços e
+1,58 nas atividades imobiliárias, mas 1,05 na indústria transformadora. A
+imputação baixa o `e` agregado de 0,45 para 0,26 e `r` de 5,8% para 3,7%.
+Supõe que os trabalhadores por conta própria ganham o mesmo que os
+empregados da sua secção; onde o rendimento misto fica aquém disso
+(agricultura: `e` bruto −0,20), `e` fica negativo e mais setores batem no
+piso do item 8. Contam-se pessoas, não horas trabalhadas.
 
 **Corrigido (opcional):** `sector_data=:eurostat` usa VAB, remunerações,
 consumo de capital fixo, emprego, FBCF e stock de capital **reais** do
@@ -420,7 +430,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 275 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 290 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -448,7 +458,11 @@ setores no piso são a eletricidade (`e` bruto ≈ −0,53), a administração
 pública, a educação (ambas ligeiramente negativas) e a saúde (≈ 0,09). O
 piso quase não mexe no agregado: `r = ΣS/Σ(C+V)` é 6,12% com ele e 5,80%
 com os rácios brutos. O piso mantém-se, porque `Department` exige
-`e > 0`.
+`e > 0`. Com os trabalhadores por conta própria imputados (`self_employed =
+:imputed`, item 4), o piso aplica-se a 9 dos 19 setores em vez de 4: a
+agricultura (A), as atividades de consultoria (M) e administrativas (N), as
+artes (R) e os outros serviços (S) juntam-se aos quatro acima, pelo que o
+piso pesa mais nesse caminho.
 
 ## 9. Formato da série de exploração/depreciação AMECO (corrigido)
 

@@ -110,6 +110,61 @@ function fetch_eurostat_sector_employment(country_code::String, year::Int)
     _eurostat_sector_values("NAMA_10_A64_E", "A.THS_PER..EMP_DC.$country_code", year)
 end
 
+"""Employees per section (thousand persons, domestic concept): `SAL_DC`, the
+part of `EMP_DC` (`fetch_eurostat_sector_employment`) that earns compensation
+of employees; the rest are the self-employed."""
+function fetch_eurostat_sector_employees(country_code::String, year::Int)
+    _eurostat_sector_values("NAMA_10_A64_E", "A.THS_PER..SAL_DC.$country_code", year)
+end
+
+# ----------------------------------------------------------------------------
+# Self-employment (shared by the INE/Eurostat and AMECO paths)
+# ----------------------------------------------------------------------------
+
+"""Checks the `self_employed` keyword (`:excluded` or `:imputed`)."""
+function _check_self_employed(self_employed::Symbol)
+    self_employed in (:excluded, :imputed) ||
+        throw(ArgumentError("self_employed must be :excluded or :imputed, got :$self_employed"))
+    return self_employed
+end
+
+"""
+    _self_employed_ratio(employment, employees)
+
+`employment / employees`, the factor that counts each self-employed worker at
+the average employee's compensation (the imputation of AMECO's adjusted wage
+share), in persons. `NaN` when the ratio is not finite or is below 1 (more
+employees than employed persons): callers decide whether that is an error.
+"""
+function _self_employed_ratio(employment::Real, employees::Real)
+    ratio = employment / employees
+    return (isfinite(ratio) && ratio >= 1) ? Float64(ratio) : NaN
+end
+
+"""
+    impute_self_employed(compensation, employment, employees, sections)
+
+Compensation per section with the self-employed imputed,
+`Vᵢ × employmentᵢ / employeesᵢ`, for each code in `sections` (the arguments
+are `Dict{String,Float64}` section → value, as returned by the Eurostat
+fetchers). Imputed at the 19 fine sections, before any aggregation, since the
+share of self-employment differs widely between sections (in Portugal, 2022,
+two thirds of those working in agriculture but 5% in manufacturing). Throws
+if a section's ratio is invalid (see `_self_employed_ratio`). Counts persons,
+not hours worked (`THS_HW` would be a possible variant). Pure (no network).
+"""
+function impute_self_employed(compensation::Dict{String, Float64}, employment::Dict{String, Float64},
+                              employees::Dict{String, Float64}, sections::Vector{String})
+    result = Dict{String, Float64}()
+    for s in sections
+        ratio = _self_employed_ratio(employment[s], employees[s])
+        isnan(ratio) && error("self_employed=:imputed needs employment ≥ employees > 0 in " *
+                              "section $s (employment $(employment[s]), employees $(employees[s]))")
+        result[s] = compensation[s] * ratio
+    end
+    return result
+end
+
 """GFCF (gross fixed capital formation) per section, all asset types (million euros)."""
 function fetch_eurostat_sector_gfcf(country_code::String, year::Int)
     _eurostat_sector_values("NAMA_10_A64_P5", "A.CP_MEUR..N11G.P51G.$country_code", year)
@@ -493,6 +548,14 @@ function check_eurostat_sectoral()
     employment = fetch_eurostat_sector_employment("PT", year)
     println(length(employment) >= 15 ? "✓" : "✗", " Employment: $(length(employment))/19 sections")
     ok &= length(employment) >= 15
+
+    employees = fetch_eurostat_sector_employees("PT", year)
+    both = [s for s in NACE_SECTIONS if haskey(employment, s) && haskey(employees, s)]
+    valid = count(s -> !isnan(_self_employed_ratio(employment[s], employees[s])), both)
+    plausible = length(both) >= 15 && valid == length(both)
+    println(plausible ? "✓" : "✗", " Employees: $(length(both))/19 sections, ",
+            "$valid with employees ≤ employment")
+    ok &= plausible
 
     try
         A = build_eurostat_io_matrix("PT", year, [[s] for s in NACE_SECTIONS], gva)

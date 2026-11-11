@@ -128,21 +128,35 @@ normal case to degrade silently.
 `perpetual_inventory=true` replaces the net stock reported directly by
 Eurostat with an own series computed by the perpetual inventory method
 (`_pim_capital_stock_by_section`); see `docs/LIMITATIONS.md` item 7.
+
+`self_employed=:imputed` also fetches the number of employees per section
+(`SAL_DC`, a 7th series that then has to be complete too) and counts each
+self-employed worker at the average employee's compensation in that section
+(`impute_self_employed`), so that their income is no longer counted as
+surplus value. The default, `:excluded`, uses compensation of employees as
+published. With `:imputed` the df also gets an `employees` column, and its
+`compensation` (hence `GOS` and `business_income`) is the imputed one.
 """
-function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = false)
+function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = false,
+                                      self_employed::Symbol = :excluded)
+    _check_self_employed(self_employed)
     println("\n🌐 Fetching real sectoral data (Eurostat) for Portugal ($year)...")
 
     gva, comp, cfc = fetch_eurostat_gva_compensation_cfc("PT", year)
     employment = fetch_eurostat_sector_employment("PT", year)
     gfcf = fetch_eurostat_sector_gfcf("PT", year)
     stock = fetch_eurostat_sector_capital_stock("PT", year)
+    imputed = self_employed == :imputed
+    employees = imputed ? fetch_eurostat_sector_employees("PT", year) : Dict{String, Float64}()
+    n_series = imputed ? 7 : 6
 
     complete_sections = filter(s -> haskey(gva, s) && haskey(comp, s) && haskey(cfc, s) &&
-                                    haskey(employment, s) && haskey(gfcf, s) && haskey(stock, s),
+                                    haskey(employment, s) && haskey(gfcf, s) && haskey(stock, s) &&
+                                    (!imputed || haskey(employees, s)),
                                [s[1] for s in PT_SECTORS])
     length(complete_sections) < 10 &&
         error("Incomplete Eurostat data for Portugal/$year: only $(length(complete_sections))/19 " *
-              "sections have all 6 series.")
+              "sections have all $n_series series.")
 
     names_by_code = Dict(s[1] => s[2] for s in PT_SECTORS)
     codes = complete_sections
@@ -151,6 +165,13 @@ function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = fal
     if perpetual_inventory
         stock = _pim_capital_stock_by_section("PT", year, codes, stock)
         println("  ✓ capital stock recomputed by perpetual inventory.")
+    end
+
+    if imputed
+        comp_published = comp
+        comp = impute_self_employed(comp, employment, employees, codes)
+        println("  ✓ self-employed imputed at the average employee's compensation, by section:")
+        println("    " * join(["$c ×$(round(comp[c] / comp_published[c], digits = 2))" for c in codes], "  "))
     end
 
     GVA = [gva[c] for c in codes]
@@ -166,12 +187,14 @@ function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = fal
                    compensation = compensation, GOS = GOS, CFC = CFC,
                    business_income = business_income,
                    employment = employment_v, GFCF = GFCF, capital_stock = capital_stock)
+    imputed && (df.employees = [employees[c] for c in codes])
 
     println("  ✓ $(length(codes))/19 sections with complete real data.")
 
     metadata = Dict{String, Any}(
         "source" => "Eurostat (real data)",
-        "year" => year, "GDP_total" => sum(GVA), "employment_total" => sum(employment_v))
+        "year" => year, "GDP_total" => sum(GVA), "employment_total" => sum(employment_v),
+        "self_employed" => string(self_employed))
 
     return INEData(year, df, df, df, df, metadata)
 end
@@ -267,6 +290,7 @@ function aggregate_sectors(df::DataFrame, A::Matrix{Float64}, groups::Vector{Vec
         GVA = total_sum(:GVA), compensation = total_sum(:compensation), GOS = total_sum(:GOS),
         CFC = total_sum(:CFC), business_income = total_sum(:business_income),
         employment = total_sum(:employment), GFCF = total_sum(:GFCF), capital_stock = total_sum(:capital_stock))
+    "employees" in names(df) && (df_aggregated.employees = total_sum(:employees))
 
     return df_aggregated, A_aggregated
 end
@@ -297,15 +321,33 @@ between the two cases.
   `data_source=:eurostat`) replaces the net stock reported by Eurostat with an
   own series computed by the perpetual inventory method; see
   `fetch_portugal_eurostat_data` and `docs/LIMITATIONS.md` item 7.
+
+`self_employed`:
+- `:excluded` (default): `V` is compensation of employees, as published, so
+  the income of the self-employed counts as surplus value, which overstates
+  `e` where self-employment is common (agriculture, real estate, personal
+  services).
+- `:imputed`: each self-employed worker is counted as earning the average
+  employee's compensation in their section, `Vᵢ × employmentᵢ / employeesᵢ`,
+  imputed at the 19 sections before any aggregation (see
+  `impute_self_employed`). Needs `data_source=:eurostat`: the synthetic data
+  have no employee counts. More sectors may then hit the 0.1 floor on `e`
+  (`docs/LIMITATIONS.md` item 8); `e_raw` keeps the unfloored values.
 """
 function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
-                                  data_source = :synthetic, perpetual_inventory = false)
+                                  data_source = :synthetic, perpetual_inventory = false,
+                                  self_employed = :excluded)
+    _check_self_employed(self_employed)
+    (self_employed == :imputed && data_source != :eurostat) &&
+        throw(ArgumentError("self_employed=:imputed needs employee counts by sector, which only " *
+                            "data_source=:eurostat provides"))
     println("\n" * "="^70)
     println("CALIBRATION FOR PORTUGAL (INE)  |  Year: $year  |  Aggregation: $aggregation  |  Source: $data_source")
     println("="^70)
 
     data = data_source == :eurostat ?
-        fetch_portugal_eurostat_data(year; perpetual_inventory = perpetual_inventory) :
+        fetch_portugal_eurostat_data(year; perpetual_inventory = perpetual_inventory,
+                                     self_employed = self_employed) :
         generate_synthetic_portugal_data(year)
     df19 = process_supply_use(data)
     N19 = nrow(df19)

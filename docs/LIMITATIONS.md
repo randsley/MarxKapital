@@ -283,9 +283,19 @@ exactly. **Self-employment (optional):** compensation of employees leaves
 out the self-employed, whose income then counts as surplus value and
 overstates `e` (in 2024 by a factor of about 1.8 in Greece and Italy).
 `self_employed = :imputed` counts each of them at the average employee's
-compensation, as AMECO's adjusted wage share does; it is opt-in, because the
-INE path uses published compensation too, and only on the `:fixed` path,
-since imputing by sector would need sectoral employee counts.
+compensation, as AMECO's adjusted wage share does. It is opt-in, and
+available on every real-data path: on `:fixed` with AMECO's aggregate
+ratio; on `sector_data = :eurostat` and in `calibrate_portugal_model(...;
+data_source = :eurostat)` per NACE section, from Eurostat's employees
+(`SAL_DC`) and employment (`EMP_DC`), imputed at the 19 sections before any
+aggregation (`impute_self_employed`). Self-employment is very uneven: in
+Portugal, 2022, the factor is 2.98 in agriculture, 1.84 in other services
+and 1.58 in real estate, but 1.05 in manufacturing. Imputing lowers the
+aggregate `e` from 0.45 to 0.26 and `r` from 5.8% to 3.7%. The imputation
+assumes the self-employed earn what employees in their section do; where
+mixed income falls short of that (agriculture: raw `e` −0.20), `e` turns
+negative, and more sectors hit the floor of item 8. Persons are counted,
+not hours worked.
 
 **Fixed (optional):** `sector_data=:eurostat` uses **real** VAB,
 compensation, consumption of fixed capital, employment, GFCF, and
@@ -428,7 +438,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 275 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 290 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -455,7 +465,11 @@ four floored sectors are electricity (raw `e` ≈ −0.53), public
 administration, education (both slightly negative) and health (≈ 0.09).
 The floor barely moves the aggregate: `r = ΣS/Σ(C+V)` is 6.12% with it and
 5.80% with the raw ratios. The floor itself stays, because `Department`
-requires `e > 0`.
+requires `e > 0`. With the self-employed imputed (`self_employed =
+:imputed`, item 4) the floor binds in 9 of 19 sectors instead of 4:
+agriculture (A), professional (M) and administrative services (N), arts
+(R) and other services (S) join the four above, so the floor matters more
+on that path.
 
 ## 9. AMECO exploitation/depreciation series format (fixed)
 

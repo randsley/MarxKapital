@@ -21,6 +21,16 @@ Format based on Keep a Changelog. Semantic versioning.
   `calibrate_with_ameco_v2` and `analyze_time_series_with_data`: counts each
   self-employed worker at the average employee's compensation. Opt-in; see
   `docs/LIMITATIONS.md` item 4.
+- `self_employed = :imputed` also on the sectoral paths:
+  `calibrate_portugal_model(...; data_source = :eurostat)`,
+  `fetch_portugal_eurostat_data` and `calibrate_with_ameco_data(...;
+  sector_data = :eurostat)`, which refused it before. The imputation is per
+  NACE section, at the 19 sections before aggregation, from Eurostat's
+  employees (`fetch_eurostat_sector_employees`, `SAL_DC`), with
+  `impute_self_employed`. For Portugal, 2022, the factor is 2.98 in
+  agriculture and 1.05 in manufacturing, and the aggregate `r` falls from
+  5.8% to 3.7%. `check_eurostat_sectoral()` checks the employee counts.
+  290 tests.
 - Notebook 8, `08_capital_mobility`: estimates the model's capital-mobility
   coefficient `μ` from EU27 capital flows (net foreign financing against
   the lagged profit-rate gap), 1996–2024. Between countries `μ̂` ≈ 0.33

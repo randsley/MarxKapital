@@ -317,6 +317,47 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test pa.e == max.(0.1, pa.e_raw)
     end
 
+    @testset "Self-employed imputed by section" begin
+        @test _self_employed_ratio(300.0, 100.0) ≈ 3.0
+        @test _self_employed_ratio(100.0, 100.0) == 1.0
+        @test isnan(_self_employed_ratio(90.0, 100.0))    # more employees than employed
+        @test isnan(_self_employed_ratio(10.0, 0.0))
+        @test isnan(_self_employed_ratio(NaN, 5.0))
+        @test _check_self_employed(:imputed) == :imputed
+        @test_throws ArgumentError _check_self_employed(:other)
+
+        comp = Dict("A" => 10.0, "C" => 100.0, "L" => 5.0)
+        emp  = Dict("A" => 300.0, "C" => 740.0, "L" => 40.0)
+        sal  = Dict("A" => 100.0, "C" => 700.0, "L" => 32.0)
+        imp = impute_self_employed(comp, emp, sal, ["A", "C"])
+        @test imp["A"] ≈ 30.0 && imp["C"] ≈ 100.0 * 740 / 700
+        @test !haskey(imp, "L")                            # only the sections asked for
+        @test_throws ErrorException impute_self_employed(comp, emp, Dict("A" => 400.0, "C" => 700.0),
+                                                         ["A", "C"])
+
+        # imputing at the fine sections and then aggregating differs from
+        # imputing with the aggregate ratio (self-employment is uneven)
+        fine = sum(imp[s] for s in ["A", "C"])
+        coarse = (comp["A"] + comp["C"]) * (emp["A"] + emp["C"]) / (sal["A"] + sal["C"])
+        @test !(fine ≈ coarse)
+
+        # aggregate_sectors carries the employees column when present
+        df = DataFrame(nace_code = ["A", "B", "C"], sector = ["a", "b", "c"],
+                       GVA = [1.0, 2.0, 3.0], compensation = [0.5, 1.0, 1.5], GOS = [0.5, 1.0, 1.5],
+                       CFC = [0.1, 0.2, 0.3], business_income = [0.4, 0.8, 1.2],
+                       employment = [3.0, 2.0, 4.0], GFCF = [0.2, 0.3, 0.4],
+                       capital_stock = [2.0, 3.0, 4.0], employees = [1.0, 2.0, 3.5])
+        dfa, _ = aggregate_sectors(df, zeros(3, 3), [["A"], ["B", "C"]], ["A", "BC"], ["a", "bc"])
+        @test dfa.employees == [1.0, 5.5]
+        dfn, _ = aggregate_sectors(select(df, Not(:employees)), zeros(3, 3), [["A"], ["B", "C"]],
+                                   ["A", "BC"], ["a", "bc"])
+        @test !("employees" in names(dfn))
+
+        # the synthetic INE data have no employee counts
+        @test_throws ArgumentError calibrate_portugal_model(year = 2022, self_employed = :imputed)
+        @test_throws ArgumentError calibrate_portugal_model(year = 2022, self_employed = :other)
+    end
+
     @testset "Wage-profit frontier" begin
         A = create_technical_matrix(6, seed = 5)
         l = fill(0.4, 6) .+ 0.1 .* (1:6) ./ 6
@@ -425,8 +466,7 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         ts0 = analyze_time_series_with_data(data; valuation = :current)
         ts1 = analyze_time_series_with_data(data; valuation = :current, self_employed = :imputed)
         @test ts1.wage_share ≈ ts0.wage_share .* (data.employment ./ data.employees)
-        @test_throws ArgumentError calibrate_with_ameco_data(data, 2020, :macro;
-                                                             sector_data = :eurostat, self_employed = :imputed)
+        @test_throws ArgumentError calibrate_with_ameco_data(data, 2020, :macro; self_employed = :other)
         @test_throws ArgumentError analyze_time_series_with_data(data; self_employed = :other)
     end
 

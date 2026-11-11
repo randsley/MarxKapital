@@ -211,18 +211,17 @@ with a warning.
   overstates `e` where self-employment is common.
 - `:imputed`: each self-employed worker is counted as earning the average
   employee's compensation, `V × employment / employees`, as in AMECO's
-  adjusted wage share. Only on the `:fixed` path: imputing by sector would
-  need sectoral employee counts, so `sector_data=:eurostat` refuses it.
+  adjusted wage share. With `sector_data=:fixed` the ratio is the
+  aggregate one (AMECO `NETD`/`NWTD`); with `sector_data=:eurostat` it is
+  computed per NACE section from Eurostat's employment and employees
+  (`impute_self_employed`), at the 19 sections before aggregation to the 3
+  macro sectors.
 """
 function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symbol;
                                   sector_data::Symbol = :fixed,
                                   perpetual_inventory::Bool = false,
                                   self_employed::Symbol = :excluded)
-    self_employed in (:excluded, :imputed) ||
-        throw(ArgumentError("self_employed must be :excluded or :imputed, got :$self_employed"))
-    (self_employed == :imputed && sector_data == :eurostat) &&
-        throw(ArgumentError("self_employed=:imputed needs sectoral employee counts and is " *
-                            "only implemented for sector_data=:fixed"))
+    _check_self_employed(self_employed)
     if year > data.years[end] && haskey(data.notes, "last_actual_year")
         @warn "Year $year is beyond the last actual AMECO year; using $(data.years[end])."
         year = data.years[end]
@@ -266,9 +265,10 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
     end
 
     if self_employed == :imputed
-        ratio = employment_total / data.employees[idx]
-        (isfinite(ratio) && ratio >= 1) ||
-            error("self_employed=:imputed needs employment ≥ employees in $year (got ratio $ratio)")
+        ratio = _self_employed_ratio(employment_total, data.employees[idx])
+        isnan(ratio) &&
+            error("self_employed=:imputed needs employment ≥ employees > 0 in $year (employment " *
+                  "$employment_total, employees $(data.employees[idx]))")
         comp_total *= ratio
         println("  ✓ self-employed imputed at the average employee's compensation " *
                 "(V × $(round(ratio, digits = 3)))")
@@ -293,6 +293,16 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
                                  haskey(cfc_s, s) && haskey(employment_s, s) && haskey(gfcf_s, s) && haskey(stock_s, s)]
             length(complete_sections) < 10 &&
                 error("insufficient coverage ($(length(complete_sections))/19 sections)")
+
+            if self_employed == :imputed
+                employees_s = fetch_eurostat_sector_employees(data.country_code, year)
+                missing_s = [s for s in complete_sections if !haskey(employees_s, s)]
+                isempty(missing_s) ||
+                    error("no Eurostat employee counts for sections $(join(missing_s, ","))")
+                comp_s = merge(comp_s, impute_self_employed(comp_s, employment_s, employees_s,
+                                                            complete_sections))
+                println("  ✓ self-employed imputed by section (19 fine sectors).")
+            end
 
             if perpetual_inventory
                 stock_s = _pim_capital_stock_by_section(data.country_code, year, complete_sections, stock_s)
@@ -514,16 +524,14 @@ income of the self-employed counts as surplus value.
 """
 function analyze_time_series_with_data(data::AMECOData; valuation::Symbol = :current,
                                        self_employed::Symbol = :excluded)
-    self_employed in (:excluded, :imputed) ||
-        throw(ArgumentError("self_employed must be :excluded or :imputed, got :$self_employed"))
+    _check_self_employed(self_employed)
     n = length(data.years)
     e_t = fill(NaN, n); k_t = fill(NaN, n); r_t = fill(NaN, n); q_t = fill(NaN, n)
     for i in 1:n
         C = data.total_capital_stock[i]
         comp = data.compensation[i]
         if self_employed == :imputed
-            ratio = data.employment[i] / data.employees[i]
-            comp = (isfinite(ratio) && ratio >= 1) ? comp * ratio : NaN
+            comp *= _self_employed_ratio(data.employment[i], data.employees[i])  # NaN if invalid
         end
         if valuation == :current
             V, GVA, CFC = comp, data.GDP[i], data.CFC[i]
