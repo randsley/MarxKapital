@@ -358,6 +358,15 @@ function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
     fd19 = data_source == :eurostat ?
         aggregate_final_demand(fetch_eurostat_final_demand("PT", year),
                                [[c] for c in df19.nace_code], df19.nace_code) : nothing
+    m = if data_source == :eurostat
+        m19 = fetch_eurostat_import_coefficients("PT", year)
+        gva19 = Dict(zip(df19.nace_code, df19.GVA))
+        groups = aggregation == :macro ? NACE_MACRO_GROUPS :
+                 aggregation == :medium ? NACE_MEDIUM_GROUPS : [[c] for c in df19.nace_code]
+        aggregate_import_coefficients(m19, groups, gva19)
+    else
+        nothing
+    end
     fd = if isnothing(fd19) || aggregation == :detailed
         fd19
     elseif aggregation == :macro
@@ -383,7 +392,7 @@ function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
     source = data_source == :eurostat ? "INE/Eurostat (real data)" : "INE (synthetic)"
     result = CalibratedParameters(N, df.sector, df.nace_code,
         p.C, p.V, df.GVA, p.e, p.e_raw, p.k, p.r, A, p.l, p.σ_c, p.σ_v, p.δ,
-        source, year, now(), 0.85, fd)
+        source, year, now(), 0.85, fd, m)
 
     println("\n✅ CALIBRATION COMPLETE — $N sectors | GDP: €$(round(sum(df.GVA)/1000, digits=1)) bn")
     return result

@@ -256,8 +256,9 @@ const _IOT_CACHE = Dict{Tuple{String, Int}, DataFrame}()
 
 Downloads the domestic-use symmetric IOT (`NAIO_10_CP1700`, `stk_flow=DOM`)
 for one benchmark year, caching it for the session: the technical matrix
-(`build_eurostat_io_matrix`) and final demand (`fetch_eurostat_final_demand`)
-read the same table.
+(`build_eurostat_io_matrix`), final demand (`fetch_eurostat_final_demand`)
+and the import coefficients (`fetch_eurostat_import_coefficients`) read the
+same table.
 """
 function _fetch_iot(country_code::String, iot_year::Int)
     get!(_IOT_CACHE, (country_code, iot_year)) do
@@ -337,6 +338,72 @@ function aggregate_final_demand(fd, groups::Vector{Vector{String}}, codes::Vecto
 end
 
 """
+    import_coefficients_from_iot(df, sections = NACE_SECTIONS)
+
+Imported intermediate inputs per unit of gross output, by buying industry:
+`mⱼ = IMPⱼ / P1ⱼ`, from two rows of the domestic-use IOT (`df`, as returned
+by `_fetch_iot`): `IMP`, the total of imported products the industry uses
+as inputs, and `P1`, its gross output. Both are summed from A64 codes to
+NACE sections. Returns a `Dict{String,Float64}` section → `mⱼ`, for the
+sections with positive gross output.
+
+The `IMP` row equals the sum of the industry's column in the imported-use
+table (`stk_flow=IMP`, checked for PT 2020), so no second download is
+needed; that table also has a `CPA_TOTAL` row, which a sum over its
+`CPA_*` rows would count twice. With `IMP`, domestic inputs plus imports
+plus GVA reconcile to `P1` within about 1% (PT 2020).
+
+The domestic matrix `A` leaves imported inputs out by design (see
+`build_eurostat_io_matrix`), so the gross output rebuilt from value added
+must add them back: `xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)` (see `_gross_output`,
+`src/core.jl`). Pure (no network).
+"""
+function import_coefficients_from_iot(df::DataFrame, sections::Vector{String} = NACE_SECTIONS)
+    P1 = Dict(s => 0.0 for s in sections)
+    M = Dict(s => 0.0 for s in sections)
+    for row in eachrow(df)
+        ismissing(row.OBS_VALUE) && continue
+        pa, pu = String(row.prd_ava), String(row.prd_use)
+        (pa in ("P1", "IMP") && startswith(pu, "CPA_")) || continue
+        sj = _section_of_a64_code(pu)
+        haskey(P1, sj) || continue
+        pa == "P1" ? (P1[sj] += Float64(row.OBS_VALUE)) : (M[sj] += max(Float64(row.OBS_VALUE), 0.0))
+    end
+    return Dict(s => M[s] / P1[s] for s in sections if P1[s] > 0)
+end
+
+"""
+    fetch_eurostat_import_coefficients(country_code, year)
+
+Import coefficients by NACE section (see `import_coefficients_from_iot`)
+from the IOT of the benchmark year nearest to `year` (the same vintage rule
+as `build_eurostat_io_matrix`). Needs the network.
+"""
+function fetch_eurostat_import_coefficients(country_code::String, year::Int)
+    iot_year = _nearest_iot_year(country_code, year)
+    isnothing(iot_year) && error("Eurostat IOT (NAIO_10_CP1700) unavailable for $country_code.")
+    return import_coefficients_from_iot(_fetch_iot(country_code, iot_year))
+end
+
+"""
+    aggregate_import_coefficients(m, groups, weights)
+
+Aggregates import coefficients (section → `mⱼ`) to `groups` as the weighted
+mean over each group's sections, with the same weights (`weights`, GVA by
+section) that `aggregate_io_matrix` uses for the columns of `A`. Then
+`Σᵢ A_coarse[i,J] + m_J` is the same weighted mean of `Σᵢ A[i,j] + mⱼ`, so the
+admissibility of the gross-output reconstruction survives aggregation.
+Sections missing from `m` count as `mⱼ = 0`.
+"""
+function aggregate_import_coefficients(m::Dict{String, Float64}, groups::Vector{Vector{String}},
+                                       weights::Dict{String, Float64})
+    map(groups) do g
+        w = sum(get(weights, s, 0.0) for s in g)
+        w > 0 ? sum(get(m, s, 0.0) * get(weights, s, 0.0) for s in g) / w : 0.0
+    end
+end
+
+"""
     consumption_basket(fd)
 
 Consumption basket of the cross-dual model (`basket` in `simulate_Ndept`)
@@ -398,7 +465,10 @@ sector within the modeled economy); imported intermediate inputs are not
 produced by any domestic sector, so including them in `A` would imply a
 domestic supply relation that does not exist. This choice directly
 addresses the concern, raised in an external review, that the matrix mixed
-domestic and imported supply without distinction.
+domestic and imported supply without distinction. The imported inputs are
+not dropped from the model, though: `fetch_eurostat_import_coefficients`
+reads them from the table's `IMP` row as coefficients per unit of output, which
+the gross-output reconstruction adds back (`_gross_output`, `src/core.jl`).
 
 **Note on vintage:** NAIO_10_CP1700 is a benchmark table published for
 specific base years (not annual like the other series used in this

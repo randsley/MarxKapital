@@ -128,8 +128,7 @@ function check_equilibrium_Ndept(sol, p; t_idx = length(sol.t))
     # Admissibility (Σᵢ A[i,j]<1 for every j) is ensured once, when the
     # simulation is set up (`_ensure_output_admissibility`, `src/core.jl`),
     # and is not re-checked here; see `system_Ndept_io!`.
-    colsum = vec(sum(p.A, dims = 1))
-    O = W ./ (1 .- colsum)
+    O = _gross_output(W, p)
     intermediate_demand = p.A * O
     deviation = O .- intermediate_demand
     demand_sum = sum(intermediate_demand)

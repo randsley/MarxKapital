@@ -249,6 +249,64 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test fa.sections == ["ALL"] && fa.household == [37.0] && fa.output == [140.0]
     end
 
+    @testset "Imported intermediate inputs" begin
+        # the domestic table's P1 (gross output) and IMP (imported inputs) rows,
+        # by buying industry; two A64 industries map to section C
+        dom = DataFrame(prd_ava = ["P1", "P1", "P1", "IMP", "IMP", "IMP", "CPA_A01", "CPA_TOTAL", "B1G"],
+                        prd_use = ["CPA_A01", "CPA_C10-12", "CPA_C13-15", "CPA_A01", "CPA_C10-12",
+                                   "CPA_C13-15", "CPA_C10-12", "CPA_C10-12", "CPA_A01"],
+                        OBS_VALUE = Union{Missing, Float64}[100.0, 150.0, 50.0, 5.0, 20.0, 10.0,
+                                                            30.0, 30.0, 60.0])
+        push!(dom, ("IMP", "P3_S14", 99.0))     # final use: not an input
+        push!(dom, ("IMP", "CPA_A01", missing))
+        m = import_coefficients_from_iot(dom, ["A", "C", "F"])
+        @test m["A"] ≈ 5 / 100
+        @test m["C"] ≈ 30 / 200            # domestic flows and CPA_TOTAL are not imports
+        @test !haskey(m, "F")              # no gross output
+        # aggregated with the same GVA weights as A's columns, so colsum + m of
+        # the aggregate is the weighted mean of the fine colsum + m
+        w = Dict("A" => 1.0, "C" => 3.0)
+        @test aggregate_import_coefficients(m, [["A", "C"], ["F"]], w) ≈ [(0.05 + 3 * 0.15) / 4, 0.0]
+        A_f = [0.1 0.2; 0.3 0.4]
+        A_c = aggregate_io_matrix(A_f, ["A", "C"], [["A", "C"]], w)
+        m_c = aggregate_import_coefficients(m, [["A", "C"]], w)
+        @test sum(A_c) + m_c[1] ≈ (1 * (0.4 + 0.05) + 3 * (0.6 + 0.15)) / 4
+
+        # gross output and admissibility
+        p0 = (A = A_f,)
+        pm = (A = A_f, import_coefficients = [0.05, 0.15])
+        W = [10.0, 20.0]
+        @test _gross_output(W, p0) ≈ W ./ (1 .- [0.4, 0.6])
+        @test _gross_output(W, pm) ≈ W ./ (1 .- [0.45, 0.75])
+        A_ok, r1 = _ensure_output_admissibility(A_f; m = [0.05, 0.15])
+        @test A_ok == A_f && !r1
+        A_r, r2 = _ensure_output_admissibility(A_f; m = [0.05, 0.5])   # column 2: 0.6 + 0.5
+        @test r2 && maximum(vec(sum(A_r, dims = 1)) .+ [0.05, 0.5]) ≈ 0.95
+        @test A_r ≈ A_f .* (A_r[1, 1] / A_f[1, 1])                    # uniform, m untouched
+        @test_throws ErrorException _ensure_output_admissibility(A_f; m = [0.0, 0.96])
+
+        # in the simulation: m = 0 is the default; invalid uses are refused
+        Random.seed!(11); depts = create_departments(4)
+        A = create_technical_matrix(4, seed = 3)
+        s0, _, _ = simulate_Ndept_custom(depts; T = 20.0, coupled = true, rationing = true, A = A)
+        sz, _, pz = simulate_Ndept_custom(depts; T = 20.0, coupled = true, rationing = true, A = A,
+                                          import_coefficients = zeros(4))
+        @test sz.u[end] ≈ s0.u[end] && pz.import_coefficients == zeros(4)
+        sm, _, pmi = simulate_Ndept_custom(depts; T = 20.0, coupled = true, rationing = true, A = A,
+                                           import_coefficients = fill(0.1, 4))
+        X = sm.u[end]
+        J = system_jacobian(pmi, X)          # AD through _gross_output with imports
+        f = _rhs(pmi); h = 1e-6 .* abs.(X)
+        J_fd = reduce(hcat, [(f(X .+ h[j] .* (1:8 .== j)) .- f(X .- h[j] .* (1:8 .== j))) ./ (2h[j]) for j in 1:8])
+        @test maximum(abs.(J .- J_fd)) < 1e-4 * maximum(abs.(J))
+        @test_throws ErrorException simulate_Ndept_custom(depts; coupled = true, A = A,
+                                                          import_coefficients = zeros(4))
+        @test_throws ErrorException simulate_Ndept_custom(depts; coupled = true, market_prices = true,
+                                                          A = A, import_coefficients = zeros(4))
+        @test_throws ErrorException simulate_Ndept_custom(depts; coupled = true, rationing = true,
+                                                          A = A, import_coefficients = zeros(3))
+    end
+
     @testset "Real-data options in the simulation" begin
         Random.seed!(11)
         depts = create_departments(4)

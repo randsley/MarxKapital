@@ -9,6 +9,15 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- Imported intermediate inputs in the gross-output reconstruction:
+  `fetch_eurostat_import_coefficients` (`mⱼ = IMPⱼ/P1ⱼ` from the IOT's
+  `IMP` row, `import_coefficients_from_iot`, `aggregate_import_coefficients`),
+  a new `CalibratedParameters` field `import_coefficients` on the Eurostat
+  paths, and `import_coefficients` in `simulate_Ndept_custom`, so that with
+  the real domestic matrix `xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)`. `_gross_output`
+  centralizes the reconstruction, and `_ensure_output_admissibility` takes
+  `m`. Portugal: the share of rationed sectors does not change, and
+  accumulation rises by 8% (10 sectors) and 31% (19). Opt-in. 312 tests.
 - Notebook 7, `07_eu_profit_rates`: `e`, `k` and `r` for the 27 EU member
   states and the EU27 aggregate, 1995–2024, from real AMECO data, offline.
   It adjusts compensation for the self-employed, splits the change in `r`

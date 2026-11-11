@@ -135,6 +135,12 @@ struct CalibratedParameters
     # Real final demand by sector (`final_demand_from_iot`, `src/eurostat_sdmx.jl`)
     # on the Eurostat paths; `nothing` with synthetic data or fixed weights.
     final_demand::Union{Nothing, NamedTuple}
+
+    # Imported intermediate inputs per unit of gross output, by sector
+    # (`fetch_eurostat_import_coefficients`), on the Eurostat paths; `nothing`
+    # otherwise. Pass to `simulate_Ndept_custom(...; import_coefficients)`
+    # with `A = params.A`, since A covers domestic inputs only.
+    import_coefficients::Union{Nothing, Vector{Float64}}
 end
 
 # ----------------------------------------------------------------------------

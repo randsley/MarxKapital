@@ -116,9 +116,9 @@ o consumo circulante de `j` é `zⱼ=(Σᵢ A[i,j])·xⱼ`, donde
 avaliação do lado direito da EDO tal como os preços de Sraffa. Válido só
 quando `A` representa o requisito de input circulante *completo* de cada
 setor (verdadeiro por construção para as matrizes sintéticas fechadas
-usadas nestas simulações; não para a matriz real de uso doméstico do
-Eurostat, que omite importações por definição — nunca usada nesta
-reconstrução). A condição de admissibilidade `Σᵢ A[i,j]<1` (necessária
+usadas nestas simulações; a matriz real de uso doméstico do Eurostat omite
+importações por definição, que os coeficientes de importação opcionais
+repõem, ver o fim deste item). A condição de admissibilidade `Σᵢ A[i,j]<1` (necessária
 para o denominador ser positivo) não é garantida por `ρ(A)<1`
 (que limita o raio espectral, não qualquer soma de coluna individual);
 verificada e corrigida uma única vez quando a simulação é montada
@@ -151,9 +151,25 @@ isto não altera a parcela de setores racionados e reduz a acumulação em
 cerca de um quinto com 10 e 19 setores. Continua em aberto: a reposição
 intermédia não é descontada, pelo que `Dᵢ≤(1−φᵢ)xᵢ` continua a ser um
 limite superior à oferta investível, não um balanço de reprodução
-totalmente líquido. E a matriz do Eurostat só cobre inputs domésticos,
-pelo que o `xᵢ` reconstruído a partir dela deixa de fora os inputs
-intermédios importados.
+totalmente líquido.
+
+**Corrigido (inputs importados, opcional):** a matriz do Eurostat só cobre
+inputs domésticos, pelo que o `xᵢ` reconstruído a partir dela deixava de
+fora os inputs intermédios importados. A própria linha `IMP` da IOT dá-os
+por ramo comprador, e `fetch_eurostat_import_coefficients` converte-os em
+coeficientes `mⱼ = IMPⱼ/P1ⱼ`, guardados em `params.import_coefficients` nos
+caminhos Eurostat (agregados com os mesmos pesos de VAB que as colunas de
+A). Com `import_coefficients` em `simulate_Ndept_custom` (e `A = params.A`),
+o output bruto é `xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)` (`_gross_output`), e a
+verificação de admissibilidade passa a cobrir `Σᵢ A[i,j] + mⱼ`. Para
+Portugal (IOT de 2020), a indústria transformadora importa inputs no valor
+de 35% do seu output, e o `x` reconstruído é 2,3 vezes o que a matriz
+doméstica sozinha implica; nas outras secções, 1,01 a 1,38 vezes. Com
+racionamento (artigo, Tabela 4), a parte de setores racionados não muda,
+mas a acumulação em 30 anos sobe 8% com 10 setores (×200,6 → ×215,9) e 31%
+com 19 (×72,4 → ×94,7). É opcional, pelo que os números do artigo não
+mudam. Não está disponível no modelo cross-dual (`market_prices`), cujos
+lucros precisariam também de um preço das importações, nem na camada TSSI.
 
 ## 2. R_max no choque salarial usa uma matriz auxiliar (corrigido)
 
@@ -430,7 +446,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 296 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 312 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,

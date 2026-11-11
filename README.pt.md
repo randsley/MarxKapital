@@ -238,6 +238,10 @@ simulate_Ndept_custom(depts; coupled = true, market_prices = true, A = params_re
                       basket = consumption_basket(params_real.final_demand))
 simulate_Ndept_custom(depts; coupled = true, rationing = true, A = params_real.A,
                       final_demand_share = exogenous_demand_share(params_real.final_demand))
+# Inputs intermédios importados somados ao output bruto que o racionamento
+# reconstrói (A só cobre inputs domésticos)
+simulate_Ndept_custom(depts; coupled = true, rationing = true, A = params_real.A,
+                      import_coefficients = params_real.import_coefficients)
 
 # Verificação manual do acesso ao Eurostat (não corre nos testes automáticos)
 check_eurostat_sectoral()
@@ -320,7 +324,7 @@ raio espectral de `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-296 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
+312 testes, executados automaticamente em CI (GitHub Actions, Julia 1.10 e 1)
 em cada push a `main` — ver `.github/workflows/test.yml`. A CI corre depois
 todos os notebooks (`julia test/notebooks.jl`, ver `notebooks/README.md`). A suite cobre os
 caminhos sintéticos/opt-in por omissão e corre totalmente offline; os

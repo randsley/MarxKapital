@@ -68,38 +68,53 @@ function create_technical_matrix(N::Int; density = 0.3, max_coef = 0.15,
 end
 
 """
-    _ensure_output_admissibility(A; margin=0.95)
+    _gross_output(W, p)
+
+Gross output rebuilt from the value-added-type flow `W = δC + V + S`:
+`xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)` (Equation 2 of the paper, with imports), where
+`m = p.import_coefficients` (imported intermediate inputs per unit of
+output; 0 when the field is absent, as for the closed synthetic matrices).
+With Eurostat's domestic matrix `A`, leaving `m` out would understate `x` by
+the imported inputs. Generic in the number type (automatic differentiation).
+"""
+_gross_output(W, p) = W ./ (1 .- vec(sum(p.A, dims = 1)) .- get(p, :import_coefficients, 0.0))
+
+"""
+    _ensure_output_admissibility(A; margin=0.95, m=nothing)
 
 Reconstructing gross output from the value-added-type flow
-(`xⱼ = Wⱼ/(1-Σᵢ A[i,j])`, Equation 2 of the paper) requires `Σᵢ A[i,j] < 1`
-for every `j`. This is an admissibility condition of the model, not a
+(`xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)`, Equation 2 of the paper, `_gross_output`)
+requires `Σᵢ A[i,j] + mⱼ < 1` for every `j` (`m` = import coefficients, 0
+by default). This is an admissibility condition of the model, not a
 numerical detail. `ρ(A)<1` (guaranteed by `create_technical_matrix`) does
 \\emph{not} imply it: ρ(A) is an upper bound on the largest column sum, not a
 lower bound, so a matrix that is productive in Leontief's sense can still
 have a column summing to ≥1.
 
-The condition only holds when `A` is the \\emph{complete} circulating-input
-requirement of each sector. That is true by construction for the closed
-synthetic matrices used in the dynamic simulations
-(`create_technical_matrix`), but not necessarily for an empirical
-domestic-use matrix (which by definition leaves out imported inputs). This
-is why the reconstruction of `x` in this function is never applied to the
-real Eurostat matrix (`build_eurostat_io_matrix`), only to the synthetic
-matrices used by the `system_Ndept_io!` dynamics.
+The reconstruction needs the \\emph{complete} circulating-input requirement
+of each sector. The closed synthetic matrices (`create_technical_matrix`)
+are complete by construction. Eurostat's domestic-use matrix
+(`build_eurostat_io_matrix`) leaves out imported inputs, which the import
+coefficients `m` (`fetch_eurostat_import_coefficients`, passed as
+`import_coefficients` to `simulate_Ndept_custom`) put back.
 
 The condition is checked explicitly rather than enforced silently at every
-evaluation of the ODE right-hand side: if some column sum exceeds `margin`,
-the whole of `A` is rescaled (same logic as `create_technical_matrix` uses
-for ρ(A)<1) until the largest column sum is below `margin`. This happens
-once, at the start of the simulation, not at every solver step.
-Returns `(A_admissible, was_rescaled::Bool)`.
+evaluation of the ODE right-hand side: if some `Σᵢ A[i,j] + mⱼ` exceeds
+`margin`, the whole of `A` (not `m`, which is data) is rescaled by the
+largest factor that brings every column below `margin`. This happens once,
+at the start of the simulation, not at every solver step. Throws if some
+`mⱼ ≥ margin` alone. Returns `(A_admissible, was_rescaled::Bool)`.
 """
-function _ensure_output_admissibility(A; margin = 0.95)
+function _ensure_output_admissibility(A; margin = 0.95, m = nothing)
     colsum = vec(sum(A, dims = 1))
-    maxcol = maximum(colsum)
+    mv = isnothing(m) ? zeros(length(colsum)) : collect(Float64, m)
+    any(mv .>= margin) && error("an import coefficient is ≥ $margin: no rescaling of A " *
+                                "makes the gross-output reconstruction admissible")
+    total = colsum .+ mv
+    maxcol = maximum(total)
     maxcol < margin && return A, false
-    factor = margin / maxcol
-    @warn "Largest column sum of A ($(round(maxcol,digits=3))) exceeds $margin; " *
+    factor = minimum((margin - mv[j]) / colsum[j] for j in eachindex(colsum) if colsum[j] > 0)
+    @warn "Largest column sum of A$(isnothing(m) ? "" : " plus imports") ($(round(maxcol,digits=3))) exceeds $margin; " *
           "rescaled by a factor of $(round(factor,digits=3)) to satisfy the " *
           "admissibility condition of the gross-output reconstruction (Equation 2)."
     return A .* factor, true
@@ -294,17 +309,15 @@ function system_Ndept_io!(dX, X, p, t)
         # model's own cost-output identity, xⱼ = zⱼ+Wⱼ with zⱼ=Σᵢ A[i,j]·xⱼ
         # (A is defined per unit of the buyer's gross output), so that
         # xⱼ = Wⱼ/(1-Σᵢ A[i,j]), with no new state. Valid only when A is the
-        # COMPLETE circulating-input requirement of each sector (true by
-        # construction for the closed synthetic matrices used here; it does
-        # not apply to Eurostat's real domestic-use matrix, which leaves out
-        # imported inputs by definition; see `build_eurostat_io_matrix`,
-        # never used in this ODE). The admissibility condition
-        # Σᵢ A[i,j]<1 is checked and enforced once, at the start of the
-        # simulation (`_ensure_output_admissibility`), not at every
-        # evaluation.
+        # COMPLETE circulating-input requirement of each sector: true by
+        # construction for the closed synthetic matrices; Eurostat's real
+        # domestic-use matrix leaves out imported inputs, which the optional
+        # import coefficients m put back, xⱼ = Wⱼ/(1-Σᵢ A[i,j]-mⱼ)
+        # (`_gross_output`). The admissibility condition Σᵢ A[i,j]+mⱼ<1 is
+        # checked and enforced once, at the start of the simulation
+        # (`_ensure_output_admissibility`), not at every evaluation.
         W = p.δ .* C .+ V .+ S
-        colsum = vec(sum(p.A, dims = 1))
-        x = W ./ (1 .- colsum)
+        x = _gross_output(W, p)   # with imported inputs if p.import_coefficients
         O = x  # genuine gross output, not W: fixes the external review's
                 # criticism that O left out circulating intermediate consumption.
         # Optional (`final_demand_share`): the part of output taken by final
@@ -588,7 +601,8 @@ end
     simulate_Ndept_custom(depts; T=100.0, seed=nothing, coupled=false, μ=0.3, μ_v=0.0,
                               realization=false, rationing=false,
                               market_prices=false, β=0.5, basket=nothing,
-                              A=nothing, final_demand_share=nothing, exit_friction=0.0)
+                              A=nothing, final_demand_share=nothing, import_coefficients=nothing,
+                              exit_friction=0.0)
 
 Simulates the N-department model from pre-configured departments. With
 `coupled=true` it uses `system_Ndept_io!` instead of `system_Ndept!` (`μ_v`,
@@ -607,7 +621,13 @@ Real-data options, typically from a calibration (`departments_from_params`):
 - `A`: a given technical matrix (e.g. `params.A`) instead of a random one
   (`seed` is then ignored). Eurostat's matrix covers domestic inputs only,
   so the gross output the coupled mechanisms reconstruct,
-  `xⱼ = Wⱼ/(1 − Σᵢ A[i,j])`, leaves out imported intermediate inputs.
+  `xⱼ = Wⱼ/(1 − Σᵢ A[i,j])`, leaves out imported intermediate inputs unless
+  `import_coefficients` is given.
+- `import_coefficients` (only with `realization` or `rationing`): imported
+  intermediate inputs per unit of output, `params.import_coefficients`
+  (`fetch_eurostat_import_coefficients`); gross output is then
+  `xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)` (`_gross_output`). Not available with
+  `market_prices`, whose profits would also need a price of imports.
 - `basket`: e.g. `consumption_basket(params.final_demand)`, real household
   consumption shares in place of `basket_initial`.
 - `final_demand_share` (only with `rationing=true`): the share `φ` of each
@@ -620,7 +640,7 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    realization = false, rationing = false,
                                    market_prices = false, β = 0.5, basket = nothing,
                                    A = nothing, final_demand_share = nothing,
-                                   exit_friction = 0.0)
+                                   import_coefficients = nothing, exit_friction = 0.0)
     N = length(depts)
     exit_friction >= 0 || error("exit_friction must be ≥ 0")
     (iszero(exit_friction) || coupled) || error("exit_friction requires coupled=true")
@@ -636,8 +656,15 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
         length(final_demand_share) == N || error("final_demand_share must have $N elements")
         all(0 .<= final_demand_share .< 1) || error("final_demand_share must be in [0, 1)")
     end
+    if !isnothing(import_coefficients)
+        (coupled && (realization || rationing) && !market_prices) ||
+            error("import_coefficients requires coupled=true with realization or rationing " *
+                  "(not market_prices)")
+        length(import_coefficients) == N || error("import_coefficients must have $N elements")
+        all(0 .<= import_coefficients .< 1) || error("import_coefficients must be in [0, 1)")
+    end
     (coupled && (realization || rationing || market_prices)) &&
-        (A, _ = _ensure_output_admissibility(A))
+        (A, _ = _ensure_output_admissibility(A; m = import_coefficients))
 
     if market_prices
         coupled || error("market_prices=true requires coupled=true")
@@ -670,6 +697,8 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
         )
         isnothing(final_demand_share) ||
             (p = merge(p, (final_demand_share = collect(Float64, final_demand_share),)))
+        isnothing(import_coefficients) ||
+            (p = merge(p, (import_coefficients = collect(Float64, import_coefficients),)))
         iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
         prob = ODEProblem(system_Ndept_io!, X0, (0.0, T), p)
     else

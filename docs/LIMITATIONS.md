@@ -119,9 +119,9 @@ is reconstructed from the model's own cost-output identity: since
 every evaluation of the ODE's right-hand side, just like Sraffa prices.
 Valid only when `A` represents each sector's *complete* circulating-input
 requirement (true by construction for the closed synthetic matrices used
-in these simulations; not for the real Eurostat domestic-use matrix,
-which omits imports by definition — never used in this reconstruction).
-The admissibility condition `Σᵢ A[i,j]<1` (needed for the denominator to
+in these simulations; the real Eurostat domestic-use matrix omits imports
+by definition, which the optional import coefficients put back, see the
+end of this item). The admissibility condition `Σᵢ A[i,j]<1` (needed for the denominator to
 be positive) is not guaranteed by `ρ(A)<1` (which bounds the spectral
 radius, not any individual column sum); checked and fixed once, when the
 simulation is assembled (`_ensure_output_admissibility`,
@@ -152,9 +152,25 @@ consumption and exports. For Portugal 2022 (paper, Section 5.7, Table 4)
 this leaves the share of rationed sectors unchanged and lowers
 accumulation by about a fifth at 10 and 19 sectors. Still open:
 intermediate replacement is not netted, so `Dᵢ≤(1−φᵢ)xᵢ` remains an upper
-bound on investable supply, not a fully netted reproduction balance. And
-Eurostat's matrix covers domestic inputs only, so the `xᵢ` reconstructed
-from it leaves out imported intermediate inputs.
+bound on investable supply, not a fully netted reproduction balance.
+
+**Fixed (imported inputs, optional):** Eurostat's matrix covers domestic
+inputs only, so the `xᵢ` reconstructed from it left out imported
+intermediate inputs. The IOT's own `IMP` row gives them per buying
+industry, and `fetch_eurostat_import_coefficients` turns them into
+coefficients `mⱼ = IMPⱼ/P1ⱼ`, stored in `params.import_coefficients` on the
+Eurostat paths (aggregated with the same GVA weights as A's columns). With
+`import_coefficients` in `simulate_Ndept_custom` (and `A = params.A`),
+gross output is `xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)` (`_gross_output`), and the
+admissibility check covers `Σᵢ A[i,j] + mⱼ`. For Portugal (IOT 2020),
+manufacturing imports 35% of its output in inputs, and the
+reconstructed `x` is 2.3 times what the domestic matrix alone implies; in
+the other sections, 1.01 to 1.38 times. With rationing (paper, Table 4)
+the share of rationed sectors does not change, but accumulation over 30
+years rises by 8% at 10 sectors (×200.6 → ×215.9) and by 31% at 19
+(×72.4 → ×94.7). Opt-in, so the paper's numbers are unchanged. Not
+available in the cross-dual model (`market_prices`), whose profits would
+also need a price of imports, nor in the TSSI layer.
 
 ## 2. R_max in the wage shock used an auxiliary matrix (fixed)
 
@@ -438,7 +454,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 296 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 312 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,

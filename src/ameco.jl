@@ -281,6 +281,7 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
     GVA = employment = compensation = capital_stock = GFCF_sectoral = CFC = Float64[]
     A_real = zeros(0, 0)
     final_demand = nothing
+    import_coefficients = nothing
     real_sectoral = false
 
     if sector_data == :eurostat
@@ -326,6 +327,8 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
             A_real = aggregate_io_matrix(A19, NACE_SECTIONS, NACE_MACRO_GROUPS, gva_s)
             final_demand = aggregate_final_demand(fetch_eurostat_final_demand(data.country_code, year),
                                                   NACE_MACRO_GROUPS, codes)
+            import_coefficients = aggregate_import_coefficients(
+                fetch_eurostat_import_coefficients(data.country_code, year), NACE_MACRO_GROUPS, gva_s)
 
             real_sectoral = true
             println("  ✓ real sectoral data (Eurostat, $(length(complete_sections))/19 sections), real matrix A.")
@@ -382,7 +385,8 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
 
     sector_source = real_sectoral ? " + Eurostat (real sectoral)" : ""
     result = CalibratedParameters(N, sectors, codes, C, V, GVA, e, e_raw, k, r, A, l,
-        σ_c, σ_v, δ, "AMECO — $(data.source)$sector_source", year, now(), 0.80, final_demand)
+        σ_c, σ_v, δ, "AMECO — $(data.source)$sector_source", year, now(), 0.80, final_demand,
+        import_coefficients)
 
     println("\n✅ CALIBRATION COMPLETE — mean e $(round(mean(e), digits=2)) | mean r $(round(mean(r)*100, digits=2))%")
     println("="^70 * "\n")
