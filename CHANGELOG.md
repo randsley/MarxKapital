@@ -44,6 +44,13 @@ Format based on Keep a Changelog. Semantic versioning.
   calibration's own price basis.
 
 ### Fixed
+- `system_hessian` with `rationing = true` failed: the implicit-function
+  derivative of the rationing fixed point was first-order only.
+  `_rationing_fixed_point` applies the implicit function theorem once per
+  level of `Dual`, so second (and higher) derivatives through rationing are
+  exact; checked against finite differences of the Jacobian and the
+  closed form of the 2-sector example. The values path is unchanged
+  (`paper/figures/jacobian_stats.tex` regenerates identically). 296 tests.
 - `calibrate_with_ameco_data` (`sector_data = :fixed`) divided AMECO's
   capital stock at constant 2020 prices by compensation at current prices,
   so `k` was too low in every year after 2020 (17–25% in 2024 for Germany,

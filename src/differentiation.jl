@@ -5,7 +5,8 @@
 # rationing map and of the TSSI price maps (`src/tssi.jl`); Hessians for
 # second-order terms (curvature of the wage-profit frontier, normal forms).
 # The rationing fixed point is differentiated through the implicit function
-# theorem (`_rationing_dual`, `src/core.jl`), not iteration by iteration.
+# theorem (`_rationing_fixed_point`, `src/core.jl`), not iteration by
+# iteration, at any order (nested Duals: Hessians).
 # ============================================================================
 
 """Picks the ODE system from the fields of `p`: cross-dual if it has `β`
@@ -62,8 +63,11 @@ end
 
 Hessians of all components of the ODE right-hand side: an array
 `H[k, i, j] = ∂²f_k/∂X_i∂X_j` (2N × 2N × 2N), obtained as the Jacobian of the
-Jacobian (nested ForwardDiff). Not supported with `rationing=true` (the
-fixed-point derivative is first-order only).
+Jacobian (nested ForwardDiff). With `rationing=true` the second derivative
+of the rationing fixed point is exact too: `_rationing_fixed_point` applies
+the implicit function theorem once per level of `Dual`, so the inner level
+differentiates the first-order formula. As with the Jacobian, the result is
+that of the active branch of the piecewise-smooth rationing map.
 """
 function system_hessian(p, X; t = 0.0)
     n = length(X)

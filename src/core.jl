@@ -479,28 +479,61 @@ function _rationing_map(ρ, A, D_planned, O)
 end
 
 """
-    _rationing_dual(A, D_planned, O; kwargs...)
+    _rationing_fixed_point(A, D_planned, O; kwargs...)
 
-Version of `_solve_rationing` for `ForwardDiff.Dual` inputs. Solves the
-fixed point `ρ* = F(ρ*; θ)` in values and propagates the derivatives through
-the implicit function theorem, `dρ* = (I − ∂F/∂ρ)⁻¹ · ∂F/∂θ·dθ`, which is
-exact at the fixed point (the same technique
-`SpatialEconometrics.StructuralMacroCalibration` uses for GRAS balancing).
-Returns `κ(ρ*)` as a vector of `Dual`.
+Fixed point `ρ* = F(ρ*; θ)` of the rationing map, with the same number type
+as its inputs, or `nothing` if the iteration does not converge.
+
+- `Float64` inputs: the damped iteration of `_solve_rationing`.
+- `ForwardDiff.Dual` inputs: one level of `Dual` is stripped, the fixed
+  point of the stripped problem is found by calling this function again,
+  and the derivatives of this level are propagated by the implicit
+  function theorem, `dρ* = (I − ∂F/∂ρ)⁻¹ · ∂F/∂θ·dθ`, exact at the fixed
+  point (the technique `SpatialEconometrics.StructuralMacroCalibration`
+  uses for GRAS balancing).
+
+The recursion is what makes nested differentiation exact. For a Hessian
+(`system_hessian`, `Dual{Dual}` inputs) the inner call returns ρ* carrying
+its first derivative. `∂F/∂ρ` and `∂F/∂θ` are then evaluated at that ρ*, so
+they carry first derivatives too, and the solve of the first-order formula
+yields the second derivative of ρ*. The same holds at any depth.
+
+`F` is piecewise smooth (a minimum over suppliers in κ, `min(1, ·)` in F),
+so the derivatives are those of the active branch: undefined at ties in κ
+or at `ρᵢ = 1` exactly (see `rationing_jacobian`).
 """
-function _rationing_dual(A, D_planned, O; kwargs...)
+function _rationing_fixed_point(A, D_planned, O; kwargs...)
+    if !(eltype(A) <: ForwardDiff.Dual || eltype(D_planned) <: ForwardDiff.Dual ||
+         eltype(O) <: ForwardDiff.Dual)
+        diag = _solve_rationing(A, ones(length(D_planned)), D_planned, O;
+                                return_diagnostics = true, kwargs...)
+        return diag.converged ? diag.ρ : nothing
+    end
     val(x) = ForwardDiff.value.(x)
     Av, Dv, Ov = val(A), val(D_planned), val(O)
-    diag = _solve_rationing(Av, ones(length(Dv)), Dv, Ov; return_diagnostics = true, kwargs...)
-    diag.converged || return fill(one(eltype(promote_type(eltype(A), eltype(D_planned), eltype(O)))), length(Dv))
-    ρ★ = diag.ρ
-    Fθ = _rationing_map(ρ★, A, D_planned, O)            # ∂F/∂θ·dθ in the partials
-    Jρ = ForwardDiff.jacobian(r -> _rationing_map(r, Av, Dv, Ov), ρ★)
+    ρv = _rationing_fixed_point(Av, Dv, Ov; kwargs...)   # one Dual level fewer
+    isnothing(ρv) && return nothing
+    Fθ = _rationing_map(ρv, A, D_planned, O)             # ∂F/∂θ·dθ in the partials
+    Jρ = ForwardDiff.jacobian(r -> _rationing_map(r, Av, Dv, Ov), ρv)
     TD = eltype(Fθ)
     P = reduce(vcat, (collect(ForwardDiff.partials(f))' for f in Fθ))
-    dρ = (identity_matrix(length(ρ★)) .- Jρ) \ P
-    ρ_dual = [TD(ρ★[i], ForwardDiff.Partials(Tuple(dρ[i, :]))) for i in eachindex(ρ★)]
-    return _κ_rationing(ρ_dual, A)
+    dρ = (identity_matrix(length(ρv)) .- Jρ) \ P
+    return [TD(ρv[i], ForwardDiff.Partials(Tuple(dρ[i, :]))) for i in eachindex(ρv)]
+end
+
+"""
+    _rationing_dual(A, D_planned, O; kwargs...)
+
+Version of `_solve_rationing` for `ForwardDiff.Dual` inputs: `κ(ρ*)` with
+ρ* from `_rationing_fixed_point`, so the derivatives of any order (Jacobians,
+Hessians) are exact. Without convergence it falls back to `κ = 1` (no
+rationing), like `_solve_rationing`.
+"""
+function _rationing_dual(A, D_planned, O; kwargs...)
+    ρ★ = _rationing_fixed_point(A, D_planned, O; kwargs...)
+    T = promote_type(eltype(A), eltype(D_planned), eltype(O))
+    isnothing(ρ★) && return fill(one(T), length(D_planned))
+    return _κ_rationing(ρ★, A)
 end
 
 # ----------------------------------------------------------------------------

@@ -438,7 +438,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 290 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 296 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -505,9 +505,17 @@ algebraically.
   empirically (6870 runs per `α`, from 0.4 to 0.95, no failures —
   `paper/main.tex`, Table 2), since Proposition 1 only guarantees local
   convergence.
-- **Hessians through rationing are not supported.** The implicit-function
-  derivative of the fixed point is first-order only; `system_hessian`
-  works without `rationing=true`.
+- **Hessians through rationing (fixed).** The implicit-function derivative
+  of the fixed point used to be first-order only, so `system_hessian`
+  failed with `rationing=true`. `_rationing_fixed_point` (`src/core.jl`) now
+  applies the implicit function theorem once per level of `Dual`: the inner
+  level returns ρ* with its first derivative, and differentiating the
+  first-order formula at that point gives the exact second derivative (any
+  order, in fact). Checked against finite differences of the exact Jacobian
+  (agreement to about 10⁻⁸ in three random 6–8-sector economies with
+  rationing binding) and against the closed form of the 2-sector example.
+  It is the Hessian of the active branch: the map is piecewise smooth, so
+  it is undefined at ties in κ or at `ρᵢ = 1`, like the Jacobian.
 - **TSSI is a valuation layer only.** The capital-mobility term still
   uses simultaneist (Sraffian) profit rates; there is no TSSI-driven
   variant of the dynamics. The lag τ is a single fixed constant (not a

@@ -551,6 +551,44 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test maximum(abs.(H[1, :, :] .- H_df)) <= 1e-3 * max(1e-12, maximum(abs.(H[1, :, :])))
     end
 
+    @testset "ODE Hessian through rationing (nested implicit function)" begin
+        # Relative steps: under heavy rationing the state spans several orders
+        # of magnitude, and a step scaled to max(X) crosses zero in small components.
+        function jacobian_fd_rel(f, x; h = 1e-5)
+            J = zeros(length(f(x)), length(x))
+            for j in eachindex(x)
+                hj = h * abs(x[j]); δx = zeros(length(x)); δx[j] = hj
+                J[:, j] = (f(x .+ δx) .- f(x .- δx)) ./ (2hj)
+            end
+            return J
+        end
+        Random.seed!(7)
+        sol, _, p = simulate_Ndept(6, T = 50.0, seed = 7, coupled = true, μ = 0.5, rationing = true)
+        X = sol.u[end]
+        H = system_hessian(p, X)
+        @test size(H) == (12, 12, 12)
+        @test maximum(abs.(H .- permutedims(H, (1, 3, 2)))) < 1e-10 * maximum(abs.(H))
+        err = maximum(maximum(abs.(H[k, :, :] .- jacobian_fd_rel(x -> system_jacobian(p, x)[k, :], X)))
+                      for k in 1:12)
+        @test err < 1e-6 * maximum(abs.(H))
+        # rationing binds here, so the fixed point's curvature is actually exercised
+        C, V = X[1:6], X[7:12]; S = p.e .* V
+        x = (p.δ .* C .+ V .+ S) ./ (1 .- vec(sum(p.A, dims = 1)))
+        @test count(_solve_rationing(p.A, ones(6), p.σ_c .* S .* x ./ C, x) .< 0.999) >= 2
+
+        # Closed form (paper, Section 3.3): sector 1 supplies only sector 2, so
+        # ρ₁ = O₁/(0.5·κ₂·D₂) with κ₂ = ρ₁, i.e. κ₂ = √(2·O₁/D₂)
+        A2 = [0.0 0.5; 0.0 0.0]
+        κ2(v) = _solve_rationing(A2, [1.0, 1.0], [10.0, v[2]], [v[1], 100.0];
+                                 tol = 1e-14, max_iter = 10_000)[2]
+        a, b = 2.0, 5.0
+        @test κ2([a, b]) ≈ sqrt(2a / b) atol = 1e-10
+        H2 = ForwardDiff.hessian(κ2, [a, b])
+        H2_exact = sqrt(2) / 4 .* [-a^-1.5 * b^-0.5  -a^-0.5 * b^-1.5;
+                                   -a^-0.5 * b^-1.5  3 * a^0.5 * b^-2.5]
+        @test H2 ≈ H2_exact rtol = 1e-8
+    end
+
     @testset "Rationing Jacobian — 2-sector example" begin
         # Section 3.3 of the paper: a single active eigenvalue λ = −1. Sector 2 is
         # not rationed (λ = 0), hence α_max = 1 (flip in the undamped iteration) and

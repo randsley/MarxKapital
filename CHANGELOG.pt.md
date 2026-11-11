@@ -45,6 +45,14 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   base de preços da própria calibração.
 
 ### Corrigido
+- `system_hessian` com `rationing = true` falhava: a derivada do ponto fixo
+  do racionamento pelo teorema da função implícita era só de primeira
+  ordem. `_rationing_fixed_point` aplica o teorema uma vez por nível de
+  `Dual`, pelo que as segundas derivadas (e de ordem superior) através do
+  racionamento são exatas; verificado contra diferenças finitas do
+  Jacobiano e contra a forma fechada do exemplo de 2 setores. O cálculo dos
+  valores não muda (`paper/figures/jacobian_stats.tex` regenera-se igual).
+  296 testes.
 - `calibrate_with_ameco_data` (`sector_data = :fixed`) dividia o stock de
   capital do AMECO a preços constantes de 2020 pelas remunerações a preços
   correntes, pelo que `k` ficava baixo em todos os anos depois de 2020

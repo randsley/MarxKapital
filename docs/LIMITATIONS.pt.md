@@ -430,7 +430,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 290 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 296 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -499,9 +499,18 @@ afirmado algebricamente.
   ponto fixo foi verificada empiricamente (6870 execuções por `α`, de 0.4
   a 0.95, sem falhas — `paper/main.tex`, Tabela 2), já que a Proposição 1
   só garante convergência local.
-- **Hessianas através do racionamento não são suportadas.** A derivada do
-  ponto fixo pelo teorema da função implícita é só de primeira ordem;
-  `system_hessian` funciona sem `rationing=true`.
+- **Hessianas através do racionamento (corrigido).** A derivada do ponto
+  fixo pelo teorema da função implícita era só de primeira ordem, pelo que
+  `system_hessian` falhava com `rationing=true`. `_rationing_fixed_point`
+  (`src/core.jl`) aplica agora o teorema da função implícita uma vez por
+  nível de `Dual`: o nível interior devolve ρ* com a sua primeira derivada,
+  e diferenciar a fórmula de primeira ordem nesse ponto dá a segunda
+  derivada exata (de facto, qualquer ordem). Verificado contra diferenças
+  finitas do Jacobiano exato (concordância de cerca de 10⁻⁸ em três
+  economias aleatórias de 6–8 setores com racionamento ativo) e contra a
+  forma fechada do exemplo de 2 setores. É a Hessiana do ramo ativo: o mapa
+  é suave por troços, pelo que não está definida em empates em κ nem em
+  `ρᵢ = 1`, tal como o Jacobiano.
 - **A TSSI é só uma camada de valorização.** O termo de mobilidade de
   capital continua a usar taxas de lucro simultaneístas (Sraffa); não há
   uma variante da dinâmica conduzida pela TSSI. O desfasamento τ é um só
