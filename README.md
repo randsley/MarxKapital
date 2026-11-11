@@ -84,12 +84,13 @@ one.*
 [`notebooks/`](notebooks/README.md) has worked examples, in English, that
 run offline:
 
-- eight Jupyter notebooks, committed with their outputs so they can be read on
+- nine Jupyter notebooks, committed with their outputs so they can be read on
   GitHub: accumulation basics, values and prices, calibration and wage
   shocks, coupled sectors and automatic differentiation, TSSI valuation,
   balanced growth, cycles and chaos, profit rates across the EU27 from
-  real AMECO data (a static extract in `data/`), and the capital-mobility
-  coefficient `μ` estimated from EU capital flows;
+  real AMECO data (a static extract in `data/`), the capital-mobility
+  coefficient `μ` estimated from EU capital flows, and the same coefficient
+  between Portugal's sectors, from Eurostat's accounts by industry;
 - three interactive Pluto notebooks with sliders: the wage–profit frontier,
   accumulation with coupling and wage shocks, and accumulation cycles in
   the cross-dual model.
@@ -293,7 +294,7 @@ marxkapital/
 │   └── notebooks.jl        # smoke test: runs every notebook offline
 ├── examples/demo.jl
 ├── notebooks/              # worked examples (see notebooks/README.md)
-│   ├── jupyter/            # eight narrative notebooks, with outputs
+│   ├── jupyter/            # nine narrative notebooks, with outputs
 │   └── pluto/              # three interactive notebooks
 ├── docs/LIMITATIONS.md     # required reading (+ .pt.md in Portuguese)
 ├── paper/                  # academic paper (LaTeX), reproducible from real data
@@ -304,7 +305,7 @@ marxkapital/
 │   ├── jacobian_bifurcation.jl # exact Jacobian, bifurcations, TSSI (offline)
 │   ├── accumulation_bifurcation.jl # balanced growth, Hopf, cycles (offline)
 │   └── figures/
-├── data/                   # (empty; downloaded data lands here, not version-controlled)
+├── data/                   # static extracts for notebooks 7–9 and their build scripts; other downloads not version-controlled
 ├── install_deps.jl
 ├── Project.toml
 ├── CHANGELOG.md

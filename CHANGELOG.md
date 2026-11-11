@@ -9,6 +9,14 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- Notebook 9, `09_sectoral_mobility`: the capital-mobility coefficient `μ`
+  between Portugal's 15 market sectors, 2002–2023, offline, from
+  `data/eurostat_pt_sectors.csv` (Eurostat accounts by industry, built by
+  `data/build_eurostat_pt_sectors.jl`, with a provenance file). The
+  transfer is net investment beyond a common share of own surplus. Within
+  sectors `μ̂` ≈ 0.11 (Driscoll–Kraay se 0.05), but −0.19 to −0.35 with the
+  self-employed imputed, because the surplus enters both sides; between
+  sectors −0.31. So `μ` between sectors is not identified by these data.
 - Imported intermediate inputs in the gross-output reconstruction:
   `fetch_eurostat_import_coefficients` (`mⱼ = IMPⱼ/P1ⱼ` from the IOT's
   `IMP` row, `import_coefficients_from_iot`, `aggregate_import_coefficients`),

@@ -581,8 +581,16 @@ afirmado algebricamente.
   os centros financeiros, perto do valor por omissão de 0,3. De ano para
   ano dentro de cada país é nulo em média: 0,15 antes de 2008 e −0,27
   depois. O `μ` constante do modelo corresponde ao padrão de longo prazo,
-  não à resposta numa crise de crédito. A estimativa é entre países, não
-  entre os setores do modelo.
+  não à resposta numa crise de crédito. Entre os próprios departamentos do
+  modelo, os setores, o notebook 9 conclui que `μ` não é identificado
+  (Portugal, 15 setores de mercado, 2002–2023). Os setores não têm registo
+  do capital transferido, pelo que este é construído como o investimento
+  líquido para além de uma parte comum do excedente próprio. Dentro de cada
+  setor, com efeitos de setor e de ano, `μ̂` ≈ 0,11 (erro de Driscoll–Kraay
+  0,05) contando o rendimento dos trabalhadores por conta própria como
+  mais-valia, mas −0,19 a −0,35 imputando-o como salário: o excedente entra
+  dos dois lados da equação. Os diferenciais setoriais persistentes não
+  atraem capital (`μ̂` = −0,31 entre setores).
 - **`μ_v` (mobilidade do capital variável) está desligado por omissão.**
   Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
   supercrítico em todas as 30 economias aleatórias testadas, com

@@ -82,13 +82,14 @@ antigo com o novo.*
 [`notebooks/`](notebooks/README.md) tem exemplos resolvidos, em inglês, que
 correm offline:
 
-- oito notebooks Jupyter, gravados com as saídas para se lerem no GitHub:
+- nove notebooks Jupyter, gravados com as saídas para se lerem no GitHub:
   fundamentos da acumulação, valores e preços, calibração e choques
   salariais, setores acoplados e diferenciação automática, valorização
   TSSI, crescimento equilibrado, ciclos e caos, taxas de lucro na UE27 a
   partir de dados reais do AMECO (um extrato estático em `data/`), e o
   coeficiente de mobilidade do capital `μ` estimado a partir dos fluxos de
-  capital na UE;
+  capital na UE, e o mesmo coeficiente entre os setores de Portugal, a
+  partir das contas por ramo do Eurostat;
 - três notebooks Pluto interativos, com sliders: a fronteira
   salário-lucro, a acumulação com acoplamento e choques salariais, e os
   ciclos de acumulação no modelo cruzado.
@@ -289,7 +290,7 @@ marxkapital/
 │   └── notebooks.jl        # teste de fumo: corre todos os notebooks offline
 ├── examples/demo.jl
 ├── notebooks/              # exemplos resolvidos (ver notebooks/README.md)
-│   ├── jupyter/            # oito notebooks narrativos, com saídas
+│   ├── jupyter/            # nove notebooks narrativos, com saídas
 │   └── pluto/              # três notebooks interativos
 ├── docs/LIMITATIONS.md     # leitura obrigatória (+ .pt.md em português)
 ├── paper/                  # artigo académico (LaTeX), reproduzível a partir de dados reais
@@ -300,7 +301,7 @@ marxkapital/
 │   ├── jacobian_bifurcation.jl # jacobiana exata, bifurcações, TSSI (offline)
 │   ├── accumulation_bifurcation.jl # crescimento equilibrado, Hopf, ciclos (offline)
 │   └── figures/
-├── data/                   # (vazio; dados descarregados ficam aqui, não versionados)
+├── data/                   # extratos estáticos dos notebooks 7–9 e os scripts que os constroem; outros dados descarregados não versionados
 ├── install_deps.jl
 ├── Project.toml
 ├── CHANGELOG.md  (+ .pt.md)

@@ -9,6 +9,15 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- Notebook 9, `09_sectoral_mobility`: o coeficiente de mobilidade do capital
+  `μ` entre os 15 setores de mercado de Portugal, 2002–2023, sem rede, a
+  partir de `data/eurostat_pt_sectors.csv` (contas por ramo do Eurostat,
+  construído por `data/build_eurostat_pt_sectors.jl`, com um ficheiro de
+  proveniência). A transferência é o investimento líquido para além de uma
+  parte comum do excedente próprio. Dentro de cada setor `μ̂` ≈ 0,11 (erro de
+  Driscoll–Kraay 0,05), mas −0,19 a −0,35 com os trabalhadores por conta
+  própria imputados, porque o excedente entra dos dois lados; entre setores
+  −0,31. Portanto, estes dados não identificam `μ` entre setores.
 - Inputs intermédios importados na reconstrução do output bruto:
   `fetch_eurostat_import_coefficients` (`mⱼ = IMPⱼ/P1ⱼ` a partir da linha
   `IMP` da IOT, `import_coefficients_from_iot`,

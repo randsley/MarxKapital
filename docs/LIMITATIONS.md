@@ -586,7 +586,14 @@ algebraically.
   centres, close to the default of 0.3. Year to year within countries it is
   zero on average: 0.15 before 2008 and −0.27 after. The model's constant
   `μ` matches the long-run pattern, not the response in a credit crisis.
-  The estimate is between countries, not between the model's sectors.
+  Between the model's own departments, sectors, notebook 9 finds `μ`
+  unidentified (Portugal, 15 market sectors, 2002–2023). Sectors have no
+  record of capital transferred, so it is built as net investment beyond a
+  common share of own surplus. Within sectors, with sector and year
+  effects, `μ̂` ≈ 0.11 (Driscoll–Kraay se 0.05) with the self-employed's
+  income counted as surplus value, but −0.19 to −0.35 with it imputed as
+  wages: the surplus enters both sides of the equation. Persistent
+  sectoral gaps attract no capital (`μ̂` = −0.31 between sectors).
 - **`μ_v` (mobility of variable capital) is off by default.** Accumulation
   cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random
   economies tested, with `β = 0.1`); the empirical value of `μ_v` is not
