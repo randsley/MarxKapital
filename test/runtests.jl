@@ -342,6 +342,52 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         # a year without GFCF truncates the series instead of extrapolating
         K2 = compute_pim_capital_stock(Dict(2000 => 10.0), 0.2, 2000, 100.0, [2000, 2001])
         @test !haskey(K2, 2001)
+
+        # by asset: δ backed out of volume series generated with known rates
+        yrs = 2000:2010
+        series(δ, K0, I) = (Dict(t => I for t in yrs),
+                            compute_pim_capital_stock(Dict(t => I for t in yrs), δ, 2000, K0, collect(yrs)))
+        Is, Ks = series(0.03, 500.0, 20.0)      # structures
+        Im, Km = series(0.15, 80.0, 15.0)       # machinery
+        @test estimate_asset_depreciation(Is, Ks) ≈ 0.03
+        @test estimate_asset_depreciation(Im, Km) ≈ 0.15
+        @test isnothing(estimate_asset_depreciation(Dict(2001 => 1.0), Dict(2000 => 0.0, 2001 => 1.0)))
+        # at constant prices (deflator 1) the stock by asset is the sum of the two recursions
+        vol = Dict("N112" => Is, "N11O" => Im)
+        Kby = compute_pim_capital_stock_by_asset(vol, vol, Dict("N112" => Ks, "N11O" => Km), 2010)
+        @test Kby ≈ Ks[2010] + Km[2010]
+        # each asset is revalued by its own GFCF deflator
+        cur = Dict("N112" => Dict(t => 2v for (t, v) in Is), "N11O" => Im)
+        @test compute_pim_capital_stock_by_asset(vol, cur, Dict("N112" => Ks, "N11O" => Km), 2010) ≈
+              2Ks[2010] + Km[2010]
+        # with equal rates it is the single-rate recursion on the summed series
+        Ia, Ka = series(0.08, 300.0, 25.0); Ib, Kb = series(0.08, 100.0, 5.0)
+        single = compute_pim_capital_stock(Dict(t => 30.0 for t in yrs), 0.08, 2000, 400.0, collect(yrs))
+        both = Dict("N111" => Ia, "N117" => Ib)
+        @test compute_pim_capital_stock_by_asset(both, both, Dict("N111" => Ka, "N117" => Kb), 2010) ≈ single[2010]
+        # a gap in the volume series is filled from current prices at the asset's deflator
+        gap = Dict("N112" => filter(kv -> kv[1] != 2005, Is), "N11O" => Im)
+        @test compute_pim_capital_stock_by_asset(gap, vol, Dict("N112" => Ks, "N11O" => Km), 2010) ≈ Kby
+        # an asset held but never bought, with no deflator anywhere in the section: fall back
+        never = Dict("N111" => Dict(t => 0.0 for t in yrs))
+        @test isnothing(compute_pim_capital_stock_by_asset(never, never, Dict("N111" => Ks), 2010))
+        # a holding without its own rate takes the asset type's rate from the other sections
+        flat = Dict("N111" => Dict(t => 50.0 for t in yrs))
+        @test isnothing(compute_pim_capital_stock_by_asset(vol, vol, merge(Dict("N112" => Ks, "N11O" => Km), flat), 2010))
+        @test compute_pim_capital_stock_by_asset(vol, vol, merge(Dict("N112" => Ks, "N11O" => Km), flat), 2010;
+                                                 δ_fallback = Dict("N111" => 0.1)) ≈ Kby + 50 * 0.9^10
+        rates = asset_depreciation_rates(Dict("N112" => Dict("C" => Is)), Dict("N112" => Dict("C" => Is)),
+                                         Dict("N112" => Dict("C" => Ks)))
+        @test rates["N112"]["C"] ≈ 0.03
+        # an asset never held and not bought contributes nothing
+        @test compute_pim_capital_stock_by_asset(vol, vol, Dict("N112" => Ks, "N11O" => Km,
+                                                 "N111" => Dict(t => 0.0 for t in yrs)), 2010) ≈ Kby
+        # other machinery is derived as N11M − N1131
+        raw = Dict("N11MG" => Dict("C" => Dict(2010 => 10.0)), "N1131G" => Dict("C" => Dict(2010 => 3.0)))
+        @test _assets_from_published(raw)["N11O"]["C"][2010] ≈ 7.0
+        @test _pim_mode(false) === :off && _pim_mode(true) === :single && _pim_mode(:by_asset) === :by_asset
+        @test_throws ArgumentError _pim_mode(:assets)
+        @test_throws ArgumentError calibrate_portugal_model(perpetual_inventory = :assets)
     end
 
     @testset "Values and prices" begin

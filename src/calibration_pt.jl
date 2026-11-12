@@ -81,15 +81,37 @@ function generate_synthetic_portugal_data(year::Int)
 end
 
 """
+    _pim_mode(perpetual_inventory)
+
+Normalizes the `perpetual_inventory` keyword: `false`/`:off` → `:off`,
+`true`/`:single` → `:single` (one depreciation rate per section),
+`:by_asset` → `:by_asset` (`compute_pim_capital_stock_by_asset`).
+"""
+function _pim_mode(perpetual_inventory)
+    perpetual_inventory === false && return :off
+    perpetual_inventory === true && return :single
+    perpetual_inventory in (:off, :single, :by_asset) && return perpetual_inventory
+    throw(ArgumentError("perpetual_inventory must be false, true, :single or :by_asset, " *
+                        "got $(repr(perpetual_inventory))"))
+end
+
+"""
 Recomputes the capital stock per section by the perpetual inventory method
 (`compute_pim_capital_stock`, `src/eurostat_sdmx.jl`) instead of using the
 value Eurostat reports for `year` directly. Falls back per section (not
 globally) to the reported value if the section does not have enough GFCF
 history for the recursion to reach `year`, or if the estimated `δ` is not
 valid. It never fails outright, like the other real-data paths in this file.
+
+With `by_asset = true`, each section's stock is first computed asset by
+asset (`compute_pim_capital_stock_by_asset`: a depreciation rate per asset
+type from Eurostat's volume series, or the asset type's median rate over
+the other sections for a small holding without one, each asset revalued by
+its own GFCF deflator); a section where that fails falls back to the single-rate
+recursion, then to the reported value, with a warning naming the sections.
 """
 function _pim_capital_stock_by_section(area_code::String, year::Int, codes::Vector{String},
-                                       stock_reported::Dict{String, Float64})
+                                       stock_reported::Dict{String, Float64}; by_asset::Bool = false)
     gfcf_series = fetch_eurostat_sector_gfcf_series(area_code)
     stock_series = fetch_eurostat_sector_capital_stock_series(area_code)
     cfc_series = fetch_eurostat_sector_cfc_series(area_code)
@@ -106,6 +128,28 @@ function _pim_capital_stock_by_section(area_code::String, year::Int, codes::Vect
         K = compute_pim_capital_stock(gfcf_series[c], δ, benchmark_year, benchmark_value,
                                        collect(benchmark_year:year))
         haskey(K, year) && (result[c] = K[year])
+    end
+    if by_asset
+        gfcf_vol = fetch_eurostat_sector_gfcf_by_asset_series(area_code; unit = "CLV15_MEUR")
+        gfcf_cur = fetch_eurostat_sector_gfcf_by_asset_series(area_code; unit = "CP_MEUR")
+        stock_vol = fetch_eurostat_sector_capital_stock_by_asset_series(area_code; unit = "CLV15_MEUR")
+        section(series, c) = Dict(a => v[c] for (a, v) in series if haskey(v, c))
+        # an asset type's rate in the other sections, for small holdings without their own
+        δ_fallback = Dict(a => median(collect(values(d)))
+                          for (a, d) in asset_depreciation_rates(gfcf_vol, gfcf_cur, stock_vol) if !isempty(d))
+        fallback = String[]
+        for c in codes
+            K = compute_pim_capital_stock_by_asset(section(gfcf_vol, c), section(gfcf_cur, c),
+                                                   section(stock_vol, c), year; δ_fallback = δ_fallback)
+            if isnothing(K) || isempty(section(stock_vol, c))
+                push!(fallback, c)
+            else
+                result[c] = K
+            end
+        end
+        isempty(fallback) ||
+            @warn "perpetual inventory by asset not possible for sections $(join(fallback, ", ")); " *
+                  "they use one depreciation rate per section (or the reported stock)"
     end
     for c in codes
         haskey(result, c) || (result[c] = stock_reported[c])
@@ -125,9 +169,10 @@ data in all 6 series are used; it throws an error if too few remain (fewer
 than 10 of 19), which signals a network failure or unavailability, not a
 normal case to degrade silently.
 
-`perpetual_inventory=true` replaces the net stock reported directly by
-Eurostat with an own series computed by the perpetual inventory method
-(`_pim_capital_stock_by_section`); see `docs/LIMITATIONS.md` item 7.
+`perpetual_inventory=true` (or `:single`) replaces the net stock reported
+directly by Eurostat with an own series computed by the perpetual inventory
+method with one depreciation rate per section; `:by_asset` does it asset by
+asset (`_pim_capital_stock_by_section`); see `docs/LIMITATIONS.md` item 7.
 
 `self_employed=:imputed` also fetches the number of employees per section
 (`SAL_DC`, a 7th series that then has to be complete too) and counts each
@@ -144,9 +189,10 @@ the labor series) for each of the `e_years` years ending in `year`, and adds
 the window sums `compensation_e` and `business_income_e`, from which
 `process_supply_use` computes `e`; the imputation is done year by year.
 """
-function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = false,
+function fetch_portugal_eurostat_data(year::Int; perpetual_inventory = false,
                                       self_employed::Symbol = :excluded, e_years::Int = 1)
     _check_self_employed(self_employed; hours_ok = true)
+    pim = _pim_mode(perpetual_inventory)
     e_years >= 1 || throw(ArgumentError("e_years must be ≥ 1, got $e_years"))
     println("\n🌐 Fetching real sectoral data (Eurostat) for Portugal ($year)...")
 
@@ -188,9 +234,10 @@ function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = fal
     codes = complete_sections
     name_list = [names_by_code[c] for c in codes]
 
-    if perpetual_inventory
-        stock = _pim_capital_stock_by_section("PT", year, codes, stock)
-        println("  ✓ capital stock recomputed by perpetual inventory.")
+    if pim !== :off
+        stock = _pim_capital_stock_by_section("PT", year, codes, stock; by_asset = pim === :by_asset)
+        println("  ✓ capital stock recomputed by perpetual inventory" *
+                (pim === :by_asset ? ", asset by asset." : "."))
     end
 
     # Compensation of the year `y`, with the self-employed imputed if asked
@@ -371,8 +418,10 @@ between the two cases.
   unavailable (no silent fallback, since real data were explicitly
   requested). `perpetual_inventory=true` (only has an effect with
   `data_source=:eurostat`) replaces the net stock reported by Eurostat with an
-  own series computed by the perpetual inventory method; see
-  `fetch_portugal_eurostat_data` and `docs/LIMITATIONS.md` item 7.
+  own series computed by the perpetual inventory method, with one
+  depreciation rate per section; `perpetual_inventory=:by_asset` computes it
+  asset by asset; see `fetch_portugal_eurostat_data` and
+  `docs/LIMITATIONS.md` item 7.
 
 `self_employed`:
 - `:excluded` (default): `V` is compensation of employees, as published, so
@@ -415,6 +464,7 @@ function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
                                   self_employed = :excluded, sectors = :all, e_years = 1,
                                   e_floor = 0.1)
     _check_self_employed(self_employed; hours_ok = true)
+    _pim_mode(perpetual_inventory)
     (self_employed != :excluded && data_source != :eurostat) &&
         throw(ArgumentError("self_employed=:$self_employed needs employee counts by sector, which only " *
                             "data_source=:eurostat provides"))

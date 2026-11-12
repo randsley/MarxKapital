@@ -416,7 +416,7 @@ with historical behavior and to keep the test suite fully offline (see
 `check_eurostat_sectoral()` for a manual check, outside the
 automated tests).
 
-## 7. Capital stock and depreciation are approximated (fixed, with caveat)
+## 7. Capital stock and depreciation are approximated (fixed, with caveat; by asset since item 4)
 
 Constant capital is approximated by capital stock. Depreciation comes
 from data wherever data exist: the real-data paths and the AMECO
@@ -441,11 +441,38 @@ The largest gaps are in sectors dominated by buildings and structures
 (L, O, G, K, Q), which fits the main simplification: the PIM here uses a
 single depreciation rate per sector, estimated from CFC/stock, not one
 per asset type (structures,
-machinery, ICT, etc. have very different useful lives in practice — GFCF
-data by asset type is already available in Eurostat, `NAMA_10_A64_P5`
-has an `asset10` dimension, but building a multi-asset PIM would also
-require depreciation profiles by asset type, which Eurostat does not
-publish directly — left undone).
+machinery, ICT, etc. have very different useful lives in practice).
+
+**Fixed (optional): by asset type.** `perpetual_inventory=:by_asset`
+(`true` is `:single`, the version above) runs the inventory asset by
+asset (`compute_pim_capital_stock_by_asset`). Eurostat publishes no
+depreciation by asset, but it does publish GFCF (`NAMA_10_A64_P5`) and
+the net stock (`NAMA_10_NFA_ST`) by asset type and section in chain-linked
+volumes, so each asset's rate can be backed out of the stock identity
+without revaluation effects (`estimate_asset_depreciation`, the median over
+years of `(Kₜ₋₁ + Iₜ − Kₜ)/Kₜ₋₁`). The six asset types (`PIM_ASSETS`:
+dwellings, other buildings and structures, transport equipment, other
+machinery, cultivated biological resources, intellectual property) add up
+to the net total in every Portuguese section, within 1%. The recursion runs
+in volumes and each asset is revalued by its own GFCF deflator; a holding
+the section never buys (dwellings in construction, say) takes the deflator
+of the section's total investment, and one whose series give no rate takes
+the asset type's median rate in the other sections. The implied rates are
+3–9% for buildings and structures, 25–28% for transport equipment,
+12–25% for other machinery and 27–46% for intellectual property.
+
+Against the stock Eurostat reports for Portugal, the aggregate gap falls
+from −15.4% to −3.3% in 2010 and from −28.2% to −1.9% in 2022. By section
+the mean absolute gap falls from 12.1% to 10.0% (2010) and from 19.9% to
+7.9% (2022); in 2022, 14 of 19 sections are within 10% (4 with one rate).
+The structure-heavy sections improve most (L from −36% to −2%, O from
+−34% to −5%, G from −30% to +9%). What is left is not the depreciation
+profile but the treatment of particular flows: construction (F, +26% in
+2022) and finance (K, −21%, with net disposals of buildings, i.e.
+negative GFCF, in many years since 2011) keep the largest gaps. The
+by-asset version removes two simplifications of the single-rate one at
+once, one rate for long- and short-lived assets and no revaluation of the
+stock at current prices; this check does not separate their contributions.
 
 Degrades per sector, not globally: if a sector's historical GFCF does
 not reach the requested year, or the estimated `δ` is not valid, that
@@ -454,7 +481,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 539 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 555 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,

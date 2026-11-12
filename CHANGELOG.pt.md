@@ -53,6 +53,17 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   como é tratada cada secção NACE (mercantil ou não mercantil; a distinção
   entre trabalho produtivo e improdutivo que o modelo não faz), como se
   contam os independentes, e o que faz o piso de `e`.
+- O inventário perpétuo por tipo de ativo, `perpetual_inventory = :by_asset`
+  (`calibrate_portugal_model`, `calibrate_with_ameco_v2`; `true` passa a
+  ser também `:single`). A taxa de depreciação de cada tipo de ativo
+  tira-se da FBCF e do stock líquido por ativo do Eurostat em volumes
+  encadeados (`estimate_asset_depreciation`, `asset_depreciation_rates`),
+  a recursão corre em volumes e cada ativo é reavaliado pelo seu próprio
+  deflator da FBCF (`compute_pim_capital_stock_by_asset`, com
+  `fetch_eurostat_sector_gfcf_by_asset_series` e
+  `fetch_eurostat_sector_capital_stock_by_asset_series`). Em Portugal o
+  desvio face ao stock reportado passa de −28,2% para −1,9% em 2022 (de
+  −15,4% para −3,3% em 2010).
 - Site: a página inicial (nas duas línguas) tem um bloco "Resultados
   empíricos" com gráficos dos notebooks 10, 11 e 13 (mobilidade do capital
   e reinvestimento), tirados dos notebooks executados por `build_site.py`

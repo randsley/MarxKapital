@@ -410,7 +410,7 @@ compatibilidade com o comportamento histórico e para manter a suite de
 testes totalmente offline (ver `check_eurostat_sectoral()` para uma
 verificação manual, fora dos testes automáticos).
 
-## 7. Stock de capital e depreciação são aproximados (corrigido, com ressalva)
+## 7. Stock de capital e depreciação são aproximados (corrigido, com ressalva; por ativo desde o item 4)
 
 O capital constante é aproximado pelo stock de capital. A depreciação vem
 dos dados sempre que estes existem: os caminhos de dados reais e o caminho
@@ -434,10 +434,40 @@ Os maiores desvios estão nos setores dominados por edifícios e estruturas
 (L, O, G, K, Q), o que é coerente com a principal simplificação: o PIM aqui
 usa uma taxa de depreciação única por setor, estimada por CCF/stock, e não
 uma por tipo de ativo (estruturas, máquinas, TIC, etc. têm vidas
-úteis muito diferentes na prática — dados de FBCF por tipo de ativo já estão
-disponíveis no Eurostat, `NAMA_10_A64_P5` tem uma dimensão `asset10`, mas
-construir um PIM multi-ativo exigiria também perfis de depreciação por tipo
-de ativo, que a Eurostat não publica diretamente — ficou por fazer).
+úteis muito diferentes na prática).
+
+**Corrigido (opcional): por tipo de ativo.** `perpetual_inventory=:by_asset`
+(`true` é `:single`, a versão acima) faz o inventário ativo a ativo
+(`compute_pim_capital_stock_by_asset`). O Eurostat não publica a
+depreciação por ativo, mas publica a FBCF (`NAMA_10_A64_P5`) e o stock
+líquido (`NAMA_10_NFA_ST`) por tipo de ativo e secção em volumes
+encadeados, pelo que a taxa de cada ativo se tira da identidade do stock
+sem efeitos de reavaliação (`estimate_asset_depreciation`, a mediana sobre
+os anos de `(Kₜ₋₁ + Iₜ − Kₜ)/Kₜ₋₁`). Os seis tipos de ativo (`PIM_ASSETS`:
+habitações, outros edifícios e estruturas, material de transporte, outras
+máquinas, recursos biológicos cultivados, propriedade intelectual) somam o
+total líquido em todas as secções portuguesas, a menos de 1%. A recursão
+corre em volumes e cada ativo é reavaliado pelo seu próprio deflator da
+FBCF; um ativo que a secção detém mas nunca compra (habitações na
+construção, por exemplo) usa o deflator do investimento total da secção, e
+um cujas séries não dão taxa usa a taxa mediana desse tipo de ativo nas
+outras secções. As taxas implícitas são de 3–9% para edifícios e
+estruturas, 25–28% para material de transporte, 12–25% para outras
+máquinas e 27–46% para a propriedade intelectual.
+
+Contra o stock que o Eurostat reporta para Portugal, o desvio agregado
+passa de −15,4% para −3,3% em 2010 e de −28,2% para −1,9% em 2022. Por
+secção, o desvio absoluto médio passa de 12,1% para 10,0% (2010) e de 19,9%
+para 7,9% (2022); em 2022, 14 de 19 secções ficam a menos de 10% (4 com uma
+só taxa). As secções com mais estruturas são as que mais melhoram (L de
+−36% para −2%, O de −34% para −5%, G de −30% para +9%). O que resta não é o
+perfil de depreciação mas o tratamento de fluxos particulares: a construção
+(F, +26% em 2022) e as finanças (K, −21%, com vendas líquidas de edifícios,
+isto é, FBCF negativa, em muitos anos desde 2011) mantêm os maiores
+desvios. A versão por ativo retira de uma vez duas simplificações da versão
+com uma só taxa, uma taxa para ativos de vida longa e curta e nenhuma
+reavaliação do stock a preços correntes; esta verificação não separa o
+contributo de cada uma.
 
 Degrada por setor, não globalmente: se a FBCF histórica de um setor não
 chegar ao ano pedido, ou `δ` estimado não for válido, esse setor
@@ -446,7 +476,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 539 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 555 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,

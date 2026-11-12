@@ -52,6 +52,17 @@ Format based on Keep a Changelog. Semantic versioning.
   how each NACE section is treated (market or non-market; the
   productive/unproductive distinction the model does not make), how the
   self-employed are counted, and what the floor on `e` does.
+- The perpetual inventory by asset type, `perpetual_inventory = :by_asset`
+  (`calibrate_portugal_model`, `calibrate_with_ameco_v2`; `true` is now
+  also `:single`). Each asset type's depreciation rate is backed out of
+  Eurostat's GFCF and net stock by asset in chain-linked volumes
+  (`estimate_asset_depreciation`, `asset_depreciation_rates`), the
+  recursion runs in volumes and each asset is revalued by its own GFCF
+  deflator (`compute_pim_capital_stock_by_asset`, with
+  `fetch_eurostat_sector_gfcf_by_asset_series` and
+  `fetch_eurostat_sector_capital_stock_by_asset_series`). For Portugal the
+  gap to the reported stock falls from −28.2% to −1.9% in 2022 (from
+  −15.4% to −3.3% in 2010).
 - Website: the home page (both languages) has an "Empirical findings"
   block with plots from notebooks 10, 11 and 13 (capital mobility and
   reinvestment), taken from the executed notebooks by `build_site.py`

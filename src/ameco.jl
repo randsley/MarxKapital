@@ -189,7 +189,7 @@ If the requested year has no valid GDP, the closest valid year is used.
 
 `perpetual_inventory=true` (only has an effect with `sector_data=:eurostat`)
 replaces the net stock reported by Eurostat with an own series computed by
-the perpetual inventory method at the 19 fine sectors
+the perpetual inventory method (`:by_asset`: asset by asset) at the 19 fine sectors
 (`_pim_capital_stock_by_section`, `src/calibration_pt.jl`), aggregated to the
 3 macro sectors only afterwards: aggregating the already computed series is
 more correct than recomputing from GFCF already summed into 3 groups. See
@@ -219,9 +219,10 @@ with a warning.
 """
 function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symbol;
                                   sector_data::Symbol = :fixed,
-                                  perpetual_inventory::Bool = false,
+                                  perpetual_inventory = false,
                                   self_employed::Symbol = :excluded)
     _check_self_employed(self_employed)
+    _pim_mode(perpetual_inventory)
     if year > data.years[end] && haskey(data.notes, "last_actual_year")
         @warn "Year $year is beyond the last actual AMECO year; using $(data.years[end])."
         year = data.years[end]
@@ -305,8 +306,9 @@ function calibrate_with_ameco_data(data::AMECOData, year::Int, aggregation::Symb
                 println("  ✓ self-employed imputed by section (19 fine sectors).")
             end
 
-            if perpetual_inventory
-                stock_s = _pim_capital_stock_by_section(data.country_code, year, complete_sections, stock_s)
+            if _pim_mode(perpetual_inventory) !== :off
+                stock_s = _pim_capital_stock_by_section(data.country_code, year, complete_sections, stock_s;
+                                                        by_asset = _pim_mode(perpetual_inventory) === :by_asset)
                 println("  ✓ capital stock recomputed by perpetual inventory (19 fine sectors).")
             end
 

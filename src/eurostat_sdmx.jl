@@ -90,6 +90,15 @@ extraterritorial activities, irrelevant here). A failure (network, format, no
 data) returns an empty dictionary; it never throws.
 """
 function _fetch_eurostat_sections_by_geo(dataflow::String, key_::String; readtimeout = 30)
+    _fetch_eurostat_sections_by(dataflow, key_, "geo"; readtimeout = readtimeout)
+end
+
+"""
+Like `_fetch_eurostat_sections_by_geo`, grouped by the dimension `column` of
+the response instead of `geo` (for example `"asset10"`, for a key naming one
+country and several asset types).
+"""
+function _fetch_eurostat_sections_by(dataflow::String, key_::String, column::String; readtimeout = 30)
     none = Dict{String, Dict{String, Dict{Int, Float64}}}()
     url = "$EUROSTAT_SDMX_BASE_URL/data/ESTAT,$dataflow,1.0/$key_?format=SDMX-CSV"
     try
@@ -97,7 +106,7 @@ function _fetch_eurostat_sections_by_geo(dataflow::String, key_::String; readtim
                         retry = true, readtimeout = readtimeout, status_exception = false)
         resp.status == 200 || return none
         df = CSV.read(IOBuffer(resp.body), DataFrame)
-        (nrow(df) == 0 || !all(c -> c in names(df), ("nace_r2", "geo", "TIME_PERIOD", "OBS_VALUE"))) &&
+        (nrow(df) == 0 || !all(c -> c in names(df), ("nace_r2", column, "TIME_PERIOD", "OBS_VALUE"))) &&
             return none
 
         result = none
@@ -105,7 +114,7 @@ function _fetch_eurostat_sections_by_geo(dataflow::String, key_::String; readtim
             section = String(row.nace_r2)
             (length(section) == 1 && section in NACE_SECTIONS) || continue
             ismissing(row.OBS_VALUE) && continue
-            d = get!(get!(result, String(row.geo), Dict{String, Dict{Int, Float64}}()),
+            d = get!(get!(result, String(row[column]), Dict{String, Dict{Int, Float64}}()),
                      section, Dict{Int, Float64}())
             d[Int(row.TIME_PERIOD)] = Float64(row.OBS_VALUE)
         end
@@ -274,6 +283,202 @@ function compute_pim_capital_stock(gfcf_series::Dict{Int, Float64}, δ::Float64,
         K[a] = (1 - δ) * K[a - 1] + gfcf_series[a]
     end
     return K
+end
+
+# ----------------------------------------------------------------------------
+# Perpetual inventory by asset type
+# ----------------------------------------------------------------------------
+
+"""
+Asset types of the perpetual inventory by asset (`ESA 2010` codes without
+the trailing `G`/`N`): dwellings, other buildings and structures, transport
+equipment, other machinery and equipment (`N11M − N1131`, published as
+`N11O` only from 2010), cultivated biological resources and intellectual
+property products. Their net stocks add up to `N11N`.
+"""
+const PIM_ASSETS = ["N111", "N112", "N1131", "N11O", "N115", "N117"]
+
+"""
+Series by asset type and section, `asset → section → (year → value)`, from
+the asset codes Eurostat publishes (`N111`, `N112`, `N1131`, `N11M`, `N115`,
+`N117` plus a suffix), with other machinery derived as `N11M − N1131` where
+both are present. Empty on any failure.
+"""
+function _assets_from_published(raw)
+    out = Dict{String, Dict{String, Dict{Int, Float64}}}()
+    for (code, sections) in raw
+        a = code[1:end-1]
+        a in ("N111", "N112", "N1131", "N115", "N117", "N11M") && (out[a] = sections)
+    end
+    if haskey(out, "N11M")
+        M = pop!(out, "N11M")
+        T = get(out, "N1131", Dict{String, Dict{Int, Float64}}())
+        out["N11O"] = Dict(s => Dict(y => v - get(get(T, s, Dict{Int, Float64}()), y, 0.0) for (y, v) in ys)
+                           for (s, ys) in M)
+    end
+    return out
+end
+
+"""
+    fetch_eurostat_sector_gfcf_by_asset_series(country; unit = "CLV15_MEUR")
+
+GFCF per asset type (`PIM_ASSETS`) and section, all years:
+`asset → section → (year → value)`. `unit` is `"CLV15_MEUR"` (chain-linked
+volumes) or `"CP_MEUR"` (current prices). `NAMA_10_A64_P5`.
+"""
+function fetch_eurostat_sector_gfcf_by_asset_series(country_code::String; unit::String = "CLV15_MEUR")
+    assets = join(("N111G", "N112G", "N1131G", "N11MG", "N115G", "N117G"), "+")
+    _assets_from_published(_fetch_eurostat_sections_by("NAMA_10_A64_P5",
+        "A.$unit..$assets.P51G.$country_code", "asset10"))
+end
+
+"""
+    fetch_eurostat_sector_capital_stock_by_asset_series(country; unit = "CLV15_MEUR")
+
+Net fixed capital stock per asset type (`PIM_ASSETS`) and section, all
+years (end of year), as `fetch_eurostat_sector_gfcf_by_asset_series`.
+`unit` is `"CLV15_MEUR"` or `"CRC_MEUR"` (current replacement cost).
+`NAMA_10_NFA_ST`.
+"""
+function fetch_eurostat_sector_capital_stock_by_asset_series(country_code::String; unit::String = "CLV15_MEUR")
+    assets = join(("N111N", "N112N", "N1131N", "N11MN", "N115N", "N117N"), "+")
+    _assets_from_published(_fetch_eurostat_sections_by("NAMA_10_NFA_ST",
+        "A.$unit..$assets.$country_code", "asset10"))
+end
+
+"""
+    estimate_asset_depreciation(gfcf, stock)
+
+Depreciation rate of one asset type from its volume series (`year → value`,
+the same chain-linked unit for both), backed out of the stock identity
+`Kₜ = (1 − δ)Kₜ₋₁ + Iₜ`: the median over years of `(Kₜ₋₁ + Iₜ − Kₜ)/Kₜ₋₁`.
+Volumes have no revaluation, so this is the rate the national accountants'
+own depreciation profile implies. Returns `nothing` if no year has
+`Kₜ₋₁ > 0` and both flows, or if the median is not in (0, 1).
+"""
+function estimate_asset_depreciation(gfcf::Dict{Int, Float64}, stock::Dict{Int, Float64})
+    rates = [(stock[t-1] + gfcf[t] - stock[t]) / stock[t-1]
+             for t in keys(stock) if haskey(stock, t - 1) && haskey(gfcf, t) && stock[t-1] > 0]
+    isempty(rates) && return nothing
+    δ = median(rates)
+    return 0 < δ < 1 ? δ : nothing
+end
+
+"""
+    _asset_deflator(Icur, Ivol, year)
+
+Price index of an asset's investment in `year`, `GFCF at current prices /
+GFCF in volumes`, taken from the nearest year in which both flows are
+positive (a year of net disposals, with negative GFCF, carries no usable
+ratio). `nothing` if there is no such year.
+"""
+function _asset_deflator(Icur, Ivol, year::Int)
+    ok = [t for t in keys(Ivol) if get(Ivol, t, 0.0) > 0 && get(Icur, t, 0.0) > 0]
+    isempty(ok) && return nothing
+    t = ok[argmin(abs.(ok .- year))]
+    return Icur[t] / Ivol[t]
+end
+
+"""
+    _asset_volumes(Ivol, Icur, years, deflator)
+
+Volume GFCF of one asset over `years`, filling the gaps of the published
+volume series: a year with no volume and zero or no current-price GFCF (an
+asset the section holds but does not buy) counts as zero; a year with a
+current-price value but no published volume gets `Icur/deflator`.
+"""
+function _asset_volumes(Ivol, Icur, years, deflator)
+    I = Dict{Int, Float64}(Ivol)
+    for t in years
+        haskey(I, t) && continue
+        c = get(Icur, t, 0.0)
+        if c == 0
+            I[t] = 0.0
+        elseif !isnothing(deflator)
+            I[t] = c / deflator
+        end
+    end
+    return I
+end
+
+"""
+    compute_pim_capital_stock_by_asset(gfcf_vol, gfcf_cur, stock_vol, year; δ_fallback = Dict())
+
+Net capital stock of one section in `year`, at current prices, by the
+perpetual inventory per asset type. Each argument maps asset → (year →
+value): GFCF in chain-linked volumes and at current prices, and the net
+stock in volumes. For each asset:
+
+1. the volume GFCF series, with its gaps filled (`_asset_volumes`);
+2. `δₐ` from the volume series (`estimate_asset_depreciation`), or, where
+   the section's own series give none (a small holding that barely moves,
+   or grows only by reclassification), `δ_fallback[a]`, the same asset type's
+   rate in the other sections;
+3. the recursion `Kₐ,ₜ = (1 − δₐ)Kₐ,ₜ₋₁ + Iₐ,ₜ` in volumes
+   (`compute_pim_capital_stock`), seeded with the reported volume stock in
+   the earliest year with stock and GFCF;
+4. revaluation to current prices by the asset's own GFCF deflator
+   (`_asset_deflator`: current prices over volumes, in `year` or the nearest
+   year with positive flows); an asset the section never buys (dwellings
+   held by a construction firm, say) has no investment price, and is
+   revalued by the deflator of the section's total GFCF instead.
+
+Then summed over assets. An asset with no positive stock and no GFCF in
+`year` contributes nothing. Returns `nothing` if some asset with a positive
+stock still cannot be computed, so that the caller can fall back.
+"""
+function compute_pim_capital_stock_by_asset(gfcf_vol, gfcf_cur, stock_vol, year::Int;
+                                            δ_fallback = Dict{String, Float64}())
+    total = 0.0
+    years_all = union(Int[], (keys(v) for v in values(gfcf_vol))...)
+    section_deflator = _asset_deflator(
+        Dict(t => sum(get(v, t, 0.0) for v in values(gfcf_cur)) for t in years_all),
+        Dict(t => sum(get(v, t, 0.0) for v in values(gfcf_vol)) for t in years_all), year)
+    for a in union(keys(stock_vol), keys(gfcf_vol))
+        K = get(stock_vol, a, Dict{Int, Float64}())
+        Icur = get(gfcf_cur, a, Dict{Int, Float64}())
+        Ivol = get(gfcf_vol, a, Dict{Int, Float64}())
+        if !any(v -> v > 0, values(K))
+            get(Ivol, year, 0.0) == 0 && continue
+            return nothing
+        end
+        own = _asset_deflator(Icur, Ivol, year)
+        P = isnothing(own) ? section_deflator : own
+        I = _asset_volumes(Ivol, Icur, minimum(keys(K)):max(year, maximum(keys(K))), P)
+        δ = estimate_asset_depreciation(I, K)
+        isnothing(δ) && (δ = get(δ_fallback, a, nothing))
+        isnothing(δ) && return nothing
+        possible = [t for t in keys(K) if haskey(I, t) && K[t] > 0]
+        isempty(possible) && return nothing
+        b = minimum(possible)
+        Kv = compute_pim_capital_stock(I, δ, b, K[b], collect(b:year))
+        haskey(Kv, year) || return nothing
+        Kv[year] == 0 && continue
+        isnothing(P) && return nothing
+        total += Kv[year] * P
+    end
+    return total
+end
+
+"""
+    asset_depreciation_rates(gfcf_vol, gfcf_cur, stock_vol)
+
+`δₐ` of every asset type in every section (`asset → section → δ`), from
+series `asset → section → (year → value)`, with the volume gaps filled as in
+`compute_pim_capital_stock_by_asset`. Sections without a valid rate are left
+out; the median over the others is the `δ_fallback` of that asset type.
+"""
+function asset_depreciation_rates(gfcf_vol, gfcf_cur, stock_vol)
+    out = Dict{String, Dict{String, Float64}}()
+    for (a, by_section) in stock_vol, (c, K) in by_section
+        any(v -> v > 0, values(K)) || continue
+        Ivol = get(get(gfcf_vol, a, Dict()), c, Dict{Int, Float64}())
+        Icur = get(get(gfcf_cur, a, Dict()), c, Dict{Int, Float64}())
+        I = _asset_volumes(Ivol, Icur, minimum(keys(K)):maximum(keys(K)), _asset_deflator(Icur, Ivol, maximum(keys(K))))
+        δ = estimate_asset_depreciation(I, K)
+        isnothing(δ) || (get!(out, a, Dict{String, Float64}())[c] = δ)
+    end
+    return out
 end
 
 """NACE section (1 letter) of an IOT A64 code (e.g. "A01"→"A", "CPA_C10-12"→"C")."""
