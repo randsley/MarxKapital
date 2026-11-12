@@ -12,7 +12,9 @@
 # with r̄ the capital-weighted mean. These functions build that panel from a
 # sectoral extract (data/eurostat_eu_sectors.csv: one country or several)
 # and estimate μ with any set of fixed effects, Driscoll–Kraay and
-# country-clustered standard errors. Used by notebooks 09 and 10.
+# country-clustered standard errors. Used by notebooks 09–12; notebook 12
+# compares the average rate with Shaikh's incremental rate of profit
+# (compute_incremental_panel, estimate_persistence).
 # ============================================================================
 
 const _MOBILITY_EFFECTS = (:geo, :section, :year, :geo_section, :geo_year, :section_year)
@@ -376,4 +378,143 @@ function estimate_investment_function(P::AbstractDataFrame; η_grid = 0:0.1:1.0,
          se_DK_μ = e.se_DK[2], ssr = e.ssr)
     end
     return (profile = DataFrame(rows), n = nrow(Q), dropped = nrow(P) - nrow(Q))
+end
+
+"""
+    compute_incremental_panel(raw; sections, countries = nothing, self_employed = :excluded,
+                              window = 1, real = true)
+
+The panel of `compute_mobility_panel` with Shaikh's incremental rate of
+profit beside the average rate (Shaikh 2016, ch. 7, eq. 7.7): the return on
+new investment, approximated by the change in gross profit over the gross
+investment that preceded it,
+
+    r_I,t = (Πₜ − Πₜ₋w) / Σₖ₌₁…w Iₜ₋ₖ,
+
+with gross profit `Π = GVA − V` (the self-employed imputed in `V` with
+`self_employed = :imputed`) and `I` gross fixed capital formation. With
+`real = true` (the default) both are real: `Π` is deflated by the sector's
+GVA deflator `GVA/GVA_volume` and `I` is `GFCF_volume` (the extract's
+chain-linked volumes); `real = false` uses current prices. `window = w`
+sums over `w` years, which smooths the rate; the sum looks only backwards,
+so the rate can be a regressor.
+
+The rate is dated like the average-rate gap, in t−1, so both can explain
+the transfer `y` of year t. Adds the columns `rI` (r_I of t−1), `I_lag` (its
+denominator, the investment sum), `rIbar` (the country's investment-weighted
+mean `ΣΔΠ/ΣI` in t−1, so the gaps weighted by `I_lag` sum to zero) and
+`gap_I = 100·(rI − rIbar)` (pp). Rows without the earlier
+years the rate needs, or whose lagged investment sum is not positive, are
+dropped; returns `(panel, dropped)`.
+"""
+function compute_incremental_panel(raw::AbstractDataFrame; sections, countries = nothing,
+                                   self_employed::Symbol = :excluded, window::Integer = 1,
+                                   real::Bool = true)
+    window >= 1 || throw(ArgumentError("window must be ≥ 1, got $window"))
+    real && !all(c -> c in names(raw), ("GVA_volume", "GFCF_volume")) &&
+        throw(ArgumentError("real = true needs the columns GVA_volume and GFCF_volume"))
+    P = compute_mobility_panel(raw; sections = sections, countries = countries,
+                               self_employed = self_employed)
+    geo = "geo" in names(raw) ? String.(raw.geo) : fill("", nrow(raw))
+    V = Float64.(raw.compensation)
+    self_employed == :imputed && (V = V .* raw.employment ./ raw.employees)
+    Π = Float64.(raw.GVA) .- V
+    I = Float64.(raw.GFCF)
+    if real
+        Π = Π .* Float64.(raw.GVA_volume) ./ Float64.(raw.GVA)
+        I = Float64.(raw.GFCF_volume)
+    end
+    flows = Dict((geo[i], String(raw.section[i]), Int(raw.year[i])) => (Π[i], I[i]) for i in 1:nrow(raw))
+
+    keep = falses(nrow(P))
+    dΠ, ΣI = fill(NaN, nrow(P)), fill(NaN, nrow(P))
+    for i in 1:nrow(P)
+        g, s, t = P.geo[i], P.section[i], P.year[i] - 1         # the rate is dated t−1
+        ks = [(g, s, t - k) for k in 0:window]
+        all(haskey(flows, k) for k in ks) || continue
+        inv = sum(last(flows[(g, s, t - k)]) for k in 1:window)
+        inv > 0 || continue
+        keep[i] = true
+        dΠ[i] = first(flows[(g, s, t)]) - first(flows[(g, s, t - window)])
+        ΣI[i] = inv
+    end
+    Q = P[keep, :]
+    Q.rI = dΠ[keep] ./ ΣI[keep]
+    Q.I_lag = ΣI[keep]
+    w = Q.I_lag
+    num, den = Dict{Tuple{String, Int}, Float64}(), Dict{Tuple{String, Int}, Float64}()
+    for i in 1:nrow(Q)
+        u = (Q.geo[i], Q.year[i])
+        num[u] = get(num, u, 0.0) + Q.rI[i] * w[i]
+        den[u] = get(den, u, 0.0) + w[i]
+    end
+    Q.rIbar = [num[u] / den[u] for u in zip(Q.geo, Q.year)]
+    Q.gap_I = 100 .* (Q.rI .- Q.rIbar)
+    return (panel = Q, dropped = nrow(P) - nrow(Q))
+end
+
+"""
+    hp_filter(x; λ = 100)
+
+The Hodrick–Prescott trend of the series `x`: the `τ` minimizing
+`Σ(xₜ − τₜ)² + λ·Σ(Δ²τₜ)²`, i.e. `(I + λD'D)τ = x` with `D` the second
+difference. For display only: the trend of year t uses later years, so it
+cannot be a regressor. Series of fewer than 3 points are returned as they
+are.
+"""
+function hp_filter(x::AbstractVector{<:Real}; λ::Real = 100)
+    λ >= 0 || throw(ArgumentError("λ must be ≥ 0, got $λ"))
+    n = length(x)
+    n < 3 && return Float64.(x)
+    D = zeros(n - 2, n)
+    for t in 1:(n - 2)
+        D[t, t], D[t, t + 1], D[t, t + 2] = 1.0, -2.0, 1.0
+    end
+    return Symmetric(Matrix(1.0I, n, n) .+ λ .* (D'D)) \ Float64.(x)
+end
+
+"""
+    estimate_persistence(panel, col)
+
+The persistence-of-profits regression of the literature (Mueller; Vaona) for
+the gap in column `col` (e.g. `:gap` or `:gap_I`):
+
+    gapᵢₜ = aᵢ + ρ·gapᵢ,ₜ₋₁ + uᵢₜ,
+
+one `aᵢ` per country × sector, over the rows whose previous year is in the
+panel. `ρ` measures how fast gaps close; `pᵢ = aᵢ/(1−ρ)` is the gap a
+sector keeps in the long run, its permanent position. Competition that
+equalizes the rate gives `pᵢ ≈ 0`. With about 25 years per unit the
+Nickell bias in `ρ` (downward, of order `(1+ρ)/T`) is small.
+
+Returns `(ρ, se_ρ, permanent, sd_permanent, between_share, n)`: `se_ρ`
+clustered by country; `permanent`, a DataFrame of `geo, section, p`;
+`sd_permanent`, the standard deviation of `p` across units; and
+`between_share`, the share of the gap's variance that is between units
+(the variance of the unit means over the total), a measure free of the
+dynamic specification.
+"""
+function estimate_persistence(panel::AbstractDataFrame, col::Symbol)
+    z = Float64.(panel[!, col])
+    idx = Dict((panel.geo[i], panel.section[i], panel.year[i]) => i for i in 1:nrow(panel))
+    rows = [i for i in 1:nrow(panel) if haskey(idx, (panel.geo[i], panel.section[i], panel.year[i] - 1))]
+    length(rows) > 3 || throw(ArgumentError("too few rows with a previous year ($(length(rows)))"))
+    lag = [z[idx[(panel.geo[i], panel.section[i], panel.year[i] - 1)]] for i in rows]
+    Q = panel[rows, :]
+    e = estimate_fe_ols(Q, z[rows], lag; effects = (:geo_section,))
+    ρ = e.β[1]
+    units = tuple.(Q.geo, Q.section)
+    sums = Dict{eltype(units), Tuple{Float64, Int}}()
+    for (k, u) in enumerate(units)
+        a, m = get(sums, u, (0.0, 0))
+        sums[u] = (a + z[rows[k]] - ρ * lag[k], m + 1)
+    end
+    us = sort(collect(keys(sums)))
+    p = [first(sums[u]) / last(sums[u]) / (1 - ρ) for u in us]
+    allunits = tuple.(panel.geo, panel.section)
+    means = Dict(u => mean(z[allunits .== Ref(u)]) for u in unique(allunits))
+    between = var([means[u] for u in allunits]; corrected = false) / var(z; corrected = false)
+    return (ρ = ρ, se_ρ = e.se_cluster[1],
+            permanent = DataFrame(geo = first.(us), section = last.(us), p = p),
+            sd_permanent = std(p), between_share = between, n = length(rows))
 end

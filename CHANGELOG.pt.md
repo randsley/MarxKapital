@@ -9,6 +9,17 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- A taxa de lucro incremental de Shaikh em `src/mobility_estimation.jl`:
+  `compute_incremental_panel` acrescenta o rendimento do investimento novo,
+  a variação do lucro bruto sobre o investimento bruto que a precedeu (real,
+  ou a preços correntes; num ano ou em vários), e o seu diferencial face à
+  média do país ponderada pelo investimento, ao lado do diferencial da taxa
+  média de `compute_mobility_panel`. `estimate_persistence` estima a
+  regressão de persistência dos lucros (a rapidez com que os diferenciais
+  fecham e o diferencial que cada setor mantém no longo prazo), e
+  `hp_filter` alisa uma série para gráficos. O extrato setorial da UE ganha
+  `GVA_volume` e `GFCF_volume` (volumes encadeados) para fluxos reais; todos
+  os valores existentes ficam iguais.
 - Notebook 11, `11_reinvestment_and_mobility`: a função de investimento do
   modelo no painel setorial da UE. Permitir que o reinvestimento se afaste
   de uma parte fixa torna `μ̂` positivo para qualquer `η` (0,05 com `η` = 0,

@@ -9,6 +9,16 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- Shaikh's incremental rate of profit in `src/mobility_estimation.jl`:
+  `compute_incremental_panel` adds the return on new investment, the change
+  in gross profit over the gross investment before it (real, or at current
+  prices; over one year or several), and its gap from the country's
+  investment-weighted mean, beside the average-rate gap of
+  `compute_mobility_panel`. `estimate_persistence` estimates the
+  persistence-of-profits regression (how fast gaps close and the gap each
+  sector keeps in the long run), and `hp_filter` smooths a series for display.
+  The EU sectoral extract gains `GVA_volume` and `GFCF_volume`
+  (chain-linked volumes) for real flows; every existing value is unchanged.
 - Notebook 11, `11_reinvestment_and_mobility`: the model's investment
   function on the EU sectoral panel. Allowing reinvestment to depart from
   a fixed share makes `μ̂` positive for every `η` (0.05 at `η` = 0, 0.13

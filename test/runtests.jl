@@ -593,6 +593,75 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ArgumentError estimate_investment_function(rows; ratio_bounds = (2.0, 1.0))
     end
 
+    @testset "Incremental rate of profit and persistence" begin
+        rng = MersenneTwister(31)
+        secs, yrs = ["A", "C", "J"], 2000:2007
+        raw = DataFrame(geo = String[], section = String[], year = Int[], GVA = Float64[],
+                        compensation = Float64[], CFC = Float64[], GFCF = Float64[],
+                        capital_stock = Float64[], employment = Float64[], employees = Float64[],
+                        GVA_volume = Float64[], GFCF_volume = Float64[])
+        for g in ("AA", "BB"), s in secs, (k, y) in enumerate(yrs)
+            K = 100 + 50rand(rng); gva = 20 + 5rand(rng); gfcf = 0.05K + 3rand(rng)
+            push!(raw, (g, s, y, gva, 8 + 2rand(rng), 0.05K, gfcf, K, 12 + rand(rng), 10.0,
+                        gva / (1 + 0.02k + 0.01rand(rng)), gfcf / (1 + 0.03k)))
+        end
+        cell(g, s, y, col) = raw[(raw.geo .== g) .& (raw.section .== s) .& (raw.year .== y), col][1]
+        Π(g, s, y) = cell(g, s, y, :GVA) - cell(g, s, y, :compensation)
+        Πr(g, s, y) = Π(g, s, y) * cell(g, s, y, :GVA_volume) / cell(g, s, y, :GVA)
+
+        # nominal, one year: (Πₜ₋₁ − Πₜ₋₂) / Iₜ₋₂, on the rows of the mobility panel
+        r1 = compute_incremental_panel(raw; sections = secs, real = false)
+        P1 = r1.panel
+        @test r1.dropped == 0 && nrow(P1) == nrow(compute_mobility_panel(raw; sections = secs))
+        row = P1[(P1.geo .== "BB") .& (P1.section .== "C") .& (P1.year .== 2005), :][1, :]
+        @test row.rI ≈ (Π("BB", "C", 2004) - Π("BB", "C", 2003)) / cell("BB", "C", 2003, :GFCF)
+        @test row.gap_I ≈ 100 * (row.rI - row.rIbar)
+        # real, three years: deflated profit, investment volumes, backward sums
+        r3 = compute_incremental_panel(raw; sections = secs, window = 3)
+        P3 = r3.panel
+        row = P3[(P3.geo .== "AA") .& (P3.section .== "J") .& (P3.year .== 2006), :][1, :]
+        @test row.rI ≈ (Πr("AA", "J", 2005) - Πr("AA", "J", 2002)) /
+                       sum(cell("AA", "J", y, :GFCF_volume) for y in 2002:2004)
+        @test minimum(P3.year) == 2004 && r3.dropped == 2 * length(secs) * 2
+        # the gaps weighted by the investment that defines them sum to zero in each country-year
+        for d in groupby(P3, [:geo, :year])
+            @test abs(sum(d.I_lag .* d.gap_I)) < 1e-9 * sum(d.I_lag)
+        end
+        @test !(compute_incremental_panel(raw; sections = secs, self_employed = :imputed,
+                                          real = false).panel.rI ≈ P1.rI)
+        @test_throws ArgumentError compute_incremental_panel(raw; sections = secs, window = 0)
+        @test_throws ArgumentError compute_incremental_panel(select(raw, Not(:GFCF_volume)); sections = secs)
+
+        # Hodrick–Prescott: identity at λ = 0, a straight line is its own trend
+        x = randn(rng, 30)
+        @test hp_filter(x; λ = 0) ≈ x
+        line = 2.0 .+ 0.5 .* (1:30)
+        @test hp_filter(line; λ = 1600) ≈ line
+        @test std(diff(diff(hp_filter(x; λ = 100)))) < std(diff(diff(x)))
+        @test_throws ArgumentError hp_filter(x; λ = -1)
+
+        # persistence: recovers ρ and the permanent positions aᵢ/(1−ρ) of an AR(1) panel
+        ρ0, T = 0.5, 400
+        rows = DataFrame(geo = String[], section = String[], year = Int[], gap = Float64[])
+        a = Dict{Tuple{String, String}, Float64}()
+        for g in ("G1", "G2", "G3"), s in ("S1", "S2", "S3", "S4")
+            a[(g, s)] = 2randn(rng)
+            z = a[(g, s)] / (1 - ρ0)
+            for t in 1:T
+                z = a[(g, s)] + ρ0 * z + randn(rng)
+                push!(rows, (g, s, 1900 + t, z))
+            end
+        end
+        pe = estimate_persistence(rows, :gap)
+        @test pe.ρ ≈ ρ0 atol = 0.03
+        @test pe.n == nrow(rows) - 12
+        for r in eachrow(pe.permanent)
+            @test r.p ≈ a[(r.geo, r.section)] / (1 - ρ0) atol = 0.4
+        end
+        @test 0.5 < pe.between_share < 1
+        @test_throws ArgumentError estimate_persistence(rows[1:3, :], :gap)
+    end
+
     @testset "Wage-profit frontier" begin
         A = create_technical_matrix(6, seed = 5)
         l = fill(0.4, 6) .+ 0.1 .* (1:6) ./ 6
