@@ -250,14 +250,63 @@ function _reinvestment_share(r, C, p, t)
     η = get(p, :η, 0.0)
     scheduled = haskey(p, :σ_times)
     (iszero(η) && !scheduled) && return p.σ_c
-    σ = p.σ_c
-    if scheduled
-        k = searchsortedlast(p.σ_times, t)
-        k > 0 && (σ = σ .* p.σ_multipliers[k])
-    end
+    σ = _scheduled_σ(p, t)
     iszero(η) && return σ
     r̄ = sum(r .* C) / sum(C)
     return σ .* (r̄ ./ r) .^ η
+end
+
+"""`σ_c·m(t)`: the reinvestment shares with the multiplier of the optional
+schedule (`σ_schedule`; `p.σ_c` itself without one)."""
+function _scheduled_σ(p, t)
+    haskey(p, :σ_times) || return p.σ_c
+    k = searchsortedlast(p.σ_times, t)
+    return k > 0 ? p.σ_c .* p.σ_multipliers[k] : p.σ_c
+end
+
+"""`true` when `p` uses the linear reinvestment form (`reinvestment_form = :linear`)."""
+_linear_form(p) = get(p, :reinvestment_form, :power) === :linear
+
+"""
+    _linear_reinvestment(σ, Π, K, η)
+
+Planned reinvestment in constant capital in the linear form
+(`reinvestment_form = :linear`), in money, not as a share:
+
+    Iᵢ = σᵢ · [(1 − η)·Πᵢ + η·r̄·Kᵢ],    r̄ = ΣΠ/ΣK.
+
+A convex combination of reinvesting own profit (`η = 0`, the fixed share)
+and investing in proportion to capital at the average profit rate
+(`η = 1`; the power form `σ·(r̄/rᵢ)^η·Πᵢ` is proportional to `K` there too,
+but with the `C`-weighted mean rate of the mobility term). Unlike the
+power form it is defined for profits of any sign, which the cross-dual
+system needs. The marginal share of own profit is `(1 − η)·σ`, the quantity
+notebook 11 calibrates `η` from. With a common `σ` aggregate reinvestment is
+`σ·ΣΠ` for every `η`: `η` redistributes investment, it does not change the
+total. Homogeneous of degree 1; generic in number type.
+"""
+function _linear_reinvestment(σ, Π, K, η)
+    r̄ = sum(Π) / sum(K)
+    return σ .* ((1 - η) .* Π .+ η .* r̄ .* K)
+end
+
+"""
+    _exit_flow(r, C, φ, h)
+
+Capital that sectors below the hurdle scrap, `φ·max(h·r̄ − rᵢ, 0)·Cᵢ`, with
+`r̄` the `C`-weighted mean of `r` (that of `_mobility_flow`). With `h = 0`
+only sectors with losses shed capital, in proportion to the loss rate; with
+`h > 0` every sector whose profit rate is below the fraction `h` of the
+mean. Unlike the mobility term, which reallocates capital, this destroys it
+(the right-hand side subtracts it from `dC/dt`). It is the `exit_rate`
+(`φ`) and `exit_hurdle` (`h`) of `simulate_Ndept_custom`, not the
+`exit_friction` of `_mobility_flow`, which damps outflows from small
+sectors. Homogeneous of degree 1; the `max` has a kink at the hurdle, where
+derivatives are one-sided.
+"""
+function _exit_flow(r, C, φ, h)
+    r̄ = sum(r .* C) / sum(C)
+    return φ .* max.(h .* r̄ .- r, 0) .* C
 end
 
 """
@@ -325,6 +374,12 @@ If `p.exit_friction = ε > 0` (optional field, default 0), outflows from a
 sector are damped as its share shrinks, for both mobility terms; see
 `_mobility_flow`.
 
+If `p.reinvestment_form == :linear` (optional), planned reinvestment is
+`_linear_reinvestment(σ_c·m(t), S, πC+V, η)` instead of the power form
+`σ_c·m(t)·(r̄/rᵢ)^η·Sᵢ`. If `p.exit_rate = φ` is present, sectors whose
+profit rate is below `p.exit_hurdle·r̄` scrap `φ·(h·r̄ − rᵢ)·Cᵢ` of constant
+capital (`_exit_flow`).
+
 The right-hand side is homogeneous of degree 1 in the state
 (`f(λX) = λf(X)`): only proportions matter, and the relevant steady states
 are balanced-growth rays, `f(X★) = g★·X★`.
@@ -335,8 +390,14 @@ function system_Ndept_io!(dX, X, p, t)
     V = @view X[N+1:2N]
     S = p.e .* V
 
-    r = _io_profit_rates(C, V, S, p)
-    σ_eff = _reinvestment_share(r, C, p, t)   # p.σ_c unless η or σ_schedule are set
+    linear = _linear_form(p)
+    if linear
+        r, K = _io_profit_rates_and_capital(C, V, S, p)
+        planned = _linear_reinvestment(_scheduled_σ(p, t), S, K, get(p, :η, 0.0))
+    else
+        r = _io_profit_rates(C, V, S, p)
+        σ_eff = _reinvestment_share(r, C, p, t)   # p.σ_c unless η or σ_schedule are set
+    end
 
     # `κ` inherits the type of `S` (not `ones(N)`, Float64): under automatic
     # differentiation (ForwardDiff, `src/differentiation.jl`) the state is `Dual`.
@@ -370,7 +431,7 @@ function system_Ndept_io!(dX, X, p, t)
             # applies to this OUTPUT expansion, not to investment spending
             # directly (the earlier simplification, already
             # documented as such in the paper).
-            Δx = σ_eff .* S .* x ./ C
+            Δx = linear ? planned .* x ./ C : σ_eff .* S .* x ./ C
             κ = _solve_rationing(p.A, ones(N), Δx, O)
         else
             intermediate_demand = p.A * O
@@ -380,7 +441,13 @@ function system_Ndept_io!(dX, X, p, t)
     end
 
     ε = get(p, :exit_friction, 0.0)
-    dX[1:N]    = κ .* σ_eff .* S .- p.δ .* C .+ _mobility_flow(r, C, p.μ, ε)
+    if linear
+        dX[1:N] = κ .* planned .- p.δ .* C .+ _mobility_flow(r, C, p.μ, ε)
+    else
+        dX[1:N] = κ .* σ_eff .* S .- p.δ .* C .+ _mobility_flow(r, C, p.μ, ε)
+    end
+    # Exit of unprofitable capital (optional, `p.exit_rate`; absent = off).
+    haskey(p, :exit_rate) && (dX[1:N] = dX[1:N] .- _exit_flow(r, C, p.exit_rate, get(p, :exit_hurdle, 0.0)))
     # Mobility of variable capital (optional, `p.μ_v`; absent or 0 = off,
     # dynamics identical to before). With r̄_V weighted by V, Σᵢ μ_v(rᵢ-r̄_V)Vᵢ = 0
     # exactly: the term reallocates variable capital between sectors without creating it.
@@ -417,6 +484,15 @@ function _io_profit_rates(C, V, S, p)
     r_effective = clamp(sum(S) / sum(C .+ V), 0.0, 0.95 * p.R_max)
     π = _price_value_ratio(p, r_effective, length(S))
     return S ./ (π .* C .+ V)
+end
+
+"""Like `_io_profit_rates`, also returning the capital it divides by,
+`K = πC + V` (constant capital at production prices): `(r, K)`."""
+function _io_profit_rates_and_capital(C, V, S, p)
+    r_effective = clamp(sum(S) / sum(C .+ V), 0.0, 0.95 * p.R_max)
+    π = _price_value_ratio(p, r_effective, length(S))
+    K = π .* C .+ V
+    return S ./ K, K
 end
 
 """
@@ -622,19 +698,23 @@ rationing; see the `system_Ndept_io!` docstring. `market_prices=true`
 `cross_dual_system!`: market prices with adjustment speed `β` and consumption
 basket `basket` (`basket_initial` by default). `exit_friction` (coupled
 only, 0 = off) damps capital outflows from sectors with small shares; see
-`_mobility_flow`.
+`_mobility_flow`. `η`, `σ_schedule`, `reinvestment_form`, `exit_rate` and
+`exit_hurdle`: see `simulate_Ndept_custom`.
 """
 function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
                        realization = false, rationing = false,
                        market_prices = false, β = 0.5, basket = nothing,
-                       exit_friction = 0.0, η = 0.0, σ_schedule = nothing)
+                       exit_friction = 0.0, η = 0.0, σ_schedule = nothing,
+                       reinvestment_form = :power, exit_rate = 0.0, exit_hurdle = 0.0)
     depts = create_departments(N, name_list)
     return simulate_Ndept_custom(depts, T = T, seed = seed, coupled = coupled, μ = μ,
                                      μ_v = μ_v, realization = realization,
                                      rationing = rationing,
                                      market_prices = market_prices, β = β, basket = basket,
-                                     exit_friction = exit_friction, η = η, σ_schedule = σ_schedule)
+                                     exit_friction = exit_friction, η = η, σ_schedule = σ_schedule,
+                                     reinvestment_form = reinvestment_form, exit_rate = exit_rate,
+                                     exit_hurdle = exit_hurdle)
 end
 
 """
@@ -656,8 +736,8 @@ aggregate realization pressure; `rationing=true` (takes precedence over
 damps capital outflows from a sector by `sᵢ/(sᵢ + ε)`, `sᵢ` its share of
 the stock, keeping the mobility term conservative (`_mobility_flow`).
 
-Reinvestment (both need `coupled=true` and not `market_prices`, whose
-profits can be ≤ 0; see `_reinvestment_share`):
+Reinvestment (all need `coupled=true`; see `_reinvestment_share` and
+`_linear_reinvestment`):
 
 - `η ≥ 0`: elasticity of the reinvestment share to relative profitability,
   `σ_c,ᵢ·(r̄/rᵢ)^η`. 0 (default) is each department's fixed share; with
@@ -668,6 +748,22 @@ profits can be ≤ 0; see `_reinvestment_share`):
   last break at or before `t` (1 before the first). The solver stops at the
   breaks. The system is then not autonomous, so the balanced-growth and
   bifurcation tools reject it.
+- `reinvestment_form`: `:power` (default), `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η` of the
+  surplus, or `:linear`, `σ_c,ᵢ·m(t)·[(1−η)Πᵢ + η·r̄·Kᵢ]` with
+  `r̄ = ΣΠ/ΣK` (`_linear_reinvestment`). The two agree at `η = 0`; at
+  `η = 1` both invest in proportion to `K`, the power form at the
+  `C`-weighted mean rate, the linear one at `ΣΠ/ΣK`, which keeps aggregate
+  reinvestment at `σ_c·ΣΠ` when `σ_c` is common. With `market_prices=true`, profits can be ≤ 0, so `η` and
+  `σ_schedule` need `:linear` there.
+
+Exit of unprofitable capital (needs `coupled=true`; `_exit_flow`):
+
+- `exit_rate = φ ≥ 0` (0 = off, the default) and `exit_hurdle = h ≥ 0`
+  (default 0): sectors whose profit rate is below `h·r̄` scrap
+  `φ·(h·r̄ − rᵢ)·Cᵢ` of constant capital a year. With `h = 0` only sectors
+  with losses do, which can only happen with `market_prices=true`. Unlike
+  the mobility term, which moves capital, this destroys it. Not the same as
+  `exit_friction`, which damps outflows from small sectors.
 
 Real-data options, typically from a calibration (`departments_from_params`):
 
@@ -694,11 +790,14 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    market_prices = false, β = 0.5, basket = nothing,
                                    A = nothing, final_demand_share = nothing,
                                    import_coefficients = nothing, exit_friction = 0.0,
-                                   η = 0.0, σ_schedule = nothing)
+                                   η = 0.0, σ_schedule = nothing, reinvestment_form = :power,
+                                   exit_rate = 0.0, exit_hurdle = 0.0)
     N = length(depts)
     exit_friction >= 0 || error("exit_friction must be ≥ 0")
     (iszero(exit_friction) || coupled) || error("exit_friction requires coupled=true")
-    reinvestment = _reinvestment_params(η, σ_schedule; coupled = coupled, market_prices = market_prices)
+    reinvestment = _reinvestment_params(η, σ_schedule; coupled = coupled, market_prices = market_prices,
+                                        form = reinvestment_form)
+    reinvestment = merge(reinvestment, _exit_params(exit_rate, exit_hurdle; coupled = coupled))
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
     if isnothing(A)
         A = create_technical_matrix(N, seed = seed)
@@ -730,8 +829,10 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
              A = A, μ = μ, μ_v = μ_v, β = β)
         iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
         p = merge(p, (basket = isnothing(basket) ? basket_initial(A, X0, p) : basket,))
+        p = merge(p, reinvestment)
         prob = ODEProblem(cross_dual_system!, [X0; zeros(N)], (0.0, T), p)
-        return solve(prob, Tsit5(), saveat = 0.5), depts, p
+        return (haskey(p, :σ_times) ? solve(prob, Tsit5(), saveat = 0.5, tstops = p.σ_times) :
+                                      solve(prob, Tsit5(), saveat = 0.5)), depts, p
     end
 
     if coupled
@@ -779,14 +880,18 @@ the fields to merge into the parameters: none with the defaults (so the
 parameters, and the dynamics, are exactly as without them), `η` if it is
 not 0, `σ_times`/`σ_multipliers` if there is a schedule.
 """
-function _reinvestment_params(η, σ_schedule; coupled, market_prices)
+function _reinvestment_params(η, σ_schedule; coupled, market_prices, form = :power)
     (η isa Real && isfinite(η) && η >= 0) || throw(ArgumentError("η must be a finite number ≥ 0, got $η"))
+    form in (:power, :linear) ||
+        throw(ArgumentError("reinvestment_form must be :power or :linear, got :$form"))
     active = !iszero(η) || !isnothing(σ_schedule)
     active || return NamedTuple()
     coupled || throw(ArgumentError("η and σ_schedule require coupled=true"))
-    market_prices && throw(ArgumentError("η and σ_schedule are not available with market_prices=true " *
-                                         "(market profits can be ≤ 0)"))
-    out = iszero(η) ? NamedTuple() : (η = Float64(η),)
+    (market_prices && form === :power) &&
+        throw(ArgumentError("with market_prices=true, η and σ_schedule need reinvestment_form=:linear " *
+                            "(market profits can be ≤ 0, where (r̄/rᵢ)^η is undefined)"))
+    out = form === :linear ? (reinvestment_form = :linear,) : NamedTuple()
+    iszero(η) || (out = merge(out, (η = Float64(η),)))
     isnothing(σ_schedule) && return out
     isempty(σ_schedule) && throw(ArgumentError("σ_schedule is empty"))
     all(b -> length(b) == 2, σ_schedule) ||
@@ -796,4 +901,19 @@ function _reinvestment_params(η, σ_schedule; coupled, market_prices)
     issorted(times; lt = <=) || throw(ArgumentError("σ_schedule times must be strictly increasing"))
     all(m -> isfinite(m) && m >= 0, mult) || throw(ArgumentError("σ_schedule multipliers must be ≥ 0"))
     return merge(out, (σ_times = times, σ_multipliers = mult))
+end
+
+"""
+Validates `exit_rate`/`exit_hurdle` of `simulate_Ndept_custom` and returns
+the fields to merge into the parameters: none when `exit_rate == 0` (the
+default; the dynamics are then exactly as without them).
+"""
+function _exit_params(exit_rate, exit_hurdle; coupled)
+    (exit_rate isa Real && isfinite(exit_rate) && exit_rate >= 0) ||
+        throw(ArgumentError("exit_rate must be a finite number ≥ 0, got $exit_rate"))
+    (exit_hurdle isa Real && isfinite(exit_hurdle) && exit_hurdle >= 0) ||
+        throw(ArgumentError("exit_hurdle must be a finite number ≥ 0, got $exit_hurdle"))
+    iszero(exit_rate) && return NamedTuple()
+    coupled || throw(ArgumentError("exit_rate requires coupled=true"))
+    return (exit_rate = Float64(exit_rate), exit_hurdle = Float64(exit_hurdle))
 end

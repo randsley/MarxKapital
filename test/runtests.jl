@@ -1040,6 +1040,97 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, σ_schedule = Tuple{Float64, Float64}[])
     end
 
+    @testset "Linear reinvestment form and the exit of unprofitable capital" begin
+        fd(f, x; h = 1e-6) = reduce(hcat, map(eachindex(x)) do j
+            hj = h * max(abs(x[j]), 1.0); δx = zeros(length(x)); δx[j] = hj
+            (f(x .+ δx) .- f(x .- δx)) ./ (2hj)
+        end)
+        # the helper: η = 0 is the fixed share, η = 1 capital at the average rate,
+        # and with a common σ the total is σ·ΣΠ for any η (also with losses)
+        σ, Π, K = fill(0.6, 4), [3.0, -1.0, 0.5, 2.0], [10.0, 20.0, 5.0, 8.0]
+        @test _linear_reinvestment(σ, Π, K, 0.0) ≈ σ .* Π
+        @test _linear_reinvestment(σ, Π, K, 1.0) ≈ σ .* (sum(Π) / sum(K)) .* K
+        @test sum(_linear_reinvestment(σ, Π, K, 0.7)) ≈ 0.6 * sum(Π)
+        @test _linear_reinvestment(σ, 2 .* Π, 2 .* K, 0.7) ≈ 2 .* _linear_reinvestment(σ, Π, K, 0.7)
+        # the exit flow: zero above the hurdle, φ·(h·r̄ − r)·C below it
+        r, C = [0.2, -0.05, 0.02, 0.1], [10.0, 5.0, 4.0, 6.0]
+        r̄ = sum(r .* C) / sum(C)
+        @test _exit_flow(r, C, 0.5, 0.0) ≈ [0, 0.5 * 0.05 * 5, 0, 0]
+        @test _exit_flow(r, C, 0.5, 0.5) ≈ 0.5 .* max.(0.5r̄ .- r, 0) .* C
+        @test _exit_flow(r, 3 .* C, 0.5, 0.5) ≈ 3 .* _exit_flow(r, C, 0.5, 0.5)
+
+        # coupled system: at η = 1 :linear invests σ_c·(ΣS/ΣK)·K, with K = πC + V
+        # (the power form also invests in proportion to K, at the C-weighted mean rate)
+        Random.seed!(3); _, _, p0 = simulate_Ndept(5, T = 1.0, seed = 3, coupled = true, μ = 0.3)
+        Random.seed!(3); sol, _, pl = simulate_Ndept(5, T = 20.0, seed = 3, coupled = true, μ = 0.3,
+                                                     η = 1.0, reinvestment_form = :linear)
+        @test sol.retcode == ReturnCode.Success && pl.reinvestment_form === :linear && pl.η == 1.0
+        X = sol.u[end]
+        pp = merge(p0, (η = 1.0,))
+        rK, KK = _io_profit_rates_and_capital(X[1:5], X[6:10], p0.e .* X[6:10], p0)
+        @test _rhs(pl)(X)[1:5] ≈ p0.σ_c .* (sum(rK .* KK) / sum(KK)) .* KK .- p0.δ .* X[1:5] .+
+                                 _mobility_flow(rK, X[1:5], 0.3, 0.0) rtol = 1e-10
+        @test _rhs(pl)(X)[6:10] == _rhs(p0)(X)[6:10]
+        pl5, pp5 = merge(pl, (η = 0.5,)), merge(pp, (η = 0.5,))
+        @test !(_rhs(pl5)(X) ≈ _rhs(pp5)(X))                  # they differ in between
+        @test _rhs(pl5)(3 .* X) ≈ 3 .* _rhs(pl5)(X)
+        @test system_jacobian(pl5, X) ≈ fd(_rhs(pl5), X) rtol = 1e-5
+        # :linear with η = 0 and no schedule adds nothing to the parameters
+        Random.seed!(3); _, _, pz = simulate_Ndept(5, T = 1.0, seed = 3, coupled = true, μ = 0.3,
+                                                   reinvestment_form = :linear)
+        @test keys(pz) == keys(p0)
+
+        # the exit in the coupled system needs a relative hurdle (r > 0 there)
+        N = 5; Cx, Vx = X[1:N], X[N+1:2N]
+        rx = _io_profit_rates(Cx, Vx, p0.e .* Vx, p0)
+        pe = merge(p0, (exit_rate = 0.4, exit_hurdle = 0.8))
+        @test _rhs(pe)(X)[1:N] ≈ _rhs(p0)(X)[1:N] .- _exit_flow(rx, Cx, 0.4, 0.8)
+        @test _rhs(pe)(X)[N+1:2N] == _rhs(p0)(X)[N+1:2N]   # V is not scrapped
+        @test _rhs(merge(p0, (exit_rate = 0.4, exit_hurdle = 0.0)))(X) ≈ _rhs(p0)(X)   # no losses, no exit
+        @test _rhs(pe)(2 .* X) ≈ 2 .* _rhs(pe)(X)
+        @test parameter_jacobian(pe, X, :exit_rate) ≈ [-_exit_flow(rx, Cx, 1.0, 0.8); zeros(N)]
+        @test length(parameter_jacobian(p0, X, :exit_rate)) == 2N   # absent = 0
+        @test with_parameter(p0, :exit_rate, 0.2).exit_hurdle == 0.0
+        @test with_parameter(pe, :exit_hurdle, 0.5).exit_hurdle == 0.5
+
+        # cross-dual system: η with the linear form, Walras's law, the exit
+        Random.seed!(2)
+        solx, _, px = simulate_Ndept(3, T = 1.0, seed = 2, coupled = true, μ = 0.5, market_prices = true,
+                                     η = 0.9, reinvestment_form = :linear, exit_rate = 0.5)
+        @test px.reinvestment_form === :linear && px.exit_rate == 0.5 && px.exit_hurdle == 0.0
+        Xq = solx.u[end] .+ [zeros(6); [0.1, -0.2, 0.05]]
+        Cq, Vq, q = Xq[1:3], Xq[4:6], Xq[7:9]
+        ec = cross_dual_state(Cq, Vq, q, px)
+        @test sum(ec.P .* ec.demand) ≈ sum(ec.P .* ec.x) rtol = 1e-12     # Walras's law
+        @test ec.reinvestment ≈ _linear_reinvestment(px.σ_c, ec.Π, Cq .+ Vq, 0.9)
+        fq = similar(Xq); cross_dual_system!(fq, Xq, px, 0.0)
+        @test fq[1:3] ≈ ec.reinvestment .- px.δ .* Cq .+ ec.mobility_C .- _exit_flow(ec.r, Cq, 0.5, 0.0)
+        f2 = similar(Xq); cross_dual_system!(f2, [2 .* Xq[1:6]; q], px, 0.0)
+        @test f2 ≈ [2 .* fq[1:6]; fq[7:9]] rtol = 1e-12
+        # losses: a sector whose market price is low enough makes a loss, and only it scraps capital
+        ecl = cross_dual_state(Cq, Vq, [0.0, -1.0, 0.0], px)
+        @test ecl.Π[2] < 0 && all(ecl.Π[[1, 3]] .> 0)
+        @test _exit_flow(ecl.r, Cq, 0.5, 0.0) ≈ [0, -0.5 * ecl.r[2] * Cq[2], 0]
+        # η = 0 in the linear form is the fixed-share cross-dual system
+        Random.seed!(2); _, _, pxd = simulate_Ndept(3, T = 1.0, seed = 2, coupled = true, μ = 0.5, market_prices = true)
+        pxl = merge(pxd, (reinvestment_form = :linear, η = 0.0))
+        @test _rhs(pxl)(Xq) ≈ _rhs(pxd)(Xq) rtol = 1e-12
+        # balanced growth exists and is stable with η = 0.9 (no exit binding)
+        p9 = merge(pxd, (reinvestment_form = :linear, η = 0.9))
+        eq = balanced_growth(p9, solx.u[1])
+        @test eq.converged && eq.stable && minimum(eq.X[1:6]) > 0
+        @test system_jacobian(p9, eq.X) ≈ fd(_rhs(p9), eq.X) rtol = 1e-5
+
+        # argument checks
+        @test_throws ArgumentError simulate_Ndept(3, T = 1.0, coupled = true, reinvestment_form = :other)
+        @test_throws ArgumentError simulate_Ndept(3, T = 1.0, coupled = true, market_prices = true, η = 0.5,
+                                                  reinvestment_form = :power)
+        @test_throws ArgumentError simulate_Ndept(3, T = 1.0, coupled = true, exit_rate = -0.1)
+        @test_throws ArgumentError simulate_Ndept(3, T = 1.0, coupled = true, exit_rate = 0.1, exit_hurdle = Inf)
+        @test_throws ArgumentError simulate_Ndept(3, T = 1.0, coupled = true, exit_rate = 0.1, exit_hurdle = -1.0)
+        @test_throws ArgumentError simulate_Ndept(3, T = 1.0, exit_rate = 0.1)            # uncoupled
+    end
+
     @testset "Rationing Jacobian — 2-sector example" begin
         # Section 3.3 of the paper: a single active eigenvalue λ = −1. Sector 2 is
         # not rationed (λ = 0), hence α_max = 1 (flip in the undamped iteration) and

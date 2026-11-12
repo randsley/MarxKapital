@@ -13,7 +13,7 @@
 # ============================================================================
 
 """
-    cross_dual_state(C, V, q, p)
+    cross_dual_state(C, V, q, p, t = 0.0)
 
 Quantities of the cross-dual system at a state `(C, V, q)`:
 
@@ -23,7 +23,12 @@ Quantities of the cross-dual system at a state `(C, V, q)`:
 - `Π`: profits at market prices, `(P − AᵀP)ᵢxᵢ − Vᵢ − δᵢCᵢ`;
 - `r`: profit rates `Π/(C + V)`;
 - `investment`: gross investment spending per buying sector
-  (`σ_cΠ + δC + μ(r − r̄)C`);
+  (`σ_cΠ + δC + μ(r − r̄)C`; with `p.reinvestment_form == :linear`,
+  `_linear_reinvestment(σ_c·m(t), Π, C + V, η) + δC + μ(r − r̄)C`, and
+  the difference between `σ_cΠ` and that planned reinvestment is spent on
+  capitalist consumption, so Walras's law still holds);
+- `reinvestment`: the planned net reinvestment in `C` (`σ_cΠ`, or the
+  linear form);
 - `demand`: demand in quantities, intermediate `Ax` + investment +
   consumption; capital goods are bought in the composition of A's columns,
   consumption (wages, `σ_vΠ` and capitalist consumption `γΠ`) in the basket
@@ -31,7 +36,7 @@ Quantities of the cross-dual system at a state `(C, V, q)`:
 
 Walras's law: `Σ Pᵢ·demandᵢ = Σ Pᵢ·xᵢ` identically.
 """
-function cross_dual_state(C, V, q, p)
+function cross_dual_state(C, V, q, p, t = 0.0)
     N = length(C)
     S = p.e .* V
     colsum = vec(sum(p.A, dims = 1))
@@ -43,15 +48,24 @@ function cross_dual_state(C, V, q, p)
     r = Π ./ (C .+ V)
     r̄ = sum(r .* C) / sum(C)
     mobility_C = _mobility_flow(r, C, p.μ, get(p, :exit_friction, 0.0))
-    investment = p.σ_c .* Π .+ p.δ .* C .+ mobility_C
     γ = 1 .- p.σ_c .- p.σ_v
-    consumption = sum(V) + sum((p.σ_v .+ γ) .* Π)
+    if _linear_form(p)
+        σ = _scheduled_σ(p, t)
+        reinvestment = _linear_reinvestment(σ, Π, C .+ V, get(p, :η, 0.0))
+        investment = reinvestment .+ p.δ .* C .+ mobility_C
+        # what is not reinvested out of σ_c·m(t)·Π (positive or negative) is consumed
+        consumption = sum(V) + sum((p.σ_v .+ γ) .* Π) + sum(p.σ_c .* Π) - sum(reinvestment)
+    else
+        reinvestment = p.σ_c .* Π
+        investment = p.σ_c .* Π .+ p.δ .* C .+ mobility_C
+        consumption = sum(V) + sum((p.σ_v .+ γ) .* Π)
+    end
     # capital goods: composition of column j of A (normalized); columns with
     # no inputs buy in the consumption basket
     composition = [colsum[j] > 0 ? p.A[i, j] / colsum[j] : p.basket[i] for i in 1:N, j in 1:N]
     demand = p.A * x .+ (composition * investment .+ p.basket .* consumption) ./ P
     return (x = x, P = P, Π = Π, r = r, r̄ = r̄, mobility_C = mobility_C,
-            investment = investment, demand = demand,
+            reinvestment = reinvestment, investment = investment, demand = demand,
             excess = (demand .- x) ./ x)
 end
 
@@ -66,14 +80,22 @@ Cross-dual dynamics (`market_prices=true`), state `X = [C; V; q]`:
 
 with profits and profit rates at market prices (`cross_dual_state`). The
 accumulation equations are those of `system_Ndept_io!` with `Π` in place of
-`S`, including the optional exit friction (`p.exit_friction`, `_mobility_flow`). The right-hand side is homogeneous of degree 1 in `(C, V)` and
+`S`, including the optional exit friction (`p.exit_friction`, `_mobility_flow`),
+the linear reinvestment form (`p.reinvestment_form == :linear`, the only form
+with `η` here, since `Π` can be ≤ 0) and the exit of unprofitable capital
+(`p.exit_rate`, `_exit_flow`; scrapping is not investment demand). The right-hand side is homogeneous of degree 1 in `(C, V)` and
 invariant to adding a constant to `q` (only relative prices matter).
 """
 function cross_dual_system!(dX, X, p, t)
     N = length(p.e)
     C, V, q = X[1:N], X[N+1:2N], X[2N+1:3N]
-    ec = cross_dual_state(C, V, q, p)
-    dX[1:N] = p.σ_c .* ec.Π .- p.δ .* C .+ ec.mobility_C
+    ec = cross_dual_state(C, V, q, p, t)
+    if _linear_form(p)
+        dX[1:N] = ec.reinvestment .- p.δ .* C .+ ec.mobility_C
+    else
+        dX[1:N] = p.σ_c .* ec.Π .- p.δ .* C .+ ec.mobility_C
+    end
+    haskey(p, :exit_rate) && (dX[1:N] = dX[1:N] .- _exit_flow(ec.r, C, p.exit_rate, get(p, :exit_hurdle, 0.0)))
     μ_v = get(p, :μ_v, 0.0)
     dX[N+1:2N] = iszero(μ_v) ? p.σ_v .* ec.Π :
                  p.σ_v .* ec.Π .+ _mobility_flow(ec.r, V, μ_v, get(p, :exit_friction, 0.0))

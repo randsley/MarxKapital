@@ -9,6 +9,17 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- A linear reinvestment form and an exit for unprofitable capital
+  (`simulate_Ndept(_custom)`, all opt-in; the defaults are bit-identical):
+  - `reinvestment_form = :linear` reinvests `σ_c·[(1−η)Π + η·r̄·K]`, with
+    `r̄ = ΣΠ/ΣK`. It is defined for losses, so `η` now works in the
+    cross-dual system (market prices), where it needs this form. With a
+    common `σ_c` it leaves aggregate reinvestment unchanged.
+  - `exit_rate = φ` and `exit_hurdle = h`: sectors whose profit rate is
+    below `h·r̄` scrap `φ·(h·r̄ − r)·C` of constant capital a year
+    (`_exit_flow`). With `h = 0` only loss-making sectors do.
+  - Both work with the Jacobians, `balanced_growth`, `with_parameter`
+    (`:exit_rate`, `:exit_hurdle`) and `parameter_jacobian`.
 - Calibration options for the floor on `e` (`calibrate_portugal_model`, all
   opt-in; the defaults are unchanged):
   - `sectors = :market` leaves out real estate and the non-market services

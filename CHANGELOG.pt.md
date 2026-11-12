@@ -9,6 +9,18 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- Uma forma linear do reinvestimento e uma saída para o capital pouco
+  rentável (`simulate_Ndept(_custom)`, tudo opcional; as predefinições ficam
+  idênticas bit a bit):
+  - `reinvestment_form = :linear` reinveste `σ_c·[(1−η)Π + η·r̄·K]`, com
+    `r̄ = ΣΠ/ΣK`. Está definida com prejuízos, pelo que `η` funciona agora
+    no sistema cruzado (preços de mercado), onde precisa desta forma. Com
+    um `σ_c` comum não altera o reinvestimento agregado.
+  - `exit_rate = φ` e `exit_hurdle = h`: os setores cuja taxa de lucro está
+    abaixo de `h·r̄` abatem `φ·(h·r̄ − r)·C` de capital constante por ano
+    (`_exit_flow`). Com `h = 0` só os setores com prejuízo o fazem.
+  - Ambas funcionam com os jacobianos, `balanced_growth`, `with_parameter`
+    (`:exit_rate`, `:exit_hurdle`) e `parameter_jacobian`.
 - Opções de calibração para o piso de `e` (`calibrate_portugal_model`,
   todas opcionais; as predefinições não mudam):
   - `sectors = :market` deixa de fora o imobiliário e os serviços não

@@ -175,7 +175,10 @@ end
 - `:μ`, `:μ_v`: mobility coefficients of constant / variable capital;
 - `:exit_friction`: the exit friction `ε` of the mobility terms;
 - `:η`: the elasticity of the reinvestment share to relative profitability
-  (`_reinvestment_share`; coupled system without market prices);
+  (`_reinvestment_share`, or `_linear_reinvestment` with
+  `reinvestment_form = :linear`, the form the cross-dual system needs);
+- `:exit_rate`, `:exit_hurdle`: the exit of unprofitable capital
+  (`_exit_flow`); `:exit_hurdle` only matters once `exit_rate` is set;
 - `:ω`: uniform wage share, `eᵢ = (1−θ)/θ` in every sector;
 - `:e_scale`: proportional exploitation, `eᵢ = θ·e_ref,ᵢ` (keeps the
   heterogeneity across sectors; the resulting aggregate wage share is
@@ -186,9 +189,11 @@ function with_parameter(p, parameter::Symbol, θ; e_ref = p.e)
     parameter === :μ_v && return merge(p, (μ_v = θ,))
     parameter === :exit_friction && return merge(p, (exit_friction = θ,))
     parameter === :η && return merge(p, (η = θ,))
+    parameter === :exit_rate && return merge(p, (exit_rate = θ, exit_hurdle = get(p, :exit_hurdle, 0.0)))
+    parameter === :exit_hurdle && return merge(p, (exit_hurdle = θ,))
     parameter === :ω && return merge(p, (e = fill((1 - θ) / θ, length(p.e)),))
     parameter === :e_scale && return merge(p, (e = θ .* e_ref,))
-    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :η, :ω or :e_scale)")
+    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :η, :exit_rate, :exit_hurdle, :ω or :e_scale)")
 end
 
 """
