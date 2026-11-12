@@ -204,6 +204,8 @@ se_cluster, ssr, n, countries)`: coefficients; classical standard errors
 Driscoll–Kraay errors (any correlation within a year, serial correlation up
 to `lags` years, Bartlett kernel); errors clustered by country (`G/(G−1)`
 factor, `NaN` with fewer than 2 countries); and the residual sum of squares.
+Also `V_cluster`, the clustered covariance matrix of `β` (for functions of
+several coefficients).
 """
 function estimate_fe_ols(panel::AbstractDataFrame, y::AbstractVector, X::AbstractVecOrMat;
                          effects = (:geo_section, :geo_year), lags::Integer = 2)
@@ -234,16 +236,18 @@ function estimate_fe_ols(panel::AbstractDataFrame, y::AbstractVector, X::Abstrac
     se = sqrt.(diag(XXi) .* (ssr / dof))
     se_DK = sqrt.(diag(XXi * _driscoll_kraay_meat(Xd, u, panel.year; lags = lags) * XXi))
     gc, G = _codes(panel.geo)
-    se_cl = if G >= 2
+    V_cl = if G >= 2
         hg = zeros(G, k)
         for i in eachindex(u)
             @views hg[gc[i], :] .+= Xd[i, :] .* u[i]
         end
-        sqrt.(diag(XXi * (G / (G - 1) .* (hg'hg)) * XXi))
+        XXi * (G / (G - 1) .* (hg'hg)) * XXi
     else
-        fill(NaN, k)
+        fill(NaN, k, k)
     end
-    return (β = β, se = se, se_DK = se_DK, se_cluster = se_cl, ssr = ssr, n = n, countries = G)
+    se_cl = sqrt.(diag(V_cl))
+    return (β = β, se = se, se_DK = se_DK, se_cluster = se_cl, ssr = ssr, n = n, countries = G,
+            V_cluster = V_cl)
 end
 
 """
@@ -308,6 +312,13 @@ flows the model's investment function needs, per country, section and year:
 analogue of a department's `σ_c`) and `valid` (`r > 0`, `rbar > 0`, `S > 0`: rows the
 elasticity form `(rbar/r)^η` can use). `self_employed = :imputed` imputes
 the self-employed in `S` as in `compute_mobility_panel`.
+
+For the linear form of the investment function (`estimate_investment_function`
+with `form = :linear`): `kv = 100·(Kₜ₋₂ + Vₜ₋₁)/Kₜ₋₁`, the capital that the
+profit rate `r` of t−1 divides by, as % of this year's stock; `rbar_K =
+ΣSₜ₋₁/Σ(Kₜ₋₂ + Vₜ₋₁)`, the country's aggregate profit rate (the `r̄` of
+`_linear_reinvestment`); and `valid_linear`, rows of country × sectors with
+a positive `σbar`, whatever the sign of their profit rate.
 """
 function compute_investment_panel(raw::AbstractDataFrame; sections, countries = nothing,
                                   self_employed::Symbol = :excluded)
@@ -334,50 +345,96 @@ function compute_investment_panel(raw::AbstractDataFrame; sections, countries = 
     end
     P.σbar = [haskey(gross, u) ? gross[u] / surplus[u] : NaN for u in zip(P.geo, P.section)]
     P.valid .&= .!isnan.(P.σbar)
+
+    # the linear form: the denominator of r and the aggregate profit rate
+    stock = Dict((geo[i], String(raw.section[i]), Int(raw.year[i])) => Float64(raw.capital_stock[i])
+                 for i in 1:nrow(raw))
+    wages = Dict((geo[i], String(raw.section[i]), Int(raw.year[i])) => V[i] for i in 1:nrow(raw))
+    D = [stock[(P.geo[i], P.section[i], P.year[i] - 2)] + wages[(P.geo[i], P.section[i], P.year[i] - 1)]
+         for i in 1:nrow(P)]
+    Slag = [last(flows[(P.geo[i], P.section[i], P.year[i] - 1)]) for i in 1:nrow(P)]
+    P.kv = 100 .* D ./ P.K
+    agg = Dict{Tuple{String, Int}, Tuple{Float64, Float64}}()
+    for i in 1:nrow(P)
+        a = get(agg, (P.geo[i], P.year[i]), (0.0, 0.0))
+        agg[(P.geo[i], P.year[i])] = (a[1] + Slag[i], a[2] + D[i])
+    end
+    P.rbar_K = [(a = agg[(P.geo[i], P.year[i])]; a[1] / a[2]) for i in 1:nrow(P)]
+    P.valid_linear = .!isnan.(P.σbar) .& (P.σbar .> 0) .& isfinite.(P.gk) .& isfinite.(P.sk)
     return P
 end
 
 """
-    estimate_investment_function(P; η_grid = 0:0.1:1.0, ratio_bounds = (0.0, Inf),
-                                 effects = (:geo_section, :geo_year), lags = 2)
+    estimate_investment_function(P; η_grid = 0:0.1:1.0, form = :power, ratio_bounds = nothing,
+                                 exit_hurdle = nothing, effects = (:geo_section, :geo_year), lags = 2)
 
-The model's investment function in data terms (`_reinvestment_share`),
+The model's investment function in data terms, on a `compute_investment_panel`
+panel. `form = :power` (`_reinvestment_share`):
 
     gk = λ·σbarᵢ·(rbar/rᵢ)^η·sk + μ·gap + effects + u,
 
-estimated at each elasticity `η` of `η_grid`, on the valid rows of a
-`compute_investment_panel` panel with `rᵢ/rbar` inside `ratio_bounds`
-(trimming the years in which a sector's profit rate is close to 0, where
-`(rbar/rᵢ)^η` explodes). Depreciation is in the country × sector effects.
-`λ = 1` is the model's own level (each department reinvests its share
-`σ_c`); `λ < 1` means investment follows own surplus less than the average
-share implies.
+on the valid rows (`r > 0`) with `rᵢ/rbar` inside `ratio_bounds` (default
+`(0, Inf)`; trimming the years in which a sector's profit rate is close to 0,
+where `(rbar/rᵢ)^η` explodes). `form = :linear` (`_linear_reinvestment`):
 
-The EU sectoral panel does not identify `η` by itself (notebook 11): the fit
-is nearly flat in `η`, so this returns the whole profile rather than an
-estimate of `η`, for `η` to be calibrated and `μ` read off at it.
+    gk = λ·σbarᵢ·[(1−η)·sk + η·rbar_K·kv] + μ·gap + effects + u,
 
-Returns `(profile, n, dropped)`: `profile` a DataFrame with, per `η`, `λ`
-and `μ`, their country-clustered standard errors `se_λ`, `se_μ`, the
-Driscoll–Kraay error `se_DK_μ` and the residual sum of squares `ssr`; `n`
-the rows used; `dropped` the rows left out (invalid or outside the bounds).
+which is defined for profit rates of any sign, so it uses every row with a
+positive `σbar` (`valid_linear`; `ratio_bounds` default `(-Inf, Inf)`).
+`exit_hurdle = h` adds the exit of unprofitable capital (`_exit_flow`), the
+regressor `100·max(h·rbar − r, 0)` with coefficient `−φ`. Depreciation is in
+the country × sector effects. `λ = 1` is the model's own level (each
+department reinvests its share `σ_c`); `λ < 1` means investment follows own
+surplus less than the average share implies.
+
+The panel identifies `η` poorly (notebook 11), so this returns the whole
+profile over `η_grid`, for `η` to be calibrated and `μ` read off at it. The
+linear form is also linear in `(λ(1−η), λη)`, so it is estimated freely as
+well: `unrestricted` gives `λ̂`, `η̂ = λη/λ` and their clustered errors
+(delta method).
+
+Returns `(profile, n, dropped, unrestricted)`: `profile` a DataFrame with,
+per `η`, `λ` and `μ`, their country-clustered standard errors `se_λ`, `se_μ`,
+the Driscoll–Kraay error `se_DK_μ`, the residual sum of squares `ssr`, and
+`φ`, `se_φ` with an exit hurdle; `n` the rows used; `dropped` the rows left
+out; `unrestricted` a NamedTuple for the linear form (`nothing` for the
+power form).
 """
-function estimate_investment_function(P::AbstractDataFrame; η_grid = 0:0.1:1.0,
-                                      ratio_bounds = (0.0, Inf),
+function estimate_investment_function(P::AbstractDataFrame; η_grid = 0:0.1:1.0, form::Symbol = :power,
+                                      ratio_bounds = nothing, exit_hurdle = nothing,
                                       effects = (:geo_section, :geo_year), lags::Integer = 2)
+    form in (:power, :linear) || throw(ArgumentError("form must be :power or :linear, got :$form"))
     isempty(η_grid) && throw(ArgumentError("empty η_grid"))
     all(η -> isfinite(η) && η >= 0, η_grid) || throw(ArgumentError("η_grid must hold finite values ≥ 0"))
-    lo, hi = ratio_bounds
-    0 <= lo < hi || throw(ArgumentError("ratio_bounds must satisfy 0 ≤ lower < upper"))
-    keep = P.valid .& (lo .<= P.r ./ P.rbar .<= hi)
+    isnothing(exit_hurdle) || (exit_hurdle isa Real && isfinite(exit_hurdle) && exit_hurdle >= 0) ||
+        throw(ArgumentError("exit_hurdle must be a finite number ≥ 0, got $exit_hurdle"))
+    lo, hi = isnothing(ratio_bounds) ? (form === :power ? (0.0, Inf) : (-Inf, Inf)) : ratio_bounds
+    lo < hi || throw(ArgumentError("ratio_bounds must satisfy lower < upper"))
+    (form === :power && lo < 0) && throw(ArgumentError("the power form needs ratio_bounds ≥ 0"))
+    keep = (form === :power ? P.valid : P.valid_linear) .& (lo .<= P.r ./ P.rbar .<= hi)
     Q = P[keep, :]
+    z = isnothing(exit_hurdle) ? nothing : 100 .* max.(exit_hurdle .* Q.rbar .- Q.r, 0)
+    with_exit(X) = isnothing(z) ? X : hcat(X, z)
+    term(η) = form === :power ? Q.σbar .* (Q.rbar ./ Q.r) .^ η .* Q.sk :
+                                Q.σbar .* ((1 - η) .* Q.sk .+ η .* Q.rbar_K .* Q.kv)
     rows = map(collect(η_grid)) do η
-        e = estimate_fe_ols(Q, Q.gk, hcat(Q.σbar .* (Q.rbar ./ Q.r) .^ η .* Q.sk, Q.gap);
-                            effects = effects, lags = lags)
-        (η = Float64(η), λ = e.β[1], se_λ = e.se_cluster[1], μ = e.β[2], se_μ = e.se_cluster[2],
-         se_DK_μ = e.se_DK[2], ssr = e.ssr)
+        e = estimate_fe_ols(Q, Q.gk, with_exit(hcat(term(η), Q.gap)); effects = effects, lags = lags)
+        row = (η = Float64(η), λ = e.β[1], se_λ = e.se_cluster[1], μ = e.β[2], se_μ = e.se_cluster[2],
+               se_DK_μ = e.se_DK[2], ssr = e.ssr)
+        isnothing(z) ? row : merge(row, (φ = -e.β[3], se_φ = e.se_cluster[3]))
     end
-    return (profile = DataFrame(rows), n = nrow(Q), dropped = nrow(P) - nrow(Q))
+    unrestricted = nothing
+    if form === :linear
+        e = estimate_fe_ols(Q, Q.gk, with_exit(hcat(Q.σbar .* Q.sk, Q.σbar .* Q.rbar_K .* Q.kv, Q.gap));
+                            effects = effects, lags = lags)
+        a, b = e.β[1], e.β[2]
+        Vab = e.V_cluster[1:2, 1:2]
+        g_λ, g_η = [1.0, 1.0], [-b, a] ./ (a + b)^2
+        unrestricted = (λ = a + b, se_λ = sqrt(g_λ' * Vab * g_λ), η = b / (a + b), se_η = sqrt(g_η' * Vab * g_η),
+                        μ = e.β[3], se_μ = e.se_cluster[3], ssr = e.ssr)
+        isnothing(z) || (unrestricted = merge(unrestricted, (φ = -e.β[4], se_φ = e.se_cluster[4])))
+    end
+    return (profile = DataFrame(rows), n = nrow(Q), dropped = nrow(P) - nrow(Q), unrestricted = unrestricted)
 end
 
 """

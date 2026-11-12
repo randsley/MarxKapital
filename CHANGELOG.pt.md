@@ -21,6 +21,13 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
     (`_exit_flow`). Com `h = 0` só os setores com prejuízo o fazem.
   - Ambas funcionam com os jacobianos, `balanced_growth`, `with_parameter`
     (`:exit_rate`, `:exit_hurdle`) e `parameter_jacobian`.
+- `estimate_investment_function(...; form = :linear, exit_hurdle)`: a forma
+  linear no painel da UE, incluindo os anos com prejuízo que a forma de
+  potência deixa de fora. É linear em `(λ(1−η), λη)`, pelo que também
+  estima `η` livremente (`unrestricted`, com erros pelo método delta).
+  `exit_hurdle` acrescenta o regressor da saída. `compute_investment_panel`
+  ganha `kv`, `rbar_K` e `valid_linear`, e `estimate_fe_ols` devolve a
+  matriz de covariância por clusters (`V_cluster`).
 - Opções de calibração para o piso de `e` (`calibrate_portugal_model`,
   todas opcionais; as predefinições não mudam):
   - `sectors = :market` deixa de fora o imobiliário e os serviços não

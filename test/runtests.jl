@@ -670,6 +670,50 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test estimate_investment_function(rows; ratio_bounds = (0.8, 1.25)).dropped > 0
         @test_throws ArgumentError estimate_investment_function(rows; η_grid = Float64[])
         @test_throws ArgumentError estimate_investment_function(rows; ratio_bounds = (2.0, 1.0))
+        @test isnothing(res.unrestricted)
+
+        # the linear form's columns, by hand
+        V(s, y) = cell(s, y, :compensation)
+        D(s, y) = cell(s, y - 2, :capital_stock) + V(s, y - 1)
+        @test row.kv ≈ 100 * D("J", 2004) / cell("J", 2003, :capital_stock)
+        @test row.rbar_K ≈ sum(S(s, 2003) for s in secs) / sum(D(s, 2004) for s in secs)
+        @test row.r ≈ S("J", 2003) / D("J", 2004)
+        @test all(IP.valid_linear)
+
+        # the linear form recovers λ, η, μ and the exit rate φ, also from rows with losses
+        λ0, η1, μ1, φ0, h0 = 0.8, 0.7, 0.12, 0.3, 0.5
+        lin = DataFrame(geo = String[], section = String[], year = Int[], gk = Float64[], sk = Float64[],
+                        kv = Float64[], r = Float64[], rbar = Float64[], rbar_K = Float64[], σbar = Float64[],
+                        gap = Float64[], valid_linear = Bool[])
+        for g in 1:G
+            b = randn(rng, Ty); rb = 0.1 .* exp.(0.2 .* randn(rng, Ty))
+            for s in 1:Ns, t in 1:Ty
+                r = rb[t] * (1 + 0.8 * randn(rng))                 # some negative
+                kv = 100 * (1.2 + 0.2rand(rng)); sk = r * kv
+                gap = 100 * (r - rb[t])
+                gk = a[g, s] + b[t] + λ0 * σb[g, s] * ((1 - η1) * sk + η1 * rb[t] * kv) + μ1 * gap -
+                     φ0 * 100 * max(h0 * rb[t] - r, 0) + 0.3 * randn(rng)
+                push!(lin, ("G$g", "S$s", 2000 + t, gk, sk, kv, r, rb[t], rb[t], σb[g, s], gap, true))
+            end
+        end
+        @test any(lin.r .< 0)
+        rl = estimate_investment_function(lin; form = :linear, exit_hurdle = h0, η_grid = 0:0.1:1.0)
+        @test rl.n == G * Ns * Ty && rl.dropped == 0
+        u = rl.unrestricted
+        @test u.η ≈ η1 atol = 0.05
+        @test u.λ ≈ λ0 atol = 0.05
+        @test u.μ ≈ μ1 atol = 0.03
+        @test u.φ ≈ φ0 atol = 0.05
+        @test u.se_η > 0 && u.se_φ > 0
+        k = argmin(rl.profile.ssr)
+        @test rl.profile.η[k] ≈ η1
+        @test rl.profile.φ[k] ≈ φ0 atol = 0.05
+        rn = estimate_investment_function(lin; form = :linear)
+        @test !hasproperty(rn.profile, :φ) && !haskey(rn.unrestricted, :φ)
+        @test estimate_investment_function(lin; form = :linear, ratio_bounds = (0.0, Inf)).dropped > 0
+        @test_throws ArgumentError estimate_investment_function(lin; form = :other)
+        @test_throws ArgumentError estimate_investment_function(lin; form = :linear, exit_hurdle = -1.0)
+        @test_throws ArgumentError estimate_investment_function(rows; ratio_bounds = (-1.0, 1.0))
     end
 
     @testset "Incremental rate of profit and persistence" begin

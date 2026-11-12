@@ -20,6 +20,13 @@ Format based on Keep a Changelog. Semantic versioning.
     (`_exit_flow`). With `h = 0` only loss-making sectors do.
   - Both work with the Jacobians, `balanced_growth`, `with_parameter`
     (`:exit_rate`, `:exit_hurdle`) and `parameter_jacobian`.
+- `estimate_investment_function(...; form = :linear, exit_hurdle)`: the
+  linear form on the EU panel, including the years with losses that the
+  power form drops. It is linear in `(λ(1−η), λη)`, so it also estimates
+  `η` freely (`unrestricted`, with delta-method errors). `exit_hurdle` adds
+  the exit regressor. `compute_investment_panel` gains `kv`, `rbar_K` and
+  `valid_linear`, and `estimate_fe_ols` returns the clustered covariance
+  matrix (`V_cluster`).
 - Calibration options for the floor on `e` (`calibrate_portugal_model`, all
   opt-in; the defaults are unchanged):
   - `sectors = :market` leaves out real estate and the non-market services
