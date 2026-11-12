@@ -602,7 +602,12 @@ afirmado algebricamente.
   (0,21). O que os dados rejeitam é o `σ_c` comum a todos os departamentos
   do modelo, que obriga toda a resposta do investimento à rentabilidade a
   passar por `μ`. Uma parte reinvestida que difira entre departamentos, ou
-  que caia com a taxa de lucro, permitiria estimar `μ` líquido dela.
+  que caia com a taxa de lucro, permitiria estimar `μ` líquido dela. A
+  aparente quebra em 2008 (`μ̂` −0,16 antes, −0,06 depois, com efeitos
+  comuns) tem a mesma origem: a resposta do investimento líquido ao
+  diferencial é estável, e a parte reinvestida caiu para metade (0,19 para
+  0,10). Portanto, o que os dados rejeitam não é um `μ` constante no
+  tempo, mas um `σ_c` constante no tempo e entre departamentos.
 - **`μ_v` (mobilidade do capital variável) está desligado por omissão.**
   Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
   supercrítico em todas as 30 economias aleatórias testadas, com

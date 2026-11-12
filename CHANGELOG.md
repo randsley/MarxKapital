@@ -17,7 +17,10 @@ Format based on Keep a Changelog. Semantic versioning.
   countries; Portugal's positive estimate is the exception. Net investment
   rises with the gap (0.08), but less than a common reinvestment share of
   the surplus would (0.21): what the panel rejects is the model's common
-  `σ_c`.
+  `σ_c`. Year by year, `μ̂ₜ` is negative up to 2009 and near zero after
+  (break at 2008: −0.16 to −0.06, t = 2.3), but the response of net
+  investment to the gap did not change; the reinvestment share halved
+  (0.19 to 0.10). The break is in `σ_c`, not in `μ`.
 - `src/mobility_estimation.jl`: `compute_mobility_panel` builds the panel
   of the capital-mobility equation from sectoral accounts, per country
   (transfer `R = I − σS` summing to zero in every country-year, gap to the

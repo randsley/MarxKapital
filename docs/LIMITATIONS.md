@@ -605,7 +605,11 @@ algebraically.
   common `σ_c` for every department, which forces all of the response of
   investment to profitability through `μ`. A reinvestment share that
   differs between departments, or falls with the profit rate, would let
-  `μ` be estimated net of it.
+  `μ` be estimated net of it. The apparent break at 2008 (`μ̂` −0.16
+  before, −0.06 after, with common effects) has the same source: the
+  response of net investment to the gap is stable, and the reinvestment
+  share halved (0.19 to 0.10). So `μ` constant over time is not what the
+  data reject; `σ_c` constant over time and across departments is.
 - **`μ_v` (mobility of variable capital) is off by default.** Accumulation
   cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random
   economies tested, with `β = 0.1`); the empirical value of `μ_v` is not

@@ -18,7 +18,10 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   positiva de Portugal é a exceção. O investimento líquido sobe com o
   diferencial (0,08), mas menos do que uma parte comum de reinvestimento do
   excedente exigiria (0,21): o que o painel rejeita é o `σ_c` comum do
-  modelo.
+  modelo. Ano a ano, `μ̂ₜ` é negativo até 2009 e perto de zero depois
+  (quebra em 2008: −0,16 para −0,06, t = 2,3), mas a resposta do
+  investimento líquido ao diferencial não mudou; a parte reinvestida caiu
+  para metade (0,19 para 0,10). A quebra está em `σ_c`, não em `μ`.
 - `src/mobility_estimation.jl`: `compute_mobility_panel` constrói o painel
   da equação de mobilidade do capital a partir das contas por ramo, país a
   país (transferência `R = I − σS`, que soma zero em cada país-ano, e
