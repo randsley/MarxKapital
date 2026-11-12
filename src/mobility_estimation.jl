@@ -318,7 +318,9 @@ with `form = :linear`): `kv = 100·(Kₜ₋₂ + Vₜ₋₁)/Kₜ₋₁`, the ca
 profit rate `r` of t−1 divides by, as % of this year's stock; `rbar_K =
 ΣSₜ₋₁/Σ(Kₜ₋₂ + Vₜ₋₁)`, the country's aggregate profit rate (the `r̄` of
 `_linear_reinvestment`); and `valid_linear`, rows of country × sectors with
-a positive `σbar`, whatever the sign of their profit rate.
+a positive `σbar`, whatever the sign of their profit rate. `dk =
+100·CFCₜ/Kₜ₋₁`, the depreciation rate (%), for the investment floor
+(`estimate_investment_floor`).
 """
 function compute_investment_panel(raw::AbstractDataFrame; sections, countries = nothing,
                                   self_employed::Symbol = :excluded)
@@ -361,7 +363,46 @@ function compute_investment_panel(raw::AbstractDataFrame; sections, countries = 
     end
     P.rbar_K = [(a = agg[(P.geo[i], P.year[i])]; a[1] / a[2]) for i in 1:nrow(P)]
     P.valid_linear = .!isnan.(P.σbar) .& (P.σbar .> 0) .& isfinite.(P.gk) .& isfinite.(P.sk)
+    cfc = Dict((geo[i], String(raw.section[i]), Int(raw.year[i])) => Float64(raw.CFC[i]) for i in 1:nrow(raw))
+    P.dk = [100 * cfc[(P.geo[i], P.section[i], P.year[i])] / P.K[i] for i in 1:nrow(P)]
     return P
+end
+
+"""
+    estimate_investment_floor(P; below = 0.0)
+
+The floor on gross investment (`investment_floor` of `simulate_Ndept_custom`,
+`_investment_floor`) from the rows of a `compute_investment_panel` panel
+whose profit rate is at most `below` times the country's mean (`r ≤
+below·rbar`; with the default 0, the years with losses): the slope `θ` of
+gross investment on depreciation through the origin,
+
+    gk = θ·dk + u,
+
+the share of what wears out that a sector replaces when its own investment
+function would invest little or nothing. Returns `(θ, se, median_ratio, n,
+countries)`: `θ̂`, its country-clustered standard error, the median of
+`gk/dk` in those rows, and their number.
+"""
+function estimate_investment_floor(P::AbstractDataFrame; below::Real = 0.0)
+    isfinite(below) || throw(ArgumentError("below must be finite, got $below"))
+    Q = P[(P.r .<= below .* P.rbar) .& isfinite.(P.gk) .& isfinite.(P.dk) .& (P.dk .> 0), :]
+    n = nrow(Q)
+    n >= 2 || throw(ArgumentError("fewer than 2 rows with r ≤ $(below)·rbar"))
+    dd = sum(abs2, Q.dk)
+    θ = sum(Q.gk .* Q.dk) / dd
+    u = Q.gk .- θ .* Q.dk
+    gc, G = _codes(Q.geo)
+    se = if G >= 2
+        h = zeros(G)
+        for i in 1:n
+            h[gc[i]] += Q.dk[i] * u[i]
+        end
+        sqrt(G / (G - 1) * sum(abs2, h)) / dd
+    else
+        NaN
+    end
+    return (θ = θ, se = se, median_ratio = median(Q.gk ./ Q.dk), n = n, countries = G)
 end
 
 """

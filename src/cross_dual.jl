@@ -26,7 +26,9 @@ Quantities of the cross-dual system at a state `(C, V, q)`:
   (`σ_cΠ + δC + μ(r − r̄)C`; with `p.reinvestment_form == :linear`,
   `_linear_reinvestment(σ_c·m(t), Π, C + V, η) + δC + μ(r − r̄)C`, and
   the difference between `σ_cΠ` and that planned reinvestment is spent on
-  capitalist consumption, so Walras's law still holds);
+  capitalist consumption, so Walras's law still holds; the same with the
+  investment floor, `max(·, θδC)`, whose extra investment comes out of
+  capitalist consumption);
 - `reinvestment`: the planned net reinvestment in `C` (`σ_cΠ`, or the
   linear form);
 - `demand`: demand in quantities, intermediate `Ax` + investment +
@@ -49,9 +51,12 @@ function cross_dual_state(C, V, q, p, t = 0.0)
     r̄ = sum(r .* C) / sum(C)
     mobility_C = _mobility_flow(r, C, p.μ, get(p, :exit_friction, 0.0))
     γ = 1 .- p.σ_c .- p.σ_v
-    if _linear_form(p)
-        σ = _scheduled_σ(p, t)
-        reinvestment = _linear_reinvestment(σ, Π, C .+ V, get(p, :η, 0.0))
+    floor_on = haskey(p, :investment_floor)
+    if _linear_form(p) || floor_on
+        reinvestment = _linear_form(p) ?
+            _linear_reinvestment(_scheduled_σ(p, t), Π, C .+ V, get(p, :η, 0.0)) :
+            p.σ_c .* Π
+        floor_on && (reinvestment = _investment_floor(reinvestment, C, p))
         investment = reinvestment .+ p.δ .* C .+ mobility_C
         # what is not reinvested out of σ_c·m(t)·Π (positive or negative) is consumed
         consumption = sum(V) + sum((p.σ_v .+ γ) .* Π) + sum(p.σ_c .* Π) - sum(reinvestment)
@@ -82,7 +87,8 @@ with profits and profit rates at market prices (`cross_dual_state`). The
 accumulation equations are those of `system_Ndept_io!` with `Π` in place of
 `S`, including the optional exit friction (`p.exit_friction`, `_mobility_flow`),
 the linear reinvestment form (`p.reinvestment_form == :linear`, the only form
-with `η` here, since `Π` can be ≤ 0) and the exit of unprofitable capital
+with `η` here, since `Π` can be ≤ 0), the investment floor
+(`p.investment_floor`, `_investment_floor`) and the exit of unprofitable capital
 (`p.exit_rate`, `_exit_flow`; scrapping is not investment demand). The right-hand side is homogeneous of degree 1 in `(C, V)` and
 invariant to adding a constant to `q` (only relative prices matter).
 """
@@ -90,7 +96,7 @@ function cross_dual_system!(dX, X, p, t)
     N = length(p.e)
     C, V, q = X[1:N], X[N+1:2N], X[2N+1:3N]
     ec = cross_dual_state(C, V, q, p, t)
-    if _linear_form(p)
+    if _linear_form(p) || haskey(p, :investment_floor)
         dX[1:N] = ec.reinvestment .- p.δ .* C .+ ec.mobility_C
     else
         dX[1:N] = p.σ_c .* ec.Π .- p.δ .* C .+ ec.mobility_C

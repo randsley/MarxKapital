@@ -19,8 +19,15 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   - `exit_rate = φ` e `exit_hurdle = h`: os setores cuja taxa de lucro está
     abaixo de `h·r̄` abatem `φ·(h·r̄ − r)·C` de capital constante por ano
     (`_exit_flow`). Com `h = 0` só os setores com prejuízo o fazem.
-  - Ambas funcionam com os jacobianos, `balanced_growth`, `with_parameter`
-    (`:exit_rate`, `:exit_hurdle`) e `parameter_jacobian`.
+  - `investment_floor = θ`: o reinvestimento bruto é pelo menos `θ·δ·C`
+    (`_investment_floor`), a irreversibilidade que o painel da UE mostra.
+    Com preços de mercado, o investimento a mais sai do consumo dos
+    capitalistas. `estimate_investment_floor` estima `θ` a partir dos anos
+    com prejuízo (`compute_investment_panel` ganha a taxa de depreciação
+    `dk`).
+  - Todas funcionam com os jacobianos, `balanced_growth`,
+    `with_parameter` (`:exit_rate`, `:exit_hurdle`, `:investment_floor`) e
+    `parameter_jacobian`.
 - `estimate_investment_function(...; form = :linear, exit_hurdle)`: a forma
   linear no painel da UE, incluindo os anos com prejuízo que a forma de
   potência deixa de fora. É linear em `(λ(1−η), λη)`, pelo que também

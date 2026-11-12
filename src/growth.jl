@@ -179,6 +179,8 @@ end
   `reinvestment_form = :linear`, the form the cross-dual system needs);
 - `:exit_rate`, `:exit_hurdle`: the exit of unprofitable capital
   (`_exit_flow`); `:exit_hurdle` only matters once `exit_rate` is set;
+- `:investment_floor`: the floor `θ` on gross reinvestment, `θ·δ·C`
+  (`_investment_floor`);
 - `:ω`: uniform wage share, `eᵢ = (1−θ)/θ` in every sector;
 - `:e_scale`: proportional exploitation, `eᵢ = θ·e_ref,ᵢ` (keeps the
   heterogeneity across sectors; the resulting aggregate wage share is
@@ -191,9 +193,10 @@ function with_parameter(p, parameter::Symbol, θ; e_ref = p.e)
     parameter === :η && return merge(p, (η = θ,))
     parameter === :exit_rate && return merge(p, (exit_rate = θ, exit_hurdle = get(p, :exit_hurdle, 0.0)))
     parameter === :exit_hurdle && return merge(p, (exit_hurdle = θ,))
+    parameter === :investment_floor && return merge(p, (investment_floor = θ,))
     parameter === :ω && return merge(p, (e = fill((1 - θ) / θ, length(p.e)),))
     parameter === :e_scale && return merge(p, (e = θ .* e_ref,))
-    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :η, :exit_rate, :exit_hurdle, :ω or :e_scale)")
+    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :η, :exit_rate, :exit_hurdle, :investment_floor, :ω or :e_scale)")
 end
 
 """

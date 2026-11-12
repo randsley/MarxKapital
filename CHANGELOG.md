@@ -18,8 +18,15 @@ Format based on Keep a Changelog. Semantic versioning.
   - `exit_rate = φ` and `exit_hurdle = h`: sectors whose profit rate is
     below `h·r̄` scrap `φ·(h·r̄ − r)·C` of constant capital a year
     (`_exit_flow`). With `h = 0` only loss-making sectors do.
-  - Both work with the Jacobians, `balanced_growth`, `with_parameter`
-    (`:exit_rate`, `:exit_hurdle`) and `parameter_jacobian`.
+  - `investment_floor = θ`: gross reinvestment is at least `θ·δ·C`
+    (`_investment_floor`), the irreversibility the EU panel shows. With
+    market prices, the extra investment comes out of capitalist
+    consumption. `estimate_investment_floor` estimates `θ` from the years
+    with losses (`compute_investment_panel` gains the depreciation rate
+    `dk`).
+  - All of them work with the Jacobians, `balanced_growth`,
+    `with_parameter` (`:exit_rate`, `:exit_hurdle`, `:investment_floor`)
+    and `parameter_jacobian`.
 - `estimate_investment_function(...; form = :linear, exit_hurdle)`: the
   linear form on the EU panel, including the years with losses that the
   power form drops. It is linear in `(λ(1−η), λη)`, so it also estimates

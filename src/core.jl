@@ -291,6 +291,19 @@ function _linear_reinvestment(σ, Π, K, η)
 end
 
 """
+    _investment_floor(planned, C, p)
+
+Gross reinvestment with the floor `θ = p.investment_floor`:
+`max(plannedᵢ, θ·δᵢ·Cᵢ)`. A sector keeps replacing at least the share `θ`
+of the capital that wears out whatever its profits (irreversibility: in the
+EU sectoral panel, sectors with losses keep gross investment close to
+depreciation, notebook 13). With `θ = 1` its own investment never shrinks
+its capital; only the mobility term moves capital out. Homogeneous of
+degree 1; the `max` has a kink where the floor starts to bind.
+"""
+_investment_floor(planned, C, p) = max.(planned, p.investment_floor .* p.δ .* C)
+
+"""
     _exit_flow(r, C, φ, h)
 
 Capital that sectors below the hurdle scrap, `φ·max(h·r̄ − rᵢ, 0)·Cᵢ`, with
@@ -376,7 +389,8 @@ sector are damped as its share shrinks, for both mobility terms; see
 
 If `p.reinvestment_form == :linear` (optional), planned reinvestment is
 `_linear_reinvestment(σ_c·m(t), S, πC+V, η)` instead of the power form
-`σ_c·m(t)·(r̄/rᵢ)^η·Sᵢ`. If `p.exit_rate = φ` is present, sectors whose
+`σ_c·m(t)·(r̄/rᵢ)^η·Sᵢ`. If `p.investment_floor = θ` is present, planned
+reinvestment is at least `θ·δᵢ·Cᵢ` (`_investment_floor`), before rationing. If `p.exit_rate = φ` is present, sectors whose
 profit rate is below `p.exit_hurdle·r̄` scrap `φ·(h·r̄ − rᵢ)·Cᵢ` of constant
 capital (`_exit_flow`).
 
@@ -397,6 +411,12 @@ function system_Ndept_io!(dX, X, p, t)
     else
         r = _io_profit_rates(C, V, S, p)
         σ_eff = _reinvestment_share(r, C, p, t)   # p.σ_c unless η or σ_schedule are set
+    end
+    # Investment floor (optional, `p.investment_floor`; absent = off): gross
+    # reinvestment is at least θ·δ·C (irreversibility, `_investment_floor`).
+    if haskey(p, :investment_floor)
+        planned = _investment_floor(linear ? planned : σ_eff .* S, C, p)
+        linear = true   # from here on the planned amount is used, as in the linear form
     end
 
     # `κ` inherits the type of `S` (not `ones(N)`, Float64): under automatic
@@ -698,15 +718,16 @@ rationing; see the `system_Ndept_io!` docstring. `market_prices=true`
 `cross_dual_system!`: market prices with adjustment speed `β` and consumption
 basket `basket` (`basket_initial` by default). `exit_friction` (coupled
 only, 0 = off) damps capital outflows from sectors with small shares; see
-`_mobility_flow`. `η`, `σ_schedule`, `reinvestment_form`, `exit_rate` and
-`exit_hurdle`: see `simulate_Ndept_custom`.
+`_mobility_flow`. `η`, `σ_schedule`, `reinvestment_form`, `exit_rate`,
+`exit_hurdle` and `investment_floor`: see `simulate_Ndept_custom`.
 """
 function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
                        realization = false, rationing = false,
                        market_prices = false, β = 0.5, basket = nothing,
                        exit_friction = 0.0, η = 0.0, σ_schedule = nothing,
-                       reinvestment_form = :power, exit_rate = 0.0, exit_hurdle = 0.0)
+                       reinvestment_form = :power, exit_rate = 0.0, exit_hurdle = 0.0,
+                       investment_floor = nothing)
     depts = create_departments(N, name_list)
     return simulate_Ndept_custom(depts, T = T, seed = seed, coupled = coupled, μ = μ,
                                      μ_v = μ_v, realization = realization,
@@ -714,7 +735,7 @@ function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                                      market_prices = market_prices, β = β, basket = basket,
                                      exit_friction = exit_friction, η = η, σ_schedule = σ_schedule,
                                      reinvestment_form = reinvestment_form, exit_rate = exit_rate,
-                                     exit_hurdle = exit_hurdle)
+                                     exit_hurdle = exit_hurdle, investment_floor = investment_floor)
 end
 
 """
@@ -764,6 +785,11 @@ Exit of unprofitable capital (needs `coupled=true`; `_exit_flow`):
   with losses do, which can only happen with `market_prices=true`. Unlike
   the mobility term, which moves capital, this destroys it. Not the same as
   `exit_friction`, which damps outflows from small sectors.
+- `investment_floor = θ ≥ 0` (`nothing` = off, the default): gross
+  reinvestment is at least `θ·δᵢ·Cᵢ` (`_investment_floor`), the
+  irreversibility the EU panel shows (sectors with losses keep investing
+  about as much as wears out; notebook 13). With market prices, the extra
+  investment above `σ_c·Π` is financed out of capitalist consumption.
 
 Real-data options, typically from a calibration (`departments_from_params`):
 
@@ -791,13 +817,19 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    A = nothing, final_demand_share = nothing,
                                    import_coefficients = nothing, exit_friction = 0.0,
                                    η = 0.0, σ_schedule = nothing, reinvestment_form = :power,
-                                   exit_rate = 0.0, exit_hurdle = 0.0)
+                                   exit_rate = 0.0, exit_hurdle = 0.0, investment_floor = nothing)
     N = length(depts)
     exit_friction >= 0 || error("exit_friction must be ≥ 0")
     (iszero(exit_friction) || coupled) || error("exit_friction requires coupled=true")
     reinvestment = _reinvestment_params(η, σ_schedule; coupled = coupled, market_prices = market_prices,
                                         form = reinvestment_form)
     reinvestment = merge(reinvestment, _exit_params(exit_rate, exit_hurdle; coupled = coupled))
+    if !isnothing(investment_floor)
+        (investment_floor isa Real && isfinite(investment_floor) && investment_floor >= 0) ||
+            throw(ArgumentError("investment_floor must be nothing or a finite number ≥ 0, got $investment_floor"))
+        coupled || throw(ArgumentError("investment_floor requires coupled=true"))
+        reinvestment = merge(reinvestment, (investment_floor = Float64(investment_floor),))
+    end
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
     if isnothing(A)
         A = create_technical_matrix(N, seed = seed)

@@ -714,6 +714,18 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ArgumentError estimate_investment_function(lin; form = :other)
         @test_throws ArgumentError estimate_investment_function(lin; form = :linear, exit_hurdle = -1.0)
         @test_throws ArgumentError estimate_investment_function(rows; ratio_bounds = (-1.0, 1.0))
+
+        # the floor: gross investment on depreciation through the origin, in the years with losses
+        @test row.dk ≈ 100 * cell("J", 2004, :CFC) / cell("J", 2003, :capital_stock)
+        fl = DataFrame(geo = repeat(["G1", "G2", "G3"], inner = 40), r = repeat([-0.02, 0.1], 60),
+                       rbar = fill(0.08, 120), dk = 5 .+ 3 .* rand(rng, 120))
+        fl.gk = 0.9 .* fl.dk .+ 0.2 .* randn(rng, 120)
+        fe = estimate_investment_floor(fl)
+        @test fe.n == 60 && fe.countries == 3
+        @test fe.θ ≈ 0.9 atol = 0.03
+        @test fe.se > 0
+        @test estimate_investment_floor(fl; below = 2.0).n == 120
+        @test_throws ArgumentError estimate_investment_floor(fl; below = -10.0)    # no rows
     end
 
     @testset "Incremental rate of profit and persistence" begin
@@ -1173,6 +1185,30 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ArgumentError simulate_Ndept(3, T = 1.0, coupled = true, exit_rate = 0.1, exit_hurdle = Inf)
         @test_throws ArgumentError simulate_Ndept(3, T = 1.0, coupled = true, exit_rate = 0.1, exit_hurdle = -1.0)
         @test_throws ArgumentError simulate_Ndept(3, T = 1.0, exit_rate = 0.1)            # uncoupled
+
+        # the investment floor: max(planned, θ·δ·C), in both systems
+        Random.seed!(3); solf, _, pf = simulate_Ndept(5, T = 20.0, seed = 3, coupled = true, μ = 0.3,
+                                                      investment_floor = 1.0)
+        @test solf.retcode == ReturnCode.Success && pf.investment_floor == 1.0
+        Sx = p0.e .* Vx
+        @test _rhs(pf)(X)[1:N] ≈ max.(p0.σ_c .* Sx, p0.δ .* Cx) .- p0.δ .* Cx .+ _mobility_flow(rx, Cx, 0.3, 0.0)
+        @test _rhs(merge(p0, (investment_floor = 0.0,)))(X) ≈ _rhs(p0)(X)    # S > 0: a zero floor never binds
+        @test _rhs(pf)(2 .* X) ≈ 2 .* _rhs(pf)(X)
+        # with market prices: a loss-making sector replaces θ·δ·C, financed out of consumption
+        pxf = merge(px, (investment_floor = 0.8,))
+        ecf = cross_dual_state(Cq, Vq, [0.0, -1.0, 0.0], pxf)
+        planned = _linear_reinvestment(px.σ_c, ecf.Π, Cq .+ Vq, 0.9)
+        @test ecf.reinvestment ≈ max.(planned, 0.8 .* px.δ .* Cq)
+        @test sum(ecf.P .* ecf.demand) ≈ sum(ecf.P .* ecf.x) rtol = 1e-12     # Walras's law
+        Random.seed!(2); _, _, pxf0 = simulate_Ndept(3, T = 1.0, seed = 2, coupled = true, μ = 0.5,
+                                                     market_prices = true, investment_floor = 0.8)
+        ec0 = cross_dual_state(Cq, Vq, [0.0, -1.0, 0.0], pxf0)              # the floor alone, fixed share
+        @test ec0.reinvestment ≈ max.(pxf0.σ_c .* ec0.Π, 0.8 .* pxf0.δ .* Cq)
+        @test ec0.Π[2] < 0 && ec0.reinvestment[2] ≈ 0.8 * pxf0.δ[2] * Cq[2]   # binds with losses
+        @test sum(ec0.P .* ec0.demand) ≈ sum(ec0.P .* ec0.x) rtol = 1e-12
+        @test with_parameter(pf, :investment_floor, 0.5).investment_floor == 0.5
+        @test_throws ArgumentError simulate_Ndept(3, T = 1.0, coupled = true, investment_floor = -0.5)
+        @test_throws ArgumentError simulate_Ndept(3, T = 1.0, investment_floor = 1.0)     # uncoupled
     end
 
     @testset "Rationing Jacobian — 2-sector example" begin
