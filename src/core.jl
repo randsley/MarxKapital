@@ -662,7 +662,7 @@ profits can be ≤ 0; see `_reinvestment_share`):
 - `η ≥ 0`: elasticity of the reinvestment share to relative profitability,
   `σ_c,ᵢ·(r̄/rᵢ)^η`. 0 (default) is each department's fixed share; with
   `η = 1` investment is proportional to capital at the average profit rate.
-  The EU sectoral panel (notebook 10) motivates it.
+  Notebook 11 takes it to the EU sectoral panel.
 - `σ_schedule`: a vector of `(t_start, multiplier)` pairs, increasing in
   time, multipliers ≥ 0: every `σ_c` is multiplied by the multiplier of the
   last break at or before `t` (1 before the first). The solver stops at the

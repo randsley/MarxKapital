@@ -607,15 +607,26 @@ algebraically.
   differs between departments, or falls with the profit rate, would let
   `μ` be estimated net of it. The apparent break at 2008 (`μ̂` −0.16
   before, −0.06 after, with common effects) has the same source: the
-  response of net investment to the gap is stable, and the reinvestment
-  share halved (0.19 to 0.10). So `μ` constant over time is not what the
-  data reject; `σ_c` constant over time and across departments is.
+  response of net investment to the gap is stable, and the share
+  reinvested net of depreciation halved (0.19 to 0.10); the gross share,
+  the model's `σ_c`, did not change (depreciation rose; notebook 11). So
+  `μ` constant over time is not what the data reject. Notebook 11 estimates
+  the model's investment function with a reinvestment share that falls
+  with relative profitability, `σ_c·(r̄/rᵢ)^η`: `μ̂` is then positive for
+  every `η` (0.05 to 0.13), but the panel does not identify `η`; investment
+  follows own surplus at about a tenth of the average share, which
+  calibrates `η` ≈ 1 and gives `μ̂` = 0.13 (se 0.04). In the model, `η` = 1
+  with that `μ` lets unprofitable sectors accumulate until their profit
+  rate reaches zero: the calibrated investment function needs an exit for
+  unprofitable capital, and `η` in the cross-dual system, before it can be
+  used for long-run simulations.
 - **Reinvestment share (optional).** `simulate_Ndept_custom(...; η, σ_schedule)`
   replaces each department's fixed `σ_c` by `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η`: an
   elasticity `η` of the share to relative profitability (0 = fixed share,
   the default) and a piecewise-constant multiplier `m(t)` (`σ_schedule`).
-  Notebook 10 motivates both: under a fixed share the EU panel gives a
-  negative `μ̂`, and the reinvestment share halved after 2008. Only in the
+  Notebooks 10–11 motivate `η`: under a fixed share the EU panel gives a
+  negative `μ̂`. The gross reinvestment share did not change after 2008,
+  so the data do not call for a schedule; it is there for scenarios. Only in the
   coupled system without market prices: in the cross-dual system profits at
   market prices can be ≤ 0, so `(r̄/rᵢ)^η` is undefined there (not yet
   supported). A schedule makes the system non-autonomous, so the

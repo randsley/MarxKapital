@@ -9,6 +9,17 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- Notebook 11, `11_reinvestment_and_mobility`: a função de investimento do
+  modelo no painel setorial da UE. Permitir que o reinvestimento se afaste
+  de uma parte fixa torna `μ̂` positivo para qualquer `η` (0,05 com `η` = 0,
+  0,13 com 1, amostra aparada), mas o painel não identifica `η` (o ajuste
+  muda 1,1%): o investimento segue o excedente próprio a cerca de um
+  décimo da parte média, e o nível do próprio modelo ajusta 57–82% pior.
+  Calibrando `η` = 1, `μ̂` = 0,13 (erro 0,04), positivo em todas as
+  verificações. A parte reinvestida bruta não mudou depois de 2008 (as
+  amortizações subiram), pelo que não é preciso um `σ_schedule`. No modelo,
+  `η` = 1 deixa os setores pouco rentáveis acumular até a taxa de lucro
+  chegar a zero.
 - Parte reinvestida que cai com a rentabilidade, e um calendário:
   `simulate_Ndept(_custom)(...; η = 0.0, σ_schedule = nothing)` no sistema
   acoplado. Cada departamento reinveste `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η` do seu
@@ -39,8 +50,9 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   excedente exigiria (0,21): o que o painel rejeita é o `σ_c` comum do
   modelo. Ano a ano, `μ̂ₜ` é negativo até 2009 e perto de zero depois
   (quebra em 2008: −0,16 para −0,06, t = 2,3), mas a resposta do
-  investimento líquido ao diferencial não mudou; a parte reinvestida caiu
-  para metade (0,19 para 0,10). A quebra está em `σ_c`, não em `μ`.
+  investimento líquido ao diferencial não mudou; a parte reinvestida
+  líquida de amortizações caiu para metade (0,19 para 0,10). A quebra não
+  está em `μ`.
 - `src/mobility_estimation.jl`: `compute_mobility_panel` constrói o painel
   da equação de mobilidade do capital a partir das contas por ramo, país a
   país (transferência `R = I − σS`, que soma zero em cada país-ano, e

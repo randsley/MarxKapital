@@ -9,6 +9,16 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- Notebook 11, `11_reinvestment_and_mobility`: the model's investment
+  function on the EU sectoral panel. Allowing reinvestment to depart from
+  a fixed share makes `μ̂` positive for every `η` (0.05 at `η` = 0, 0.13
+  at 1, trimmed sample), but the panel does not identify `η` (the fit
+  changes by 1.1%): investment follows own surplus at about a tenth of
+  the average share, and the model's own level fits 57–82% worse.
+  Calibrating `η` = 1 gives `μ̂` = 0.13 (se 0.04), positive in every check.
+  The gross reinvestment share did not change after 2008 (depreciation
+  rose), so no `σ_schedule` is needed. In the model, `η` = 1 lets
+  unprofitable sectors accumulate until their profit rate reaches zero.
 - Reinvestment share that falls with profitability, and a schedule:
   `simulate_Ndept(_custom)(...; η = 0.0, σ_schedule = nothing)` in the
   coupled system. Each department reinvests `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η` of its
@@ -37,8 +47,8 @@ Format based on Keep a Changelog. Semantic versioning.
   the surplus would (0.21): what the panel rejects is the model's common
   `σ_c`. Year by year, `μ̂ₜ` is negative up to 2009 and near zero after
   (break at 2008: −0.16 to −0.06, t = 2.3), but the response of net
-  investment to the gap did not change; the reinvestment share halved
-  (0.19 to 0.10). The break is in `σ_c`, not in `μ`.
+  investment to the gap did not change; the share reinvested net of
+  depreciation halved (0.19 to 0.10). The break is not in `μ`.
 - `src/mobility_estimation.jl`: `compute_mobility_panel` builds the panel
   of the capital-mobility equation from sectoral accounts, per country
   (transfer `R = I − σS` summing to zero in every country-year, gap to the

@@ -605,16 +605,27 @@ afirmado algebricamente.
   que caia com a taxa de lucro, permitiria estimar `μ` líquido dela. A
   aparente quebra em 2008 (`μ̂` −0,16 antes, −0,06 depois, com efeitos
   comuns) tem a mesma origem: a resposta do investimento líquido ao
-  diferencial é estável, e a parte reinvestida caiu para metade (0,19 para
-  0,10). Portanto, o que os dados rejeitam não é um `μ` constante no
-  tempo, mas um `σ_c` constante no tempo e entre departamentos.
+  diferencial é estável, e a parte reinvestida líquida de amortizações caiu
+  para metade (0,19 para 0,10); a parte bruta, o `σ_c` do modelo, não mudou
+  (as amortizações subiram; notebook 11). Portanto, o que os dados rejeitam
+  não é um `μ` constante no tempo. O notebook 11 estima a função de
+  investimento do modelo com uma parte reinvestida que cai com a
+  rentabilidade relativa, `σ_c·(r̄/rᵢ)^η`: `μ̂` é então positivo para
+  qualquer `η` (0,05 a 0,13), mas o painel não identifica `η`; o
+  investimento segue o excedente próprio a cerca de um décimo da parte
+  média, o que calibra `η` ≈ 1 e dá `μ̂` = 0,13 (erro 0,04). No modelo,
+  `η` = 1 com esse `μ` deixa os setores pouco rentáveis acumular até a taxa
+  de lucro chegar a zero: a função de investimento calibrada precisa de uma
+  saída para o capital pouco rentável, e de `η` no sistema cruzado, antes
+  de poder ser usada em simulações de longo prazo.
 - **Parte reinvestida (opcional).** `simulate_Ndept_custom(...; η, σ_schedule)`
   substitui o `σ_c` fixo de cada departamento por `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η`:
   uma elasticidade `η` da parte reinvestida à rentabilidade relativa (0 =
   parte fixa, por omissão) e um multiplicador `m(t)` constante por troços
-  (`σ_schedule`). O notebook 10 justifica ambos: com uma parte fixa o
-  painel da UE dá um `μ̂` negativo, e a parte reinvestida caiu para metade
-  depois de 2008. Só no sistema acoplado sem preços de mercado: no sistema
+  (`σ_schedule`). Os notebooks 10–11 justificam `η`: com uma parte fixa o
+  painel da UE dá um `μ̂` negativo. A parte reinvestida bruta não mudou
+  depois de 2008, pelo que os dados não pedem um calendário; fica
+  disponível para cenários. Só no sistema acoplado sem preços de mercado: no sistema
   cruzado os lucros a preços de mercado podem ser ≤ 0, pelo que `(r̄/rᵢ)^η`
   não está definido (ainda não suportado). Um calendário torna o sistema não
   autónomo, pelo que as ferramentas de crescimento equilibrado e de
