@@ -9,6 +9,21 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- `capital_goods` and `benchmark_output` in `simulate_Ndept(_custom)`
+  (with `rationing = true`; the defaults are bit-identical), which make
+  the netted balance of `net_intermediate` hold with real tables:
+  - `capital_goods`: gross investment buys capital goods in given shares
+    (a vector, or an `N×N` matrix by buying sector) instead of demanding
+    the circulating inputs of expanding output (`A·Δx`).
+    `capital_goods_composition(fd; A, min_share)` gives the shares from the
+    IOT's gross capital formation or its row residual.
+  - `benchmark_output`: per-sector factors, fixed at `t = 0`, give the
+    rebuilt gross output the IOT's composition (`_output_scale`).
+
+  With Portugal's IOT the balance then holds at `t = 0` and binds as the
+  sectoral composition drifts, within about 3 years at the calibrated
+  `σ_v` = 0.15 and over decades at the estimated ≈ 0.01
+  (`docs/LIMITATIONS.md` §1).
 - `net_intermediate = true` in `simulate_Ndept(_custom)` (needs
   `coupled = true` and `rationing = true`; the defaults are bit-identical):
   rationing compares investment demand with supply net of the replacement

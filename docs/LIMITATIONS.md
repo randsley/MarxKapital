@@ -152,30 +152,60 @@ consumption and exports. For Portugal 2022 (paper, Section 5.7, Table 4)
 this leaves the share of rationed sectors unchanged and lowers
 accumulation by about a fifth at 10 and 19 sectors.
 
-**Implemented as an option, but not usable with the real IOT (netted
-replacement):** `net_intermediate = true` (with `rationing = true`) also
-nets the replacement of the period's intermediate inputs, comparing `Dᵢ`
-with `max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)` (`_investable_supply`, `src/core.jl`).
-In synthetic economies it works as expected: it rations more often and
-lowers accumulation in 7 of 10 synthetic runs (3 and 6 sectors, 5 seeds). **With Portugal's
-2022 IOT, accumulation collapses** (ΣC ×0.3 over 30 years at 10 and 19
-sectors, against ×56.6–×200.6 without it; 14–16 of the 19 sectors have
-no investable supply). The reason is structural, not numerical. In the
-IOT the row residual `x − A·x − φ·x` is gross fixed capital formation
-(plus inventories and, in O and P, about 3% of other uses), and GFCF is produced by a handful of
-sectors: construction F (65% of its output), J (18%), M (15%), L (12%),
-A (8%), G (5%), R (2%). Sections D, E, H, I, K, N, Q and S produce
-practically none. The
-model's investment demand, `A·Δx`, has the composition of the
-*circulating* inputs of expanding output (a column of `A`), which every
-sector supplies. The minimum in `κⱼ = minᵢ ρᵢ` then binds at a sector
-with no residual, and investment stops everywhere. The model's own `x`
-adds to this: it is 0.5–2.0 times the IOT output by section, so at
-`t = 0` the netted balance already fails in D and E. **Still open:** a
-fully netted balance needs investment to demand capital goods in the
-composition of the IOT's GFCF column (a capital-goods matrix), not the
-columns of `A`. Until then `Dᵢ ≤ (1−φᵢ)xᵢ` remains an upper bound on
-investable supply.
+**Partly fixed (optional; netted replacement and a capital-goods
+matrix):** `net_intermediate = true` (with `rationing = true`) also nets
+the replacement of the period's intermediate inputs, comparing `Dᵢ` with
+`max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)` (`_investable_supply`, `src/core.jl`).
+
+- **On its own it is not usable with the real IOT.** With Portugal's 2022
+  IOT accumulation collapses (ΣC ×0.3 over 30 years at 10 and 19 sectors,
+  against ×56.6–×200.6 without it), because two things don't match.
+  - *What investment buys.* In the table the row residual
+    `x − A·x − φ·x` is gross capital formation (plus small items), which a
+    handful of sectors produce: construction F (65% of its output), J
+    (18%), M (15%), L (12%), A (8%), G (5%), R (2%). But the model's
+    investment demand, `A·Δx`, has the composition of the circulating
+    inputs of expanding output, which every sector supplies. The minimum
+    in `κⱼ = minᵢ ρᵢ` binds at a sector with no residual.
+  - *The model's `x`.* It is 0.5–2.0 times the IOT output by section in
+    2022 (0.7–1.3 in 2020, the table's benchmark year), and the residual
+    is 0–6% of output in most sectors, so a few percent of error decides
+    which sectors can supply investment.
+- **Fixed for the first, opt-in:** `capital_goods = b` makes gross
+  investment buy capital goods, in the shares `b` (or the columns of an
+  `N×N` matrix). `capital_goods_composition(params.final_demand; A =
+  params.A)` gives them from the table's row residual, dropping goods
+  below 0.1% of capital formation, which would otherwise decide the
+  minimum.
+- **Fixed for the second, opt-in:** `benchmark_output =
+  params.final_demand.output` rescales `x` sector by sector, with factors
+  fixed at `t = 0`, to the table's composition and the same total.
+- **With both, the netted balance holds at the start but not for long**
+  (Portugal, 15 market sectors, 2022 and 2019; 19 sections, 2022). At
+  `t = 0` no sector is rationed (model investment is about 1/1.24 of the
+  table's gross capital formation). How long it holds depends on how fast
+  the sectoral composition drifts away from the table's, and the drift is
+  mostly unrationed variable capital (`dV = σ_v·S`, growing at `σ_v·eᵢ`,
+  2–23% a year by sector).
+  - At the calibrated `σ_v` = 0.15, the composition drifts by a factor of
+    e¹·⁴–e¹⁰ in 10 years, and investment stops within about 3 years.
+  - At `σ_v` = 0.01, the order of the estimates of notebook 14, κ averages
+    0.74–0.80 over the first 10 years and falls to 0 by year 30.
+  - At `σ_v` = 0, it averages 0.85–0.89, then about 0.5, and is 0.42–0.45
+    at year 30.
+
+  The supply-side reproduction balance binds in about 90% of the
+  periods. The coupled system has no mechanism keeping sectoral
+  proportions in line with `A`. Proportionality is exactly what a netted
+  balance tests, and it fails as sectors grow at their own rates.
+- **Still open:** a mechanism that restores proportions, such as market
+  prices (the cross-dual system, which cannot be combined with rationing)
+  or demand-led variable capital.
+
+A related observation for the default model: at `σ_v` = 0.01, ΣC grows
+×0.9–1.4 over 30 years even without netting (×1.4 at 19 sections with
+imports, against ×73.7 at the calibrated 0.15). The ×56–×200 of the
+paper's Table 4 come from variable capital growing at `σ_v` = 0.15.
 
 **Fixed (imported inputs, optional):** Eurostat's matrix covers domestic
 inputs only, so the `xᵢ` reconstructed from it left out imported
@@ -504,7 +534,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 612 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 635 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,

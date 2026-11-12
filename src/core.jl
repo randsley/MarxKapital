@@ -75,9 +75,33 @@ Gross output rebuilt from the value-added-type flow `W = δC + V + S`:
 `m = p.import_coefficients` (imported intermediate inputs per unit of
 output; 0 when the field is absent, as for the closed synthetic matrices).
 With Eurostat's domestic matrix `A`, leaving `m` out would understate `x` by
-the imported inputs. Generic in the number type (automatic differentiation).
+the imported inputs. With `p.output_scale` (`benchmark_output` in
+`simulate_Ndept_custom`), each sector's `x` is multiplied by a factor fixed
+at the start of the simulation. Generic in the number type (automatic
+differentiation).
 """
-_gross_output(W, p) = W ./ (1 .- vec(sum(p.A, dims = 1)) .- get(p, :import_coefficients, 0.0))
+function _gross_output(W, p)
+    x = W ./ (1 .- vec(sum(p.A, dims = 1)) .- get(p, :import_coefficients, 0.0))
+    return haskey(p, :output_scale) ? p.output_scale .* x : x
+end
+
+"""
+    _output_scale(benchmark, x0)
+
+Factors `sⱼ` that give the model's initial gross output `x0` the sectoral
+composition of `benchmark` (the input-output table's output) and leave its
+total unchanged: `sⱼ = (benchmarkⱼ/Σ benchmark)/(x0ⱼ/Σ x0)`. They stand for
+what the rebuilt `x` misses sector by sector (taxes on products, the gap
+between the calibration year and the table's benchmark year), and are held
+fixed afterwards.
+"""
+function _output_scale(benchmark, x0)
+    length(benchmark) == length(x0) ||
+        throw(ArgumentError("benchmark_output must have length $(length(x0)), got $(length(benchmark))"))
+    all(v -> isfinite(v) && v > 0, benchmark) ||
+        throw(ArgumentError("benchmark_output must be finite and positive"))
+    return (benchmark ./ sum(benchmark)) ./ (x0 ./ sum(x0))
+end
 
 """
     _ensure_output_admissibility(A; margin=0.95, m=nothing)
@@ -454,8 +478,17 @@ function system_Ndept_io!(dX, X, p, t)
             # applies to this OUTPUT expansion, not to investment spending
             # directly (the earlier simplification, already
             # documented as such in the paper).
-            Δx = linear ? planned .* x ./ C : σ_eff .* S .* x ./ C
-            κ = _solve_rationing(p.A, ones(N), Δx, O)
+            if haskey(p, :capital_goods)
+                # Optional (`capital_goods`): planned gross investment is
+                # spending on capital goods, bought in the composition of
+                # the columns of the capital-goods matrix (the IOT's gross
+                # capital formation column), not in the composition of
+                # expanding output's circulating inputs (A's columns).
+                κ = _solve_rationing(p.capital_goods, ones(N), linear ? planned : σ_eff .* S, O)
+            else
+                Δx = linear ? planned .* x ./ C : σ_eff .* S .* x ./ C
+                κ = _solve_rationing(p.A, ones(N), Δx, O)
+            end
         else
             intermediate_demand = p.A * O
             demand_sum = sum(intermediate_demand)
@@ -509,6 +542,27 @@ function _investable_supply(x, p)
     O = haskey(p, :final_demand_share) ? (1 .- p.final_demand_share) .* x : x
     get(p, :net_intermediate, false) || return O
     return max.(O .- p.A * x, zero(eltype(x)))
+end
+
+"""
+    _capital_goods_matrix(b, N)
+
+The `N×N` capital-goods matrix of `simulate_Ndept_custom(...; capital_goods
+= b)`: a vector `b` gives the same composition to every buying sector
+(`B[:, j] = b/Σb`), a matrix has each column normalized to sum to 1. Shares
+must be finite and nonnegative, and every column must buy something.
+"""
+function _capital_goods_matrix(b, N)
+    M = b isa AbstractVector ? repeat(reshape(collect(Float64, b), :, 1), 1, N) :
+        b isa AbstractMatrix ? collect(Float64, b) :
+        throw(ArgumentError("capital_goods must be a vector or a matrix"))
+    size(M) == (N, N) ||
+        throw(ArgumentError("capital_goods must have length $N or size ($N, $N), got size $(size(b))"))
+    all(v -> isfinite(v) && v >= 0, M) ||
+        throw(ArgumentError("capital_goods shares must be finite and nonnegative"))
+    s = vec(sum(M; dims = 1))
+    all(>(0), s) || throw(ArgumentError("every column of capital_goods must have a positive share"))
+    return M ./ s'
 end
 
 """
@@ -751,8 +805,9 @@ rationing; see the `system_Ndept_io!` docstring. `market_prices=true`
 basket `basket` (`basket_initial` by default). `exit_friction` (coupled
 only, 0 = off) damps capital outflows from sectors with small shares; see
 `_mobility_flow`. `η`, `σ_schedule`, `reinvestment_form`, `exit_rate`,
-`exit_hurdle`, `investment_floor`, `tssi_dynamics`, `τ` and
-`net_intermediate`: see `simulate_Ndept_custom`.
+`exit_hurdle`, `investment_floor`, `tssi_dynamics`, `τ`,
+`net_intermediate`, `capital_goods` and `benchmark_output`: see
+`simulate_Ndept_custom`.
 """
 function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
@@ -761,7 +816,8 @@ function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        exit_friction = 0.0, η = 0.0, σ_schedule = nothing,
                        reinvestment_form = :power, exit_rate = 0.0, exit_hurdle = 0.0,
                        investment_floor = nothing, tssi_dynamics = false, τ = 1.0,
-                       net_intermediate = false)
+                       net_intermediate = false, capital_goods = nothing,
+                       benchmark_output = nothing)
     depts = create_departments(N, name_list)
     return simulate_Ndept_custom(depts, T = T, seed = seed, coupled = coupled, μ = μ,
                                      μ_v = μ_v, realization = realization,
@@ -771,7 +827,9 @@ function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                                      reinvestment_form = reinvestment_form, exit_rate = exit_rate,
                                      exit_hurdle = exit_hurdle, investment_floor = investment_floor,
                                      tssi_dynamics = tssi_dynamics, τ = τ,
-                                     net_intermediate = net_intermediate)
+                                     net_intermediate = net_intermediate,
+                                     capital_goods = capital_goods,
+                                     benchmark_output = benchmark_output)
 end
 
 """
@@ -858,6 +916,23 @@ Real-data options, typically from a calibration (`departments_from_params`):
 - `net_intermediate = true` (only with `rationing=true`): the supply
   available to investment is also net of the replacement of the period's
   intermediate inputs, `max(x − A·x − φ·x, 0)` (`_investable_supply`).
+- `capital_goods` (only with `rationing=true`): what investment buys. By
+  default the planned investment of sector `j` is converted into an output
+  expansion `Δxⱼ` and demands its circulating inputs, `A·Δx`. With a
+  vector `b` (e.g. `capital_goods_composition(params.final_demand)`, the
+  IOT's gross capital formation by product) every sector's gross
+  investment buys capital goods in the shares `b`; with an `N×N` matrix,
+  sector `j` buys them in the shares of column `j`. Shares are normalized
+  to sum to 1. The demand for good `i` is `Σⱼ B[i,j]·κⱼ·Iⱼ`, and only the
+  goods a sector buys can ration it. This is what makes `net_intermediate`
+  usable with real tables (`docs/LIMITATIONS.md` item 1).
+- `benchmark_output` (only with `rationing=true`): the input-output table's
+  gross output by sector (`params.final_demand.output`). The rebuilt `x` is
+  rescaled sector by sector, with factors fixed at `t = 0`
+  (`_output_scale`), so that it starts with the table's composition and
+  the same total. The netted balance is a small residual of large numbers
+  (2–6% of output in most sectors), so without this a few percent of
+  error in `x` decides which sectors can supply investment.
 """
 function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
@@ -867,8 +942,14 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    import_coefficients = nothing, exit_friction = 0.0,
                                    η = 0.0, σ_schedule = nothing, reinvestment_form = :power,
                                    exit_rate = 0.0, exit_hurdle = 0.0, investment_floor = nothing,
-                                   tssi_dynamics = false, τ = 1.0, net_intermediate = false)
+                                   tssi_dynamics = false, τ = 1.0, net_intermediate = false,
+                                   capital_goods = nothing, benchmark_output = nothing)
     N = length(depts)
+    (!isnothing(benchmark_output) && !(coupled && rationing)) &&
+        throw(ArgumentError("benchmark_output requires coupled=true and rationing=true"))
+    B_goods = isnothing(capital_goods) ? nothing : _capital_goods_matrix(capital_goods, N)
+    (!isnothing(B_goods) && !(coupled && rationing)) &&
+        throw(ArgumentError("capital_goods requires coupled=true and rationing=true"))
     net_intermediate isa Bool || throw(ArgumentError("net_intermediate must be true or false"))
     (net_intermediate && !(coupled && rationing)) &&
         throw(ArgumentError("net_intermediate requires coupled=true and rationing=true"))
@@ -954,6 +1035,12 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
         isnothing(import_coefficients) ||
             (p = merge(p, (import_coefficients = collect(Float64, import_coefficients),)))
         net_intermediate && (p = merge(p, (net_intermediate = true,)))
+        isnothing(B_goods) || (p = merge(p, (capital_goods = B_goods,)))
+        if !isnothing(benchmark_output)
+            C0, V0 = X0[1:N], X0[N+1:2N]
+            x0 = _gross_output(p.δ .* C0 .+ V0 .+ p.e .* V0, p)
+            p = merge(p, (output_scale = _output_scale(collect(Float64, benchmark_output), x0),))
+        end
         iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
         p = merge(p, reinvestment)
         if tssi_dynamics   # TSSI prices and book value, consistent with each other

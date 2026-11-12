@@ -1197,6 +1197,57 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test !haskey(p0, :net_intermediate)
     end
 
+    @testset "Capital-goods matrix and output benchmark in rationing" begin
+        # the matrix: a vector is every column, columns sum to 1
+        B = _capital_goods_matrix([2.0, 0.0, 6.0], 3)
+        @test B ≈ repeat([0.25, 0.0, 0.75], 1, 3)
+        M = _capital_goods_matrix([1.0 0.0; 3.0 2.0], 2)
+        @test M ≈ [0.25 0.0; 0.75 1.0]
+        @test_throws ArgumentError _capital_goods_matrix([1.0, 2.0], 3)
+        @test_throws ArgumentError _capital_goods_matrix([1.0, -1.0, 2.0], 3)
+        @test_throws ArgumentError _capital_goods_matrix([1.0 0.0; 1.0 0.0], 2)
+        @test_throws ArgumentError _capital_goods_matrix("b", 2)
+        # composition from final demand: P5, or the table's row residual
+        A = [0.1 0.2 0.0; 0.2 0.1 0.1; 0.0 0.1 0.2]
+        fd = (household = [40.0, 30.0, 70.0], government = [0.0, 0.0, 5.0],
+              investment = [30.0, -2.0, 0.00001], exports = [10.0, 30.0, 4.9], output = [100.0, 100.0, 100.0])
+        b5 = capital_goods_composition(fd)
+        @test b5 ≈ [1.0, 0.0, 0.0]          # inventories fall in 2; 3's share is below min_share
+        @test capital_goods_composition(fd; min_share = 0.0)[3] > 0
+        res = max.(fd.output .- A * fd.output .- exogenous_demand_share(fd) .* fd.output, 0.0)
+        @test capital_goods_composition(fd; A = A, min_share = 0.0) ≈ res ./ sum(res)
+        @test_throws ArgumentError capital_goods_composition(merge(fd, (investment = zeros(3),)))
+        # output benchmark: the composition of the benchmark, the same total
+        s = _output_scale([1.0, 2.0, 3.0], [3.0, 3.0, 3.0])
+        @test (s .* 3.0) ./ 9.0 ≈ [1, 2, 3] ./ 6 && sum(s .* 3.0) ≈ 9.0
+        @test_throws ArgumentError _output_scale([1.0, 2.0], [1.0, 1.0, 1.0])
+        @test_throws ArgumentError _output_scale([1.0, 0.0, 1.0], [1.0, 1.0, 1.0])
+        # in the simulation
+        Random.seed!(6); depts = create_departments(4, String[])
+        bench = [4.0, 3.0, 2.0, 1.0]; b = [0.5, 0.3, 0.2, 0.0]
+        sol, _, p = simulate_Ndept_custom(depts; T = 20.0, seed = 6, coupled = true, rationing = true,
+                                          capital_goods = b, benchmark_output = bench, net_intermediate = true)
+        @test p.capital_goods ≈ repeat(b, 1, 4)
+        X0 = sol.u[1]; C0, V0 = X0[1:4], X0[5:8]
+        x0 = _gross_output(p.δ .* C0 .+ V0 .+ p.e .* V0, p)
+        @test x0 ./ sum(x0) ≈ bench ./ sum(bench)
+        @test sum(x0) ≈ sum(_gross_output(p.δ .* C0 .+ V0 .+ p.e .* V0, Base.structdiff(p, (output_scale = 0,))))
+        @test all(isfinite, sol.u[end]) && all(>(0), sol.u[end][1:8])
+        # one composition for every buyer → one κ for every buyer
+        X = sol.u[end]; C, V = X[1:4], X[5:8]; S = p.e .* V
+        κ = _solve_rationing(p.capital_goods, ones(4), p.σ_c .* S, _investable_supply(_gross_output(p.δ .* C .+ V .+ S, p), p))
+        @test all(≈(κ[1]), κ)
+        # automatic differentiation through the new rationing step
+        J = system_jacobian(p, X)
+        @test maximum(abs.(J .- jacobian_fd(_rhs(p), X; h = 1e-5 * maximum(X)))) / maximum(abs.(J)) < 1e-2
+        # validation, and defaults untouched
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, capital_goods = b)
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, benchmark_output = bench)
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, rationing = true, capital_goods = [1.0, 2.0])
+        Random.seed!(6); _, _, p0 = simulate_Ndept(4, T = 1.0, coupled = true, rationing = true, seed = 6)
+        @test !haskey(p0, :capital_goods) && !haskey(p0, :output_scale)
+    end
+
     @testset "TSSI-driven dynamics" begin
         Random.seed!(7); depts = create_departments(5, String[])
         N = 5

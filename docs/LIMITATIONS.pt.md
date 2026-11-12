@@ -150,30 +150,62 @@ final e exportações. Para Portugal 2022 (artigo, Secção 5.7, Tabela 4),
 isto não altera a parcela de setores racionados e reduz a acumulação em
 cerca de um quinto com 10 e 19 setores.
 
-**Implementado como opção, mas não utilizável com a IOT real (reposição
-descontada):** `net_intermediate = true` (com `rationing = true`)
-desconta também a reposição dos inputs intermédios do período,
-comparando `Dᵢ` com `max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)` (`_investable_supply`,
-`src/core.jl`). Em economias sintéticas funciona como esperado: raciona
-mais vezes e reduz a acumulação em 7 de 10 simulações sintéticas (3 e 6
-setores, 5 sementes). **Com a IOT portuguesa de 2022, a acumulação colapsa**
-(ΣC ×0,3 em 30 anos com 10 e 19 setores, contra ×56,6–×200,6 sem a opção;
-14–16 dos 19 setores ficam sem oferta investível). A razão é estrutural,
-não numérica. Na IOT o resíduo de linha `x − A·x − φ·x` é a formação
-bruta de capital fixo (mais existências e, em O e P, cerca de 3% de
-outras utilizações), e a FBCF é produzida
-por poucos setores: construção F (65% do seu output), J (18%), M (15%),
-L (12%), A (8%), G (5%), R (2%). As secções D, E, H, I, K, N, Q e S não
-produzem praticamente nenhuma. A procura de investimento do modelo, `A·Δx`, tem a composição
-dos inputs *circulantes* do output em expansão (uma coluna de `A`), que
-todos os setores fornecem. O mínimo em `κⱼ = minᵢ ρᵢ` fica então
-vinculado num setor sem resíduo, e o investimento para em toda a parte.
-O próprio `x` do modelo agrava isto: é 0,5–2,0 vezes o output da IOT por
-secção, pelo que em `t = 0` o balanço descontado já falha em D e E.
-**Continua em aberto:** um balanço totalmente líquido exige que o
-investimento procure bens de capital na composição da coluna de FBCF da
-IOT (uma matriz de bens de capital), e não as colunas de `A`. Até lá,
-`Dᵢ ≤ (1−φᵢ)xᵢ` continua a ser um limite superior à oferta investível.
+**Corrigido em parte (opcional; reposição descontada e matriz de bens de
+capital):** `net_intermediate = true` (com `rationing = true`) desconta
+também a reposição dos inputs intermédios do período, comparando `Dᵢ` com
+`max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)` (`_investable_supply`, `src/core.jl`).
+
+- **Sozinho, não é utilizável com a IOT real.** Com a IOT portuguesa de
+  2022 a acumulação colapsa (ΣC ×0,3 em 30 anos com 10 e 19 setores,
+  contra ×56,6–×200,6 sem a opção), porque duas coisas não batem certo.
+  - *O que o investimento compra.* Na tabela o resíduo de linha
+    `x − A·x − φ·x` é a formação bruta de capital (mais pequenos itens),
+    produzida por poucos setores: construção F (65% do seu output), J
+    (18%), M (15%), L (12%), A (8%), G (5%), R (2%). Mas a procura de
+    investimento do modelo, `A·Δx`, tem a composição dos inputs
+    circulantes do output em expansão, que todos os setores fornecem. O
+    mínimo em `κⱼ = minᵢ ρᵢ` fica vinculado num setor sem resíduo.
+  - *O `x` do modelo.* É 0,5–2,0 vezes o output da IOT por secção em 2022
+    (0,7–1,3 em 2020, o ano de referência da tabela), e o resíduo é 0–6%
+    do output na maioria dos setores, pelo que alguns pontos percentuais
+    de erro decidem que setores podem fornecer investimento.
+- **Corrigido para o primeiro, opcional:** `capital_goods = b` faz o
+  investimento bruto comprar bens de capital, nas parcelas `b` (ou nas
+  colunas de uma matriz `N×N`). `capital_goods_composition(params.final_demand;
+  A = params.A)` dá-as a partir do resíduo de linha da tabela, deixando
+  de fora os bens abaixo de 0,1% da formação de capital, que de outro modo
+  decidiriam o mínimo.
+- **Corrigido para o segundo, opcional:** `benchmark_output =
+  params.final_demand.output` reescala `x` setor a setor, com fatores
+  fixados em `t = 0`, para a composição da tabela e o mesmo total.
+- **Com ambos, o balanço descontado vale no início, mas não por muito
+  tempo** (Portugal, 15 setores mercantis, 2022 e 2019; 19 secções, 2022).
+  Em `t = 0` nenhum setor é racionado (o investimento do modelo é cerca de
+  1/1,24 da formação bruta de capital da tabela). Quanto tempo vale
+  depende da rapidez com que a composição setorial se afasta da da
+  tabela, e o afastamento vem sobretudo do capital variável não
+  racionado (`dV = σ_v·S`, que cresce a `σ_v·eᵢ`, 2–23% ao ano conforme o
+  setor).
+  - Com o `σ_v` calibrado de 0,15, a composição afasta-se por um fator de
+    e¹·⁴–e¹⁰ em 10 anos, e o investimento para em cerca de 3 anos.
+  - Com `σ_v` = 0,01, a ordem das estimativas do notebook 14, κ tem média
+    0,74–0,80 nos primeiros 10 anos e cai para 0 até ao ano 30.
+  - Com `σ_v` = 0, tem média 0,85–0,89, depois cerca de 0,5, e vale
+    0,42–0,45 no ano 30.
+
+  O balanço de reprodução do lado da oferta fica vinculado em cerca de
+  90% dos períodos. O sistema acoplado não tem nenhum mecanismo que
+  mantenha as proporções setoriais de acordo com `A`. A
+  proporcionalidade é exatamente o que um balanço descontado testa, e
+  falha quando os setores crescem a ritmos próprios.
+- **Continua em aberto:** um mecanismo que reponha as proporções, como os
+  preços de mercado (o sistema cross-dual, que não pode ser combinado com
+  racionamento) ou um capital variável puxado pela procura.
+
+Uma observação relacionada, para o modelo predefinido: com `σ_v` = 0,01,
+ΣC cresce ×0,9–1,4 em 30 anos mesmo sem desconto (×1,4 com 19 secções e
+importações, contra ×73,7 com o valor calibrado de 0,15). Os ×56–×200 da
+Tabela 4 do artigo vêm do capital variável a crescer a `σ_v` = 0,15.
 
 **Corrigido (inputs importados, opcional):** a matriz do Eurostat só cobre
 inputs domésticos, pelo que o `xᵢ` reconstruído a partir dela deixava de
@@ -498,7 +530,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 612 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 635 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,

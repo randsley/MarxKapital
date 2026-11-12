@@ -721,6 +721,41 @@ shares of initial net output.
 consumption_basket(fd) = fd.household ./ sum(fd.household)
 
 """
+    capital_goods_composition(fd; A = nothing, cap = 0.95, min_share = 0.001)
+
+Composition of the capital goods investment buys (`capital_goods` in
+`simulate_Ndept_custom`), from real final demand.
+
+- Without `A`: each sector's share of gross capital formation of domestic
+  output (`P5`, fixed capital and inventories; a fall in inventories counts
+  as 0).
+- With the table's `A` (`params.A`): each sector's share of the row
+  residual `max(x − A·x − φ·x, 0)` of the table, with `x = fd.output` and
+  `φ = exogenous_demand_share(fd; cap)`. That is gross capital formation
+  plus the small items the row balance leaves over, and it is the
+  composition the netted rationing balance (`net_intermediate`) nets
+  against: a sector with a share of `P5` but no residual (D in Portugal's
+  table) would otherwise ration every buyer to zero.
+
+Shares below `min_share` are set to 0 before normalizing. Rationing takes
+the minimum over every good a sector buys, so a good worth 10⁻⁸ of
+investment (or a floating-point remnant of the residual) would otherwise
+decide it.
+"""
+function capital_goods_composition(fd; A = nothing, cap = 0.95, min_share = 0.001)
+    b = if isnothing(A)
+        max.(fd.investment, 0.0)
+    else
+        x = fd.output
+        max.(x .- A * x .- exogenous_demand_share(fd; cap = cap) .* x, 0.0)
+    end
+    sum(b) > 0 || throw(ArgumentError("final demand has no gross capital formation"))
+    b = b ./ sum(b)
+    b[b .< min_share] .= 0.0
+    return b ./ sum(b)
+end
+
+"""
     exogenous_demand_share(fd; cap = 0.95)
 
 Share of each sector's output that goes to final consumption (households,

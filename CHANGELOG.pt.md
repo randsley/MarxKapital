@@ -9,6 +9,21 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- `capital_goods` e `benchmark_output` em `simulate_Ndept(_custom)` (com
+  `rationing = true`; as predefinições são idênticas bit a bit), que fazem
+  o balanço descontado de `net_intermediate` valer com tabelas reais:
+  - `capital_goods`: o investimento bruto compra bens de capital em
+    parcelas dadas (um vetor, ou uma matriz `N×N` por setor comprador) em
+    vez de procurar os inputs circulantes do output em expansão (`A·Δx`).
+    `capital_goods_composition(fd; A, min_share)` dá as parcelas a partir
+    da formação bruta de capital da IOT ou do seu resíduo de linha.
+  - `benchmark_output`: fatores por setor, fixados em `t = 0`, dão ao
+    output bruto reconstruído a composição da IOT (`_output_scale`).
+
+  Com a IOT portuguesa o balanço vale então em `t = 0` e fica vinculado à
+  medida que a composição setorial deriva, em cerca de 3 anos com o `σ_v`
+  calibrado de 0,15 e ao longo de décadas com o estimado ≈ 0,01
+  (`docs/LIMITATIONS.pt.md` §1).
 - `net_intermediate = true` em `simulate_Ndept(_custom)` (exige
   `coupled = true` e `rationing = true`; as predefinições são idênticas bit
   a bit): o racionamento compara a procura de investimento com a oferta
