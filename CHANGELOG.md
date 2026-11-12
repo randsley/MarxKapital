@@ -247,6 +247,24 @@ Format based on Keep a Changelog. Semantic versioning.
   prices with the capital stock at current replacement cost, the
   calibration's own price basis.
 
+### Changed
+- The paper (`paper/main.tex`) is brought up to date with the work since
+  it was frozen:
+  - a new Section 5.8 estimates the accumulation parameters on the EU
+    sectoral panel (Table 5, Figure 12), from the new offline script
+    `paper/estimation.jl`;
+  - Section 5.6 places the estimated `μ_v` against the Hopf point of
+    Portugal's calibrated economy;
+  - Section 5.7 gains Table 4b (imported inputs, the netted balance, the
+    capital-goods matrix, an empirical `σ_v`);
+  - Sections 4.3 and 5.1 report the perpetual inventory by asset and the
+    self-employed and market-sector variants;
+  - Section 3.4 describes the TSSI-driven dynamics;
+  - the abstract, introduction, limitations and conclusion are revised to
+    match.
+
+  The existing figures and tables are unchanged.
+
 ### Fixed
 - `system_hessian` with `rationing = true` failed: the implicit-function
   derivative of the rationing fixed point was first-order only.

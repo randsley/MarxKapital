@@ -260,6 +260,25 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   correntes com o stock de capital ao custo de substituição corrente, a
   base de preços da própria calibração.
 
+### Alterado
+- O artigo (`paper/main.tex`) é atualizado com o trabalho feito desde que
+  foi congelado:
+  - uma nova Secção 5.8 estima os parâmetros de acumulação no painel
+    setorial da UE (Tabela 5, Figura 12), a partir do novo script offline
+    `paper/estimation.jl`;
+  - a Secção 5.6 situa o `μ_v` estimado face ao ponto de Hopf da economia
+    portuguesa calibrada;
+  - a Secção 5.7 ganha a Tabela 4b (inputs importados, o balanço
+    descontado, a matriz de bens de capital, um `σ_v` empírico);
+  - as Secções 4.3 e 5.1 apresentam o inventário permanente por ativo e
+    as variantes com trabalhadores por conta própria e só setores
+    mercantis;
+  - a Secção 3.4 descreve a dinâmica guiada pelo TSSI;
+  - o resumo, a introdução, as limitações e a conclusão são revistos em
+    conformidade.
+
+  As figuras e tabelas existentes não mudam.
+
 ### Corrigido
 - `system_hessian` com `rationing = true` falhava: a derivada do ponto fixo
   do racionamento pelo teorema da função implícita era só de primeira

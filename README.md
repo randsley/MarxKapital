@@ -323,6 +323,7 @@ marxkapital/
 │   ├── monte_carlo.jl      # systematic sweeps (convergence, dispersion)
 │   ├── jacobian_bifurcation.jl # exact Jacobian, bifurcations, TSSI (offline)
 │   ├── accumulation_bifurcation.jl # balanced growth, Hopf, cycles (offline)
+│   ├── estimation.jl       # accumulation parameters on the EU sectoral panel (offline)
 │   └── figures/
 ├── data/                   # static extracts for notebooks 7–14 and their build scripts; other downloads not version-controlled
 ├── install_deps.jl
@@ -387,7 +388,9 @@ also optional.
 fixed point) and an empirical application to Portugal, with every
 figure/table generated reproducibly from real data
 (`paper/generate_results.jl`, `paper/monte_carlo.jl`,
-`paper/matrix_audit.jl` — no number entered by hand). Compile with
+`paper/matrix_audit.jl`, `paper/estimation.jl` — no number entered by
+hand). Section 5.8 estimates the accumulation parameters (μ, η, the
+investment floor, μ_v) on the EU sectoral panel. Compile with
 `latexmk -pdf paper/main.tex`.
 
 Published on Zenodo with its own DOI, separate from the software DOI:

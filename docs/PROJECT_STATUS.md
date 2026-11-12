@@ -442,7 +442,7 @@ Proposed sequence, from most structural to most exploratory:
 10. ~~Write the academic paper (methodology + empirical
     application)~~ — done, `paper/main.tex`, reproducible from real data
     (`paper/generate_results.jl`, `paper/monte_carlo.jl`,
-    `paper/matrix_audit.jl`).
+    `paper/matrix_audit.jl`, `paper/estimation.jl`).
 11. Medium-term extensions (financialization, ecology, unequal exchange,
     heterogeneous agents) — still to do.
 
