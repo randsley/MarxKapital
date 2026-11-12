@@ -416,7 +416,7 @@ with historical behavior and to keep the test suite fully offline (see
 `check_eurostat_sectoral()` for a manual check, outside the
 automated tests).
 
-## 7. Capital stock and depreciation are approximated (fixed, with caveat; by asset since item 4)
+## 7. Capital stock and depreciation are approximated (fixed, with caveat; optionally by asset type)
 
 Constant capital is approximated by capital stock. Depreciation comes
 from data wherever data exist: the real-data paths and the AMECO
@@ -599,7 +599,11 @@ algebraically.
   variant keeps homogeneity of degree 1, so balanced growth, its stability
   and the Jacobian tools apply. The lag τ is still a single fixed constant
   (not a distribution of turnover times by sector), and the TSSI prices
-  leave out imported inputs, so `import_coefficients` is not accepted.
+  leave out imported inputs, so `import_coefficients` is not accepted. In
+  Portugal's calibrated cross-dual economy (notebook 14) historical-cost
+  valuation barely changes balanced growth (7.23% against 7.24%, the same
+  stability), the dispersion of profit rates (0.077 against 0.072) or the
+  response to a price shock; book values stay within 0.76–1.17 times `C`.
 - **Depreciation at historical cost (fixed, optional).** By default
   depreciation `d = δC/x` is valued at base prices.
   `tssi_valuation(...; depreciation = :historical)` instead keeps a book
@@ -723,10 +727,18 @@ algebraically.
   (scrapping below a hurdle; not supported by the investment data, kept
   for scenarios). A schedule makes the system non-autonomous, so the
   balanced-growth and bifurcation tools reject it.
-- **`μ_v` (mobility of variable capital) is off by default.** Accumulation
-  cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random
-  economies tested, with `β = 0.1`); the empirical value of `μ_v` is not
-  calibrated.
+- **`μ_v` (mobility of variable capital) is off by default (now
+  estimated).** Accumulation cycles appear from `μ_v ≈ 0.5–1.3`
+  (supercritical Hopf in all 30 random economies tested, with `β = 0.1`).
+  Notebook 14 estimates `μ_v` on the EU panel (`compute_labor_panel`,
+  `estimate_variable_mobility`): 0.037 (se 0.016) on wage-bill growth and
+  0.024 (se 0.009) on employment growth, 0.016–0.074 across variants. In
+  Portugal's calibrated cross-dual economy (notebook 13's estimates)
+  stability is lost at `μ_v` ≈ 1.22, 33 times the estimate, so the cycles
+  lie outside the empirical range; at the estimate, balanced growth is
+  stable with damped oscillations of 18–19 years. The data's `σ_v`, the
+  share of surplus spent on hiring, is 0.005–0.012, far below the
+  0.1–0.15 the calibrations assume.
 - **The cycles approach the boundary of the simplex (partly fixed:
   optional exit friction).** Away from the Hopf point, sector shares fall
   to 10⁻³–10⁻⁴ (10⁻⁵ at `μ_v = 2.4`): the oscillations nearly wipe out

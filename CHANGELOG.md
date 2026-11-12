@@ -52,6 +52,13 @@ Format based on Keep a Changelog. Semantic versioning.
   how each NACE section is treated (market or non-market; the
   productive/unproductive distinction the model does not make), how the
   self-employed are counted, and what the floor on `e` does.
+- Notebook 14, `14_variable_capital_mobility_and_tssi_dynamics`: `μ_v`
+  estimated on the EU panel (0.037, se 0.016, on the wage bill; 0.024, se
+  0.009, on employment), against a Hopf point at `μ_v` ≈ 1.22 in Portugal's
+  calibrated cross-dual economy, 33 times higher, so the accumulation
+  cycles are outside the empirical range; and the same economy with
+  TSSI-driven dynamics, whose balanced growth, stability and response to a
+  price shock are almost those at current prices.
 - TSSI-driven dynamics, `tssi_dynamics = true` with lag `τ`
   (`simulate_Ndept(_custom)`, both coupled systems; opt-in, the defaults are
   bit-identical): the profit rate that drives mobility, reinvestment, the

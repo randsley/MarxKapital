@@ -410,7 +410,7 @@ compatibilidade com o comportamento histórico e para manter a suite de
 testes totalmente offline (ver `check_eurostat_sectoral()` para uma
 verificação manual, fora dos testes automáticos).
 
-## 7. Stock de capital e depreciação são aproximados (corrigido, com ressalva; por ativo desde o item 4)
+## 7. Stock de capital e depreciação são aproximados (corrigido, com ressalva; opcionalmente por tipo de ativo)
 
 O capital constante é aproximado pelo stock de capital. A depreciação vem
 dos dados sempre que estes existem: os caminhos de dados reais e o caminho
@@ -601,7 +601,11 @@ afirmado algebricamente.
   aplicam. O desfasamento τ continua a ser um só e fixo (não uma
   distribuição de tempos de rotação por setor), e os preços TSSI deixam de
   fora os consumos importados, pelo que `import_coefficients` não é
-  aceite.
+  aceite. Na economia cruzada calibrada de Portugal (notebook 14) a
+  valorização a custo histórico quase não muda o crescimento equilibrado
+  (7,23% contra 7,24%, a mesma estabilidade), a dispersão das taxas de
+  lucro (0,077 contra 0,072) nem a resposta a um choque de preço; os
+  valores contabilísticos ficam entre 0,76 e 1,17 vezes `C`.
 - **Depreciação a custo histórico (resolvido, opcional).** Por omissão, a
   depreciação `d = δC/x` é valorizada a preços-base.
   `tssi_valuation(...; depreciation = :historical)` mantém em vez disso um
@@ -734,10 +738,19 @@ afirmado algebricamente.
   mantido para cenários). Um calendário torna o sistema não autónomo, pelo
   que as ferramentas de crescimento equilibrado e de bifurcação o
   rejeitam.
-- **`μ_v` (mobilidade do capital variável) está desligado por omissão.**
-  Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
-  supercrítico em todas as 30 economias aleatórias testadas, com
-  `β = 0.1`); o valor empírico de `μ_v` não está calibrado.
+- **`μ_v` (mobilidade do capital variável) está desligado por omissão
+  (agora estimado).** Os ciclos de acumulação aparecem a partir de
+  `μ_v ≈ 0.5–1.3` (Hopf supercrítico em todas as 30 economias aleatórias
+  testadas, com `β = 0.1`). O notebook 14 estima `μ_v` no painel da UE
+  (`compute_labor_panel`, `estimate_variable_mobility`): 0,037 (erro
+  0,016) no crescimento da massa salarial e 0,024 (erro 0,009) no
+  crescimento do emprego, 0,016–0,074 nas variantes. Na economia cruzada
+  calibrada de Portugal (com as estimativas do notebook 13) a estabilidade
+  perde-se em `μ_v` ≈ 1,22, 33 vezes a estimativa, pelo que os ciclos
+  ficam fora do intervalo empírico; na estimativa, o crescimento
+  equilibrado é estável, com oscilações amortecidas de 18–19 anos. O `σ_v`
+  dos dados, a parte da mais-valia gasta a contratar, é 0,005–0,012, muito
+  abaixo dos 0,1–0,15 que as calibrações supõem.
 - **Os ciclos aproximam-se da fronteira do simplex (resolvido em parte:
   fricção de saída opcional).** Longe do Hopf, as quotas setoriais descem
   a 10⁻³–10⁻⁴ (10⁻⁵ em `μ_v = 2.4`): as oscilações quase eliminam

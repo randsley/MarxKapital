@@ -53,6 +53,14 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   como é tratada cada secção NACE (mercantil ou não mercantil; a distinção
   entre trabalho produtivo e improdutivo que o modelo não faz), como se
   contam os independentes, e o que faz o piso de `e`.
+- Notebook 14, `14_variable_capital_mobility_and_tssi_dynamics`: `μ_v`
+  estimado no painel da UE (0,037, erro 0,016, na massa salarial; 0,024,
+  erro 0,009, no emprego), contra um ponto de Hopf em `μ_v` ≈ 1,22 na
+  economia cruzada calibrada de Portugal, 33 vezes mais alto, pelo que os
+  ciclos de acumulação ficam fora do intervalo empírico; e a mesma economia
+  com dinâmica conduzida pela TSSI, cujo crescimento equilibrado,
+  estabilidade e resposta a um choque de preço são quase os de preços
+  correntes.
 - Dinâmica conduzida pela TSSI, `tssi_dynamics = true` com desfasamento
   `τ` (`simulate_Ndept(_custom)`, nos dois sistemas acoplados; opcional, os
   valores por omissão dão resultados idênticos bit a bit): a taxa de lucro

@@ -30,7 +30,7 @@ capital variável e mais-valia, e que setores ficam de fora, está em
 
 O coeficiente de mobilidade do capital $$\mu$$ e a função de investimento
 do modelo, estimados com as contas do Eurostat para os 15 setores
-mercantis de 26 países da UE (notebooks 9–13, em inglês).
+mercantis de 26 países da UE (notebooks 9–14, em inglês).
 
 <div class="fig-grid">
 <figure><img src="assets/figures/nb10_mobility.png" alt="Capital recebido além do excedente próprio contra o diferencial da taxa de lucro, 26 países da UE">
@@ -125,7 +125,7 @@ A [visão geral](overview.pt.html) cobre toda a API; leia as
 ## Notebooks
 
 Exemplos trabalhados (em inglês), com os resultados. Correm offline: os
-notebooks 1–6 com os valores sintéticos por omissão, os 7–13 com extratos
+notebooks 1–6 com os valores sintéticos por omissão, os 7–14 com extratos
 estáticos de dados do AMECO e do Eurostat.
 
 @@GALLERY@@

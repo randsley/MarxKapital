@@ -30,7 +30,7 @@ capital and surplus value, and which sectors are left out, is set out in
 
 The model's capital-mobility coefficient $$\mu$$ and its investment
 function, estimated on Eurostat's accounts for the 15 market sectors of 26
-EU countries (notebooks 9–13).
+EU countries (notebooks 9–14).
 
 <div class="fig-grid">
 <figure><img src="assets/figures/nb10_mobility.png" alt="Capital received beyond own surplus against the profit-rate gap, 26 EU countries">
@@ -119,7 +119,7 @@ The [overview](overview.html) covers the full API; read the
 ## Notebooks
 
 Worked examples, rendered with their outputs. They run offline:
-notebooks 1–6 on the synthetic defaults, 7–13 on static extracts of AMECO
+notebooks 1–6 on the synthetic defaults, 7–14 on static extracts of AMECO
 and Eurostat data.
 
 @@GALLERY@@
