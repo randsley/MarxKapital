@@ -591,6 +591,18 @@ afirmado algebricamente.
   mais-valia, mas −0,19 a −0,35 imputando-o como salário: o excedente entra
   dos dois lados da equação. Os diferenciais setoriais persistentes não
   atraem capital (`μ̂` = −0,31 entre setores).
+  O notebook 10 repete a estimativa nos 15 setores de mercado de 26 países
+  da UE, com efeitos país × ano que absorvem o ciclo de crédito de cada
+  país (`compute_mobility_panel`, `estimate_mobility`). Aí `μ̂` ≈ −0,14
+  (erro agrupado por país 0,05), com quaisquer efeitos fixos, com o
+  diferencial instrumentado pelo seu desfasamento (−0,12), e negativo em 21
+  de 26 países; o 0,11 de Portugal é a exceção. Não é sobretudo erro de
+  medida: o investimento líquido sobe com o diferencial (0,08), mas menos
+  do que uma parte comum de reinvestimento do excedente do setor exigiria
+  (0,21). O que os dados rejeitam é o `σ_c` comum a todos os departamentos
+  do modelo, que obriga toda a resposta do investimento à rentabilidade a
+  passar por `μ`. Uma parte reinvestida que difira entre departamentos, ou
+  que caia com a taxa de lucro, permitiria estimar `μ` líquido dela.
 - **`μ_v` (mobilidade do capital variável) está desligado por omissão.**
   Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
   supercrítico em todas as 30 economias aleatórias testadas, com

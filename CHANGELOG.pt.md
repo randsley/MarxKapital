@@ -9,6 +9,16 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- Notebook 10, `10_eu_sectoral_mobility`: `μ` entre os 15 setores de
+  mercado de 26 países da UE, sem rede, a partir de
+  `data/eurostat_eu_sectors.csv`, com efeitos país × setor e país × ano (e
+  setor × ano), erros agrupados por país. `μ̂` ≈ −0,14 (erro 0,05) em todas
+  as especificações, com as caudas aparadas, com o diferencial
+  instrumentado pelo seu desfasamento, e em 21 de 26 países; a estimativa
+  positiva de Portugal é a exceção. O investimento líquido sobe com o
+  diferencial (0,08), mas menos do que uma parte comum de reinvestimento do
+  excedente exigiria (0,21): o que o painel rejeita é o `σ_c` comum do
+  modelo.
 - `src/mobility_estimation.jl`: `compute_mobility_panel` constrói o painel
   da equação de mobilidade do capital a partir das contas por ramo, país a
   país (transferência `R = I − σS`, que soma zero em cada país-ano, e
@@ -16,7 +26,8 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   `estimate_mobility` estima `μ` com qualquer conjunto de efeitos fixos
   (`demean_fe`, projeções alternadas) e erros de Driscoll–Kraay e
   agrupados por país; `estimate_mobility_between` dá a estimativa entre
-  unidades. O notebook 9 passa a usá-las (mesmos resultados).
+  unidades. Os notebooks 9 e 10 usam-nas (os resultados do notebook 9 não
+  mudam).
 - `data/eurostat_eu_sectors.csv`: contas por ramo do Eurostat para as 19
   secções NACE de 26 países da UE (UE27 sem Malta), construído por
   `data/build_eurostat_sectors.jl` com `_fetch_eurostat_sections_by_geo`

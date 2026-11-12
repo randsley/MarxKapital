@@ -2,10 +2,10 @@
 
 Worked examples of MarxKapital in two formats:
 
-- **`jupyter/`**: nine narrative notebooks, committed with their outputs, so they can be read on GitHub without running anything.
+- **`jupyter/`**: ten narrative notebooks, committed with their outputs, so they can be read on GitHub without running anything.
 - **`pluto/`**: three interactive [Pluto](https://plutojl.org) notebooks with sliders, which recompute as you change the parameters.
 
-Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthetic defaults; notebooks 7 and 8 use real AMECO data from a static extract, `data/ameco_eu27.csv` (rebuild it with `julia data/build_ameco_eu.jl`, which needs network; provenance in `data/ameco_eu27_PROVENANCE.md`), and notebook 9 real Eurostat sectoral accounts for Portugal from `data/eurostat_eu_sectors.csv` (26 EU countries; `julia data/build_eurostat_sectors.jl`; provenance in `data/eurostat_eu_sectors_PROVENANCE.md`). The prose and the MarxKapital API are both in English.
+Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthetic defaults; notebooks 7 and 8 use real AMECO data from a static extract, `data/ameco_eu27.csv` (rebuild it with `julia data/build_ameco_eu.jl`, which needs network; provenance in `data/ameco_eu27_PROVENANCE.md`), and notebooks 9 and 10 real Eurostat sectoral accounts (Portugal; 26 EU countries) from `data/eurostat_eu_sectors.csv` (26 EU countries; `julia data/build_eurostat_sectors.jl`; provenance in `data/eurostat_eu_sectors_PROVENANCE.md`). The prose and the MarxKapital API are both in English.
 
 ## Jupyter
 
@@ -20,6 +20,7 @@ Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthet
 | [07_eu_profit_rates](jupyter/07_eu_profit_rates.ipynb) | **Real data.** `e`, `k` and `r` for the EU27 member states, 1995–2024: the self-employment adjustment, trends, an exact split of the change in `r` into exploitation and composition, and why the valuation decides the trend in `k` |
 | [08_capital_mobility](jupyter/08_capital_mobility.ipynb) | **Real data.** The model's capital-mobility coefficient `μ` estimated from EU27 capital flows, 1996–2024: between and within countries, common shocks, a spatial panel with Driscoll–Kraay errors and spatial CCE (via [SpatialEconometrics.jl](https://github.com/randsley/SpatialEconometrics.jl)), before and after 2008, and the estimates back in the model |
 | [09_sectoral_mobility](jupyter/09_sectoral_mobility.ipynb) | **Real data.** `μ` between Portugal's 15 market sectors, 2002–2023, from Eurostat's accounts by industry: capital received beyond own surplus against the lagged profit-rate gap, between and within sectors, Driscoll–Kraay errors, why the self-employment adjustment flips the sign, before and after 2008 |
+| [10_eu_sectoral_mobility](jupyter/10_eu_sectoral_mobility.ipynb) | **Real data.** The same `μ` between the 15 market sectors of 26 EU countries, with country × year effects for each national credit cycle: negative in almost every country, robust to trimming and to instrumenting the gap; the decomposition that shows what fails is the model's common reinvestment share |
 
 ## Pluto
 

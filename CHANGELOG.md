@@ -9,14 +9,23 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- Notebook 10, `10_eu_sectoral_mobility`: `μ` between the 15 market sectors
+  of 26 EU countries, offline, from `data/eurostat_eu_sectors.csv`, with
+  country × sector and country × year effects (and sector × year), errors
+  clustered by country. `μ̂` ≈ −0.14 (se 0.05) in every specification,
+  after trimming, with the gap instrumented by its lag, and in 21 of 26
+  countries; Portugal's positive estimate is the exception. Net investment
+  rises with the gap (0.08), but less than a common reinvestment share of
+  the surplus would (0.21): what the panel rejects is the model's common
+  `σ_c`.
 - `src/mobility_estimation.jl`: `compute_mobility_panel` builds the panel
   of the capital-mobility equation from sectoral accounts, per country
   (transfer `R = I − σS` summing to zero in every country-year, gap to the
   capital-weighted mean profit rate); `estimate_mobility` estimates `μ`
   with any set of fixed effects (`demean_fe`, alternating projections),
   Driscoll–Kraay and country-clustered standard errors;
-  `estimate_mobility_between` gives the between estimate. Notebook 9 now
-  uses them (same results).
+  `estimate_mobility_between` gives the between estimate. Notebooks 9 and
+  10 use them (notebook 9's results are unchanged).
 - `data/eurostat_eu_sectors.csv`: Eurostat accounts by industry for the
   19 NACE sections of 26 EU countries (EU27 without Malta), built by
   `data/build_eurostat_sectors.jl` with `_fetch_eurostat_sections_by_geo`

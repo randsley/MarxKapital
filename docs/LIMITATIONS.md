@@ -594,6 +594,18 @@ algebraically.
   income counted as surplus value, but −0.19 to −0.35 with it imputed as
   wages: the surplus enters both sides of the equation. Persistent
   sectoral gaps attract no capital (`μ̂` = −0.31 between sectors).
+  Notebook 10 repeats the estimate on the 15 market sectors of 26 EU
+  countries, with country × year effects that absorb each national credit
+  cycle (`compute_mobility_panel`, `estimate_mobility`). There `μ̂` ≈ −0.14
+  (clustered se 0.05), with any fixed effects, with the gap instrumented by
+  its lag (−0.12), and negative in 21 of 26 countries; Portugal's 0.11 is
+  the exception. It is not mainly measurement error: net investment does
+  rise with the gap (0.08), but less than a common reinvestment share of
+  the sector's surplus would (0.21). What the data reject is the model's
+  common `σ_c` for every department, which forces all of the response of
+  investment to profitability through `μ`. A reinvestment share that
+  differs between departments, or falls with the profit rate, would let
+  `μ` be estimated net of it.
 - **`μ_v` (mobility of variable capital) is off by default.** Accumulation
   cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random
   economies tested, with `β = 0.1`); the empirical value of `μ_v` is not
