@@ -9,6 +9,15 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- Notebook 12, `12_incremental_profit_rates`: a tese de Shaikh de que a
+  concorrência iguala as taxas de lucro incrementais, e não as médias, no
+  painel setorial da UE. Os diferenciais da taxa incremental são sobretudo
+  transitórios (4–14% da variância é permanente, contra 74–78% nas taxas
+  médias), mas não se igualam (uma dispersão permanente de 6–8 pp, metade
+  da das taxas médias), e têm muito ruído. O capital segue o diferencial
+  da taxa média (`μ̂` = 0,14 com `η` = 1); o diferencial incremental nada
+  acrescenta quando entram os dois. O termo de mobilidade do modelo mantém
+  a taxa média.
 - A taxa de lucro incremental de Shaikh em `src/mobility_estimation.jl`:
   `compute_incremental_panel` acrescenta o rendimento do investimento novo,
   a variação do lucro bruto sobre o investimento bruto que a precedeu (real,

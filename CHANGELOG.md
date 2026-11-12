@@ -9,6 +9,14 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- Notebook 12, `12_incremental_profit_rates`: Shaikh's claim that
+  competition equalizes incremental, not average, rates of profit, on the
+  EU sectoral panel. Incremental-rate gaps are mostly transitory (4–14%
+  of their variance is permanent, against 74–78% for average rates) but
+  not equalized (a permanent dispersion of 6–8 pp, half that of average
+  rates), and very noisy. Capital follows the average-rate gap (`μ̂` = 0.14
+  at `η` = 1); the incremental gap adds nothing once both are in. The
+  model's mobility term keeps the average rate.
 - Shaikh's incremental rate of profit in `src/mobility_estimation.jl`:
   `compute_incremental_panel` adds the return on new investment, the change
   in gross profit over the gross investment before it (real, or at current

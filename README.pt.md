@@ -82,7 +82,7 @@ antigo com o novo.*
 [`notebooks/`](notebooks/README.md) tem exemplos resolvidos, em inglês, que
 correm offline:
 
-- onze notebooks Jupyter, gravados com as saídas para se lerem no GitHub:
+- doze notebooks Jupyter, gravados com as saídas para se lerem no GitHub:
   fundamentos da acumulação, valores e preços, calibração e choques
   salariais, setores acoplados e diferenciação automática, valorização
   TSSI, crescimento equilibrado, ciclos e caos, taxas de lucro na UE27 a
@@ -90,7 +90,8 @@ correm offline:
   coeficiente de mobilidade do capital `μ` estimado a partir dos fluxos de
   capital na UE, e o mesmo coeficiente entre os setores de Portugal e
   entre os setores de 26 países da UE, a partir das contas por ramo do
-  Eurostat, e a função de investimento do modelo no mesmo painel;
+  Eurostat, a função de investimento do modelo no mesmo painel, e a taxa
+  de lucro incremental de Shaikh;
 - três notebooks Pluto interativos, com sliders: a fronteira
   salário-lucro, a acumulação com acoplamento e choques salariais, e os
   ciclos de acumulação no modelo cruzado.
@@ -292,7 +293,7 @@ marxkapital/
 │   └── notebooks.jl        # teste de fumo: corre todos os notebooks offline
 ├── examples/demo.jl
 ├── notebooks/              # exemplos resolvidos (ver notebooks/README.md)
-│   ├── jupyter/            # onze notebooks narrativos, com saídas
+│   ├── jupyter/            # doze notebooks narrativos, com saídas
 │   └── pluto/              # três notebooks interativos
 ├── docs/LIMITATIONS.md     # leitura obrigatória (+ .pt.md em português)
 ├── paper/                  # artigo académico (LaTeX), reproduzível a partir de dados reais
@@ -303,7 +304,7 @@ marxkapital/
 │   ├── jacobian_bifurcation.jl # jacobiana exata, bifurcações, TSSI (offline)
 │   ├── accumulation_bifurcation.jl # crescimento equilibrado, Hopf, ciclos (offline)
 │   └── figures/
-├── data/                   # extratos estáticos dos notebooks 7–11 e os scripts que os constroem; outros dados descarregados não versionados
+├── data/                   # extratos estáticos dos notebooks 7–12 e os scripts que os constroem; outros dados descarregados não versionados
 ├── install_deps.jl
 ├── Project.toml
 ├── CHANGELOG.md  (+ .pt.md)

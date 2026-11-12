@@ -620,6 +620,23 @@ algebraically.
   rate reaches zero: the calibrated investment function needs an exit for
   unprofitable capital, and `η` in the cross-dual system, before it can be
   used for long-run simulations.
+- **The mobility term uses the average rate of profit, and the data agree.**
+  Shaikh (2016, ch. 7) argues that competition equalizes the incremental
+  rate, the return on new investment, so average rates may differ forever.
+  Notebook 12 measures it on the EU panel (`compute_incremental_panel`,
+  `estimate_persistence`): incremental-rate gaps are mostly transitory
+  (4–14% of their variance is between country × sector units, against
+  74–78% for average-rate gaps), but they are not equalized (a permanent
+  dispersion of 6–8 pp net of noise, half the 14–15 pp of average rates),
+  and they are very noisy, with a mechanical bias from past investment in
+  the denominator. Capital follows the average-rate gap: in the investment
+  function at `η` = 1, `μ̂` = 0.14 (se 0.03), while the incremental gap
+  moves investment a third as much per standard deviation and adds nothing
+  once both are in. Inside a department of the model, constant returns make
+  the marginal and average rates equal, so the model is unchanged; the
+  persistent average gaps of the data (vintages, what the accounts count as
+  capital) belong in each department's calibrated technique, and the
+  estimates of `μ` absorb them in country × sector effects.
 - **Reinvestment share (optional).** `simulate_Ndept_custom(...; η, σ_schedule)`
   replaces each department's fixed `σ_c` by `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η`: an
   elasticity `η` of the share to relative profitability (0 = fixed share,

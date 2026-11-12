@@ -618,6 +618,25 @@ afirmado algebricamente.
   de lucro chegar a zero: a função de investimento calibrada precisa de uma
   saída para o capital pouco rentável, e de `η` no sistema cruzado, antes
   de poder ser usada em simulações de longo prazo.
+- **O termo de mobilidade usa a taxa de lucro média, e os dados
+  concordam.** Shaikh (2016, cap. 7) defende que a concorrência iguala a
+  taxa incremental, o rendimento do investimento novo, pelo que as taxas
+  médias podem diferir para sempre. O notebook 12 mede-a no painel da UE
+  (`compute_incremental_panel`, `estimate_persistence`): os diferenciais
+  da taxa incremental são sobretudo transitórios (4–14% da sua variância é
+  entre unidades país × setor, contra 74–78% nos diferenciais da taxa
+  média), mas não se igualam (uma dispersão permanente de 6–8 pp líquida
+  de ruído, metade dos 14–15 pp das taxas médias), e têm muito ruído, com
+  um enviesamento mecânico do investimento passado no denominador. O
+  capital segue o diferencial da taxa média: na função de investimento com
+  `η` = 1, `μ̂` = 0,14 (erro 0,03), enquanto o diferencial incremental
+  move o investimento um terço por desvio-padrão e nada acrescenta quando
+  entram os dois. Dentro de um departamento do modelo, os rendimentos
+  constantes tornam iguais as taxas marginal e média, pelo que o modelo
+  não muda; os diferenciais médios persistentes dos dados (gerações de
+  capital, o que as contas contam como capital) pertencem à técnica
+  calibrada de cada departamento, e as estimativas de `μ` absorvem-nos nos
+  efeitos país × setor.
 - **Parte reinvestida (opcional).** `simulate_Ndept_custom(...; η, σ_schedule)`
   substitui o `σ_c` fixo de cada departamento por `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η`:
   uma elasticidade `η` da parte reinvestida à rentabilidade relativa (0 =
