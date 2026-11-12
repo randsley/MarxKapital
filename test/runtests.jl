@@ -544,6 +544,7 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test (m.μ, m.se, m.se_DK, m.se_cluster) == (e1.β[1], e1.se[1], e1.se_DK[1], e1.se_cluster[1])
         @test_throws DimensionMismatch estimate_fe_ols(P, y[1:end-1], X)
         @test_throws ErrorException estimate_fe_ols(P, y, hcat(X[:, 1], 2 .* X[:, 1]))   # collinear
+        @test_throws ErrorException estimate_fe_ols(P, y, Float64.(length.(P.geo)))  # absorbed by the effects
 
         # the investment panel, by hand on a two-country extract
         secs, yrs = ["A", "C", "J"], 2000:2005

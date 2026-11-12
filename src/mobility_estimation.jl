@@ -214,9 +214,15 @@ function estimate_fe_ols(panel::AbstractDataFrame, y::AbstractVector, X::Abstrac
     groups = [_effect_labels(panel, e) for e in effects]
     yd = demean_fe(y, groups...)
     Xd = reduce(hcat, [demean_fe(Xm[:, j], groups...) for j in 1:k])
+    # a scale-free rank test: Cholesky's own check depends on rounding and
+    # can pass an exactly singular X'X
+    norms = [norm(Xd[:, j]) for j in 1:k]
+    all(norms[j] > 1e-8 * max(norm(Xm[:, j]), floatmin()) for j in 1:k) ||
+        error("a regressor is absorbed by the fixed effects")
+    sv = svdvals(Xd ./ norms')
+    sv[end] > 1e-8 * sv[1] || error("the regressors are collinear after the fixed effects")
     XX = Symmetric(Xd'Xd)
-    F = cholesky(XX; check = false)
-    issuccess(F) || error("the regressors are collinear after the fixed effects")
+    F = cholesky(XX)
     β = F \ (Xd'yd)
     u = yd .- Xd * β
     ssr = sum(abs2, u)
