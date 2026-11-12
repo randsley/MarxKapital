@@ -9,6 +9,16 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- Parte reinvestida que cai com a rentabilidade, e um calendário:
+  `simulate_Ndept(_custom)(...; η = 0.0, σ_schedule = nothing)` no sistema
+  acoplado. Cada departamento reinveste `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η` do seu
+  excedente (`_reinvestment_share`): `η` é a elasticidade à rentabilidade
+  relativa, `m(t)` um multiplicador constante por troços (o integrador pára
+  nas quebras). Os valores por omissão deixam a dinâmica idêntica bit a
+  bit. Jacobianos e Hessianos exatos (também através do racionamento),
+  `parameter_jacobian(:η)` e `with_parameter(:η)` funcionam; não disponível
+  com `market_prices`, e as ferramentas de crescimento equilibrado rejeitam
+  um calendário.
 - Notebook 10, `10_eu_sectoral_mobility`: `μ` entre os 15 setores de
   mercado de 26 países da UE, sem rede, a partir de
   `data/eurostat_eu_sectors.csv`, com efeitos país × setor e país × ano (e

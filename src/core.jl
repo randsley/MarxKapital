@@ -224,6 +224,43 @@ function _mobility_flow(r, K, μ, ε)
 end
 
 """
+    _reinvestment_share(r, C, p, t)
+
+Effective share of surplus value reinvested in constant capital,
+
+    σ_eff,ᵢ(t) = σ_c,ᵢ · m(t) · (r̄ / rᵢ)^η
+
+with `r̄` the `C`-weighted mean of `r` (the mean of `_mobility_flow`).
+`η = get(p, :η, 0.0)` is the elasticity of the share to relative
+profitability: 0 is the fixed share of each department, 1 makes investment
+proportional to capital at the average profit rate (own surplus stops
+mattering). `m(t)` is the optional piecewise-constant multiplier of
+`σ_schedule` (`p.σ_times`, `p.σ_multipliers`; 1 before the first break).
+The factor is homogeneous of degree 0, so the right-hand side stays
+homogeneous of degree 1. `σ_eff` can exceed 1 for a department far below
+the average rate (investment beyond its own surplus); it is not clamped, so
+the right-hand side stays smooth. Needs `rᵢ > 0` and `r̄ > 0`, which hold in
+`system_Ndept_io!` (S = e·V > 0, positive prices).
+
+With the defaults (`η = 0`, no schedule) it returns `p.σ_c` itself, so the
+dynamics are bit-identical to the fixed-share model. Generic in number
+type, for the automatic-differentiation path.
+"""
+function _reinvestment_share(r, C, p, t)
+    η = get(p, :η, 0.0)
+    scheduled = haskey(p, :σ_times)
+    (iszero(η) && !scheduled) && return p.σ_c
+    σ = p.σ_c
+    if scheduled
+        k = searchsortedlast(p.σ_times, t)
+        k > 0 && (σ = σ .* p.σ_multipliers[k])
+    end
+    iszero(η) && return σ
+    r̄ = sum(r .* C) / sum(C)
+    return σ .* (r̄ ./ r) .^ η
+end
+
+"""
     system_Ndept_io!(dX, X, p, t)
 
 ODE system for N departments, with the technical matrix `p.A` feeding back
@@ -231,6 +268,8 @@ into the dynamics through a capital-mobility term:
 
     dCᵢ/dt = σ_c,ᵢ·Sᵢ − δᵢ·Cᵢ + μ·(rᵢ − r̄)·Cᵢ
 
+(with the optional reinvestment elasticity `p.η` and schedule `σ_schedule`,
+`σ_c,ᵢ` is replaced by `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η`; see `_reinvestment_share`),
 where `rᵢ` is the profit rate of sector i with constant capital valued at
 Sraffian production prices (which depend on A), not at bare book value. To
 avoid the circularity of using r̄ to compute prices that in turn define r̄,
@@ -297,6 +336,7 @@ function system_Ndept_io!(dX, X, p, t)
     S = p.e .* V
 
     r = _io_profit_rates(C, V, S, p)
+    σ_eff = _reinvestment_share(r, C, p, t)   # p.σ_c unless η or σ_schedule are set
 
     # `κ` inherits the type of `S` (not `ones(N)`, Float64): under automatic
     # differentiation (ForwardDiff, `src/differentiation.jl`) the state is `Dual`.
@@ -330,7 +370,7 @@ function system_Ndept_io!(dX, X, p, t)
             # applies to this OUTPUT expansion, not to investment spending
             # directly (the earlier simplification, already
             # documented as such in the paper).
-            Δx = p.σ_c .* S .* x ./ C
+            Δx = σ_eff .* S .* x ./ C
             κ = _solve_rationing(p.A, ones(N), Δx, O)
         else
             intermediate_demand = p.A * O
@@ -340,7 +380,7 @@ function system_Ndept_io!(dX, X, p, t)
     end
 
     ε = get(p, :exit_friction, 0.0)
-    dX[1:N]    = κ .* p.σ_c .* S .- p.δ .* C .+ _mobility_flow(r, C, p.μ, ε)
+    dX[1:N]    = κ .* σ_eff .* S .- p.δ .* C .+ _mobility_flow(r, C, p.μ, ε)
     # Mobility of variable capital (optional, `p.μ_v`; absent or 0 = off,
     # dynamics identical to before). With r̄_V weighted by V, Σᵢ μ_v(rᵢ-r̄_V)Vᵢ = 0
     # exactly: the term reallocates variable capital between sectors without creating it.
@@ -588,13 +628,13 @@ function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
                        realization = false, rationing = false,
                        market_prices = false, β = 0.5, basket = nothing,
-                       exit_friction = 0.0)
+                       exit_friction = 0.0, η = 0.0, σ_schedule = nothing)
     depts = create_departments(N, name_list)
     return simulate_Ndept_custom(depts, T = T, seed = seed, coupled = coupled, μ = μ,
                                      μ_v = μ_v, realization = realization,
                                      rationing = rationing,
                                      market_prices = market_prices, β = β, basket = basket,
-                                     exit_friction = exit_friction)
+                                     exit_friction = exit_friction, η = η, σ_schedule = σ_schedule)
 end
 
 """
@@ -602,7 +642,7 @@ end
                               realization=false, rationing=false,
                               market_prices=false, β=0.5, basket=nothing,
                               A=nothing, final_demand_share=nothing, import_coefficients=nothing,
-                              exit_friction=0.0)
+                              exit_friction=0.0, η=0.0, σ_schedule=nothing)
 
 Simulates the N-department model from pre-configured departments. With
 `coupled=true` it uses `system_Ndept_io!` instead of `system_Ndept!` (`μ_v`,
@@ -615,6 +655,19 @@ aggregate realization pressure; `rationing=true` (takes precedence over
 `system_Ndept_io!`. `exit_friction = ε ≥ 0` (needs `coupled=true`; 0 = off)
 damps capital outflows from a sector by `sᵢ/(sᵢ + ε)`, `sᵢ` its share of
 the stock, keeping the mobility term conservative (`_mobility_flow`).
+
+Reinvestment (both need `coupled=true` and not `market_prices`, whose
+profits can be ≤ 0; see `_reinvestment_share`):
+
+- `η ≥ 0`: elasticity of the reinvestment share to relative profitability,
+  `σ_c,ᵢ·(r̄/rᵢ)^η`. 0 (default) is each department's fixed share; with
+  `η = 1` investment is proportional to capital at the average profit rate.
+  The EU sectoral panel (notebook 10) motivates it.
+- `σ_schedule`: a vector of `(t_start, multiplier)` pairs, increasing in
+  time, multipliers ≥ 0: every `σ_c` is multiplied by the multiplier of the
+  last break at or before `t` (1 before the first). The solver stops at the
+  breaks. The system is then not autonomous, so the balanced-growth and
+  bifurcation tools reject it.
 
 Real-data options, typically from a calibration (`departments_from_params`):
 
@@ -640,10 +693,12 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    realization = false, rationing = false,
                                    market_prices = false, β = 0.5, basket = nothing,
                                    A = nothing, final_demand_share = nothing,
-                                   import_coefficients = nothing, exit_friction = 0.0)
+                                   import_coefficients = nothing, exit_friction = 0.0,
+                                   η = 0.0, σ_schedule = nothing)
     N = length(depts)
     exit_friction >= 0 || error("exit_friction must be ≥ 0")
     (iszero(exit_friction) || coupled) || error("exit_friction requires coupled=true")
+    reinvestment = _reinvestment_params(η, σ_schedule; coupled = coupled, market_prices = market_prices)
     X0 = [ [d.c for d in depts]; [d.v for d in depts] ]
     if isnothing(A)
         A = create_technical_matrix(N, seed = seed)
@@ -700,6 +755,7 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
         isnothing(import_coefficients) ||
             (p = merge(p, (import_coefficients = collect(Float64, import_coefficients),)))
         iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
+        p = merge(p, reinvestment)
         prob = ODEProblem(system_Ndept_io!, X0, (0.0, T), p)
     else
         p = (
@@ -712,6 +768,32 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
         prob = ODEProblem(system_Ndept!, X0, (0.0, T), p)
     end
 
-    sol = solve(prob, Tsit5(), saveat = 0.5)
+    sol = haskey(p, :σ_times) ? solve(prob, Tsit5(), saveat = 0.5, tstops = p.σ_times) :
+                                solve(prob, Tsit5(), saveat = 0.5)
     return sol, depts, p
+end
+
+"""
+Validates the reinvestment options of `simulate_Ndept_custom` and returns
+the fields to merge into the parameters: none with the defaults (so the
+parameters, and the dynamics, are exactly as without them), `η` if it is
+not 0, `σ_times`/`σ_multipliers` if there is a schedule.
+"""
+function _reinvestment_params(η, σ_schedule; coupled, market_prices)
+    (η isa Real && isfinite(η) && η >= 0) || throw(ArgumentError("η must be a finite number ≥ 0, got $η"))
+    active = !iszero(η) || !isnothing(σ_schedule)
+    active || return NamedTuple()
+    coupled || throw(ArgumentError("η and σ_schedule require coupled=true"))
+    market_prices && throw(ArgumentError("η and σ_schedule are not available with market_prices=true " *
+                                         "(market profits can be ≤ 0)"))
+    out = iszero(η) ? NamedTuple() : (η = Float64(η),)
+    isnothing(σ_schedule) && return out
+    isempty(σ_schedule) && throw(ArgumentError("σ_schedule is empty"))
+    all(b -> length(b) == 2, σ_schedule) ||
+        throw(ArgumentError("σ_schedule must hold (t_start, multiplier) pairs"))
+    times = Float64[first(b) for b in σ_schedule]
+    mult = Float64[last(b) for b in σ_schedule]
+    issorted(times; lt = <=) || throw(ArgumentError("σ_schedule times must be strictly increasing"))
+    all(m -> isfinite(m) && m >= 0, mult) || throw(ArgumentError("σ_schedule multipliers must be ≥ 0"))
+    return merge(out, (σ_times = times, σ_multipliers = mult))
 end

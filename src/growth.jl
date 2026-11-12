@@ -52,6 +52,10 @@ function _project(fX, X, p)
     return [hy; fX[nq+1:end] .- mean(fX[nq+1:end])]
 end
 
+"""Errors if `p` has a reinvestment schedule (`σ_schedule`): balanced growth needs an autonomous system."""
+_require_autonomous(p) = haskey(p, :σ_times) &&
+    throw(ArgumentError("balanced growth needs an autonomous system: drop σ_schedule (η is fine)"))
+
 """
     normalized_system(p; t=0.0)
 
@@ -62,6 +66,7 @@ the cross-dual system (`p` with `β`), `q̇ − mean(q̇)` for the log prices
 prices, in the cross-dual system).
 """
 function normalized_system(p; t = 0.0)
+    _require_autonomous(p)
     f = _rhs(p, t)
     nq = 2 * length(p.e)
     return function (z)
@@ -87,6 +92,7 @@ on the simplex, mean-zero log prices), without the exponential growth of the
 levels, which overflows over long horizons.
 """
 function simulate_normalized(p, X0; T = 500.0, saveat = 1.0)
+    _require_autonomous(p)
     prob = ODEProblem(_rhs_normalized!, _from_free(_to_free(X0, p), p), (0.0, T), p)
     return solve(prob, Tsit5(), saveat = saveat, abstol = 1e-10, reltol = 1e-8)
 end
@@ -168,6 +174,8 @@ end
 
 - `:μ`, `:μ_v`: mobility coefficients of constant / variable capital;
 - `:exit_friction`: the exit friction `ε` of the mobility terms;
+- `:η`: the elasticity of the reinvestment share to relative profitability
+  (`_reinvestment_share`; coupled system without market prices);
 - `:ω`: uniform wage share, `eᵢ = (1−θ)/θ` in every sector;
 - `:e_scale`: proportional exploitation, `eᵢ = θ·e_ref,ᵢ` (keeps the
   heterogeneity across sectors; the resulting aggregate wage share is
@@ -177,9 +185,10 @@ function with_parameter(p, parameter::Symbol, θ; e_ref = p.e)
     parameter === :μ && return merge(p, (μ = θ,))
     parameter === :μ_v && return merge(p, (μ_v = θ,))
     parameter === :exit_friction && return merge(p, (exit_friction = θ,))
+    parameter === :η && return merge(p, (η = θ,))
     parameter === :ω && return merge(p, (e = fill((1 - θ) / θ, length(p.e)),))
     parameter === :e_scale && return merge(p, (e = θ .* e_ref,))
-    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :ω or :e_scale)")
+    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :η, :ω or :e_scale)")
 end
 
 """

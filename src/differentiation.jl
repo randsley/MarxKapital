@@ -42,11 +42,13 @@ system_jacobian(p, X; t = 0.0) = ForwardDiff.jacobian(_rhs(p, t), X)
     parameter_jacobian(p, X, field::Symbol; t=0.0)
 
 Sensitivity `∂f/∂θ` of the ODE right-hand side to a field of `p` (scalar,
-such as `:μ`, or vector, such as `:e` or `:σ_c`). Returns a vector (2N) for
-scalar fields and a matrix (2N × dim θ) for vector fields.
+such as `:μ` or `:η`, or vector, such as `:e` or `:σ_c`). Returns a vector (2N) for
+scalar fields and a matrix (2N × dim θ) for vector fields. `:η` (the
+reinvestment elasticity, `_reinvestment_share`) defaults to 0 when `p` has
+no such field.
 """
 function parameter_jacobian(p, X, field::Symbol; t = 0.0)
-    θ0 = getfield(p, field)
+    θ0 = field === :η ? get(p, :η, 0.0) : getfield(p, field)
     system! = _system_of(p)
     function f(θ)
         q = merge(p, NamedTuple{(field,)}((θ,)))

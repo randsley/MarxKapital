@@ -454,7 +454,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 347 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 377 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -610,6 +610,16 @@ algebraically.
   response of net investment to the gap is stable, and the reinvestment
   share halved (0.19 to 0.10). So `μ` constant over time is not what the
   data reject; `σ_c` constant over time and across departments is.
+- **Reinvestment share (optional).** `simulate_Ndept_custom(...; η, σ_schedule)`
+  replaces each department's fixed `σ_c` by `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η`: an
+  elasticity `η` of the share to relative profitability (0 = fixed share,
+  the default) and a piecewise-constant multiplier `m(t)` (`σ_schedule`).
+  Notebook 10 motivates both: under a fixed share the EU panel gives a
+  negative `μ̂`, and the reinvestment share halved after 2008. Only in the
+  coupled system without market prices: in the cross-dual system profits at
+  market prices can be ≤ 0, so `(r̄/rᵢ)^η` is undefined there (not yet
+  supported). A schedule makes the system non-autonomous, so the
+  balanced-growth and bifurcation tools reject it.
 - **`μ_v` (mobility of variable capital) is off by default.** Accumulation
   cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random
   economies tested, with `β = 0.1`); the empirical value of `μ_v` is not

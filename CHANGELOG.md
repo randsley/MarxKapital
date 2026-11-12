@@ -9,6 +9,15 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- Reinvestment share that falls with profitability, and a schedule:
+  `simulate_Ndept(_custom)(...; η = 0.0, σ_schedule = nothing)` in the
+  coupled system. Each department reinvests `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η` of its
+  surplus (`_reinvestment_share`): `η` is the elasticity to relative
+  profitability, `m(t)` a piecewise-constant multiplier (the solver stops
+  at its breaks). The defaults leave the dynamics bit-identical. Exact
+  Jacobians and Hessians (also through rationing), `parameter_jacobian(:η)`
+  and `with_parameter(:η)` work; not available with `market_prices`, and a
+  schedule is rejected by the balanced-growth tools.
 - Notebook 10, `10_eu_sectoral_mobility`: `μ` between the 15 market sectors
   of 26 EU countries, offline, from `data/eurostat_eu_sectors.csv`, with
   country × sector and country × year effects (and sector × year), errors

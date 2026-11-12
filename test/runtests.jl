@@ -750,6 +750,74 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test H2 ≈ H2_exact rtol = 1e-8
     end
 
+    @testset "Reinvestment share: elasticity η and σ_schedule" begin
+        fd_rel(f, x; h = 1e-6) = reduce(hcat, map(eachindex(x)) do j
+            hj = h * abs(x[j]); δx = zeros(length(x)); δx[j] = hj
+            (f(x .+ δx) .- f(x .- δx)) ./ (2hj)
+        end)
+        # the defaults leave the parameters and the solution exactly as before
+        Random.seed!(3); sol0, _, p0 = simulate_Ndept(5, T = 20.0, seed = 3, coupled = true, μ = 0.3)
+        Random.seed!(3); sol1, _, p1 = simulate_Ndept(5, T = 20.0, seed = 3, coupled = true, μ = 0.3,
+                                                      η = 0.0, σ_schedule = nothing)
+        @test keys(p1) == keys(p0) && sol1.u == sol0.u
+        Random.seed!(3); sol2, _, p2 = simulate_Ndept(5, T = 20.0, seed = 3, coupled = true, μ = 0.3,
+                                                      σ_schedule = [(0.0, 1.0)])
+        @test p2.σ_times == [0.0]
+        @test sol2.u[end] ≈ sol0.u[end] rtol = 1e-10
+        X = sol0.u[end]
+        C, V = X[1:5], X[6:10]
+        r = _io_profit_rates(C, V, p0.e .* V, p0)
+        @test _reinvestment_share(r, C, p0, 0.0) === p0.σ_c
+        # η: above-average sectors reinvest a smaller share, the factor has
+        # degree 0, and a uniform profit rate leaves every share unchanged
+        pη = merge(p0, (η = 0.7,))
+        σe = _reinvestment_share(r, C, pη, 0.0)
+        r̄ = sum(r .* C) / sum(C)
+        @test σe ≈ p0.σ_c .* (r̄ ./ r) .^ 0.7
+        @test all((σe .< p0.σ_c) .== (r .> r̄))
+        @test _reinvestment_share(fill(0.1, 5), C, pη, 0.0) ≈ p0.σ_c
+        f = _rhs(pη)
+        @test f(3 .* X) ≈ 3 .* f(X)                          # homogeneous of degree 1
+        @test !(f(X) ≈ _rhs(p0)(X))
+        # exact Jacobian, parameter sensitivity, and Hessian (also through rationing)
+        @test system_jacobian(pη, X) ≈ fd_rel(f, X) rtol = 1e-6
+        gη(θ) = _rhs(merge(p0, (η = θ,)))(X)
+        @test parameter_jacobian(pη, X, :η) ≈ (gη(0.7 + 1e-6) .- gη(0.7 - 1e-6)) ./ 2e-6 rtol = 1e-6
+        @test length(parameter_jacobian(p0, X, :η)) == 10    # η absent = 0
+        Random.seed!(7)
+        solr, _, pr = simulate_Ndept(6, T = 50.0, seed = 7, coupled = true, μ = 0.5, rationing = true,
+                                     η = 0.7)
+        Xr = solr.u[end]
+        @test solr.retcode == ReturnCode.Success && pr.η == 0.7
+        @test system_jacobian(pr, Xr) ≈ fd_rel(_rhs(pr), Xr) rtol = 1e-5
+        H = system_hessian(pr, Xr)
+        @test maximum(abs.(H .- permutedims(H, (1, 3, 2)))) < 1e-10 * maximum(abs.(H))
+        @test with_parameter(p0, :η, 0.5).η == 0.5
+
+        # the schedule: σ_c multiplied by the multiplier of the last break at or before t
+        Random.seed!(3)
+        sols, _, ps = simulate_Ndept(5, T = 20.0, seed = 3, coupled = true, μ = 0.3,
+                                     σ_schedule = [(5.0, 0.5), (12.0, 0.8)])
+        @test sols.retcode == ReturnCode.Success && sols.t[end] == 20.0
+        S = ps.e .* V
+        fs(t) = (dX = similar(X); system_Ndept_io!(dX, X, ps, t); dX)
+        @test fs(4.9) ≈ _rhs(p0)(X)
+        @test fs(5.0)[1:5] .- fs(4.9)[1:5] ≈ -0.5 .* ps.σ_c .* S
+        @test fs(12.0)[1:5] .- fs(4.9)[1:5] ≈ -0.2 .* ps.σ_c .* S
+        @test fs(5.0)[6:10] == fs(4.9)[6:10]                 # V is not affected
+        @test !(sols.u[end] ≈ sol0.u[end])
+        @test_throws ArgumentError normalized_system(ps)      # not autonomous
+        @test_throws ArgumentError simulate_normalized(ps, X)
+
+        # argument checks
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, η = -0.1)
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, η = 0.5)          # uncoupled
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, market_prices = true, η = 0.5)
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, σ_schedule = [(2.0, 1.0), (1.0, 0.5)])
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, σ_schedule = [(1.0, -0.5)])
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, σ_schedule = Tuple{Float64, Float64}[])
+    end
+
     @testset "Rationing Jacobian — 2-sector example" begin
         # Section 3.3 of the paper: a single active eigenvalue λ = −1. Sector 2 is
         # not rationed (λ = 0), hence α_max = 1 (flip in the undamped iteration) and

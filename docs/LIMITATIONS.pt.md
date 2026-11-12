@@ -446,7 +446,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 347 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 377 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -608,6 +608,17 @@ afirmado algebricamente.
   diferencial é estável, e a parte reinvestida caiu para metade (0,19 para
   0,10). Portanto, o que os dados rejeitam não é um `μ` constante no
   tempo, mas um `σ_c` constante no tempo e entre departamentos.
+- **Parte reinvestida (opcional).** `simulate_Ndept_custom(...; η, σ_schedule)`
+  substitui o `σ_c` fixo de cada departamento por `σ_c,ᵢ·m(t)·(r̄/rᵢ)^η`:
+  uma elasticidade `η` da parte reinvestida à rentabilidade relativa (0 =
+  parte fixa, por omissão) e um multiplicador `m(t)` constante por troços
+  (`σ_schedule`). O notebook 10 justifica ambos: com uma parte fixa o
+  painel da UE dá um `μ̂` negativo, e a parte reinvestida caiu para metade
+  depois de 2008. Só no sistema acoplado sem preços de mercado: no sistema
+  cruzado os lucros a preços de mercado podem ser ≤ 0, pelo que `(r̄/rᵢ)^η`
+  não está definido (ainda não suportado). Um calendário torna o sistema não
+  autónomo, pelo que as ferramentas de crescimento equilibrado e de
+  bifurcação o rejeitam.
 - **`μ_v` (mobilidade do capital variável) está desligado por omissão.**
   Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
   supercrítico em todas as 30 economias aleatórias testadas, com
