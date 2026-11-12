@@ -405,11 +405,14 @@ function system_Ndept_io!(dX, X, p, t)
     S = p.e .* V
 
     linear = _linear_form(p)
+    # TSSI-driven dynamics (optional, `p.tssi_τ`; `src/tssi.jl`): the profit
+    # rate is computed on capital advanced at historical cost, `S/(B + V)`.
+    tssi = _tssi_on(p)
     if linear
-        r, K = _io_profit_rates_and_capital(C, V, S, p)
+        r, K = tssi ? _book_rates(S, V, X, p) : _io_profit_rates_and_capital(C, V, S, p)
         planned = _linear_reinvestment(_scheduled_σ(p, t), S, K, get(p, :η, 0.0))
     else
-        r = _io_profit_rates(C, V, S, p)
+        r = tssi ? first(_book_rates(S, V, X, p)) : _io_profit_rates(C, V, S, p)
         σ_eff = _reinvestment_share(r, C, p, t)   # p.σ_c unless η or σ_schedule are set
     end
     # Investment floor (optional, `p.investment_floor`; absent = off): gross
@@ -476,6 +479,13 @@ function system_Ndept_io!(dX, X, p, t)
         dX[N+1:2N] = p.σ_v .* S
     else
         dX[N+1:2N] = p.σ_v .* S .+ _mobility_flow(r, V, μ_v, ε)
+    end
+    if tssi   # state [C; V; P; B]: TSSI prices and book value
+        P, B = X[2N+1:3N], X[3N+1:4N]
+        scrapped = haskey(p, :exit_rate) ? _exit_flow(r, C, p.exit_rate, get(p, :exit_hurdle, 0.0)) :
+                   zero(C)
+        dX[2N+1:3N] = _tssi_price_flow(P, C, V, B, p)
+        dX[3N+1:4N] = _book_value_flow(dX[1:N], C, B, p, _capital_goods_price(P, p.A), scrapped)
     end
 end
 
@@ -719,7 +729,8 @@ rationing; see the `system_Ndept_io!` docstring. `market_prices=true`
 basket `basket` (`basket_initial` by default). `exit_friction` (coupled
 only, 0 = off) damps capital outflows from sectors with small shares; see
 `_mobility_flow`. `η`, `σ_schedule`, `reinvestment_form`, `exit_rate`,
-`exit_hurdle` and `investment_floor`: see `simulate_Ndept_custom`.
+`exit_hurdle`, `investment_floor`, `tssi_dynamics` and `τ`: see
+`simulate_Ndept_custom`.
 """
 function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
@@ -727,7 +738,7 @@ function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        market_prices = false, β = 0.5, basket = nothing,
                        exit_friction = 0.0, η = 0.0, σ_schedule = nothing,
                        reinvestment_form = :power, exit_rate = 0.0, exit_hurdle = 0.0,
-                       investment_floor = nothing)
+                       investment_floor = nothing, tssi_dynamics = false, τ = 1.0)
     depts = create_departments(N, name_list)
     return simulate_Ndept_custom(depts, T = T, seed = seed, coupled = coupled, μ = μ,
                                      μ_v = μ_v, realization = realization,
@@ -735,7 +746,8 @@ function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                                      market_prices = market_prices, β = β, basket = basket,
                                      exit_friction = exit_friction, η = η, σ_schedule = σ_schedule,
                                      reinvestment_form = reinvestment_form, exit_rate = exit_rate,
-                                     exit_hurdle = exit_hurdle, investment_floor = investment_floor)
+                                     exit_hurdle = exit_hurdle, investment_floor = investment_floor,
+                                     tssi_dynamics = tssi_dynamics, τ = τ)
 end
 
 """
@@ -790,6 +802,16 @@ Exit of unprofitable capital (needs `coupled=true`; `_exit_flow`):
   irreversibility the EU panel shows (sectors with losses keep investing
   about as much as wears out; notebook 13). With market prices, the extra
   investment above `σ_c·Π` is financed out of capitalist consumption.
+- `tssi_dynamics = true` (needs `coupled=true`), with the lag `τ > 0`: the
+  profit rate that drives accumulation (mobility, reinvestment, the floor,
+  the exit) is computed on capital advanced at historical cost,
+  `Sᵢ/(Bᵢ + Vᵢ)` (`Πᵢ/(Bᵢ + Vᵢ)` with market prices), with the book value
+  `B` of fixed capital appended to the state (`src/tssi.jl`). Capital goods
+  are bought at market prices with `market_prices=true` (state
+  `[C; V; q; B]`, `B₀ = C` at the initial prices), and otherwise at TSSI
+  temporal prices `P`, which follow the TSSI map with lag `τ` (state
+  `[C; V; P; B]`, starting from the simultaneist prices). Not with
+  `import_coefficients`.
 
 Real-data options, typically from a calibration (`departments_from_params`):
 
@@ -817,8 +839,16 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    A = nothing, final_demand_share = nothing,
                                    import_coefficients = nothing, exit_friction = 0.0,
                                    η = 0.0, σ_schedule = nothing, reinvestment_form = :power,
-                                   exit_rate = 0.0, exit_hurdle = 0.0, investment_floor = nothing)
+                                   exit_rate = 0.0, exit_hurdle = 0.0, investment_floor = nothing,
+                                   tssi_dynamics = false, τ = 1.0)
     N = length(depts)
+    if tssi_dynamics
+        coupled || throw(ArgumentError("tssi_dynamics requires coupled=true"))
+        (τ isa Real && isfinite(τ) && τ > 0) || throw(ArgumentError("τ must be a finite number > 0, got $τ"))
+        isnothing(import_coefficients) ||
+            throw(ArgumentError("tssi_dynamics does not take import_coefficients (the TSSI prices " *
+                                "would need a price of imports)"))
+    end
     exit_friction >= 0 || error("exit_friction must be ≥ 0")
     (iszero(exit_friction) || coupled) || error("exit_friction requires coupled=true")
     reinvestment = _reinvestment_params(η, σ_schedule; coupled = coupled, market_prices = market_prices,
@@ -862,7 +892,13 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
         iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
         p = merge(p, (basket = isnothing(basket) ? basket_initial(A, X0, p) : basket,))
         p = merge(p, reinvestment)
-        prob = ODEProblem(cross_dual_system!, [X0; zeros(N)], (0.0, T), p)
+        Xfull = [X0; zeros(N)]
+        if tssi_dynamics   # book value at the initial market prices: B₀ = C·π(P₀)
+            p = merge(p, (tssi_τ = Float64(τ),))
+            P0 = cross_dual_state(X0[1:N], X0[N+1:2N], zeros(N), p).P
+            Xfull = [Xfull; X0[1:N] .* _capital_goods_price(P0, A)]
+        end
+        prob = ODEProblem(cross_dual_system!, Xfull, (0.0, T), p)
         return (haskey(p, :σ_times) ? solve(prob, Tsit5(), saveat = 0.5, tstops = p.σ_times) :
                                       solve(prob, Tsit5(), saveat = 0.5)), depts, p
     end
@@ -889,6 +925,11 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
             (p = merge(p, (import_coefficients = collect(Float64, import_coefficients),)))
         iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
         p = merge(p, reinvestment)
+        if tssi_dynamics   # TSSI prices and book value, consistent with each other
+            p = merge(p, (tssi_τ = Float64(τ),))
+            init = _tssi_initial(X0[1:N], X0[N+1:2N], p)
+            X0 = [X0; init.P; init.B]
+        end
         prob = ODEProblem(system_Ndept_io!, X0, (0.0, T), p)
     else
         p = (

@@ -243,3 +243,92 @@ function compare_tssi_simultaneous(sol, p; τ = 1.0, h = 0.5, show_plot = true)
     end
     return v
 end
+
+# ============================================================================
+# TSSI-DRIVEN DYNAMICS (optional, `simulate_Ndept_custom(...; tssi_dynamics = true)`)
+# ----------------------------------------------------------------------------
+# The valuation layer above runs after a simulation. With `tssi_dynamics`,
+# the rate of profit that drives accumulation is itself computed on capital
+# advanced at historical cost: the state gains the book value `B` of each
+# sector's fixed capital, in money at the prices it was bought at, and
+# `rᵢ = Sᵢ/(Bᵢ + Vᵢ)` (or `Πᵢ/(Bᵢ + Vᵢ)` with market prices) replaces the
+# rate on capital valued at current prices in the mobility term, the
+# reinvestment function, the floor and the exit.
+#
+# Capital goods are bought at the price of the sector's capital good
+# (`_capital_goods_price`): with market prices (`cross_dual_system!`, state
+# `[C; V; q; B]`) at market prices; without them (`system_Ndept_io!`, state
+# `[C; V; P; B]`) at temporal (TSSI) prices `P`, which follow the TSSI map
+# with a continuous lag, `τ·dP/dt = tssi_map(P, data).p − P`, with
+# depreciation at historical cost, `d = δB/x`.
+# ============================================================================
+
+"""`true` when `p` has TSSI-driven dynamics (`tssi_dynamics = true`)."""
+_tssi_on(p) = haskey(p, :tssi_τ)
+
+"""Book value of fixed capital, the last `N` entries of the state."""
+_book(X, p) = X[end-length(p.e)+1:end]
+
+"""
+    _book_rates(S, V, X, p)
+
+Profit rates on capital advanced at historical cost, `S./(B + V)`, and that
+capital, `(r, K)`, with the book value `B` from the state `X`.
+"""
+function _book_rates(S, V, X, p)
+    K = _book(X, p) .+ V
+    return S ./ K, K
+end
+
+"""
+    _book_value_flow(dC, C, B, p, π, scrapped)
+
+`dB/dt`: gross purchases `G = dC/dt + δC + scrapped` (in base-value units;
+`scrapped` is the exit flow, `_exit_flow`, which is not a purchase) are
+bought at the price of the capital good `π`; depreciation removes `δB`;
+scrapped capital, and net disposals (`G < 0`), leave at average book cost
+`B/C`, as in `_book_value_step`.
+"""
+function _book_value_flow(dC, C, B, p, π, scrapped)
+    G = dC .+ p.δ .* C .+ scrapped
+    avg = B ./ C
+    return ifelse.(G .>= 0, π, avg) .* G .- p.δ .* B .- avg .* scrapped
+end
+
+"""
+    _tssi_dynamics_data(C, V, B, p)
+
+`tssi_map` data at a state of the coupled system, with depreciation at
+historical cost (`d = δB/x`, as `tssi_valuation(...; depreciation =
+:historical)`) and gross output rebuilt as in `tssi_data` (without imported
+inputs).
+"""
+function _tssi_dynamics_data(C, V, B, p)
+    S = p.e .* V
+    x = (p.δ .* C .+ V .+ S) ./ (1 .- vec(sum(p.A, dims = 1)))
+    return (A = p.A, x = x, d = p.δ .* B ./ x, v = V ./ x, s = S ./ x, S_total = sum(S))
+end
+
+"""`dP/dt` of the TSSI prices: `(tssi_map(P, data).p − P)/τ`."""
+_tssi_price_flow(P, C, V, B, p) = (tssi_map(P, _tssi_dynamics_data(C, V, B, p)).p .- P) ./ p.tssi_τ
+
+"""
+    _tssi_initial(C, V, p; tol = 1e-12, max_iter = 200)
+
+Initial TSSI prices and book value of the coupled system: the simultaneist
+prices `P₀` of the data with depreciation at historical cost, and
+`B₀ = C·π(P₀)` (capital valued as if bought at those prices), found
+together by fixed-point iteration. Returns `(P, B)`.
+"""
+function _tssi_initial(C, V, p; tol = 1e-12, max_iter = 200)
+    B = float.(C)
+    P = ones(length(C))
+    for _ in 1:max_iter
+        P = simultaneous_prices(_tssi_dynamics_data(C, V, B, p)).p
+        Bnew = C .* _capital_goods_price(P, p.A)
+        done = maximum(abs.(Bnew .- B) ./ B) < tol
+        B = Bnew
+        done && break
+    end
+    return (P = P, B = B)
+end

@@ -481,7 +481,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 574 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 601 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -585,10 +585,21 @@ algebraically.
   rationing binding) and against the closed form of the 2-sector example.
   It is the Hessian of the active branch: the map is piecewise smooth, so
   it is undefined at ties in κ or at `ρᵢ = 1`, like the Jacobian.
-- **TSSI is a valuation layer only.** The capital-mobility term still
-  uses simultaneist (Sraffian) profit rates; there is no TSSI-driven
-  variant of the dynamics. The lag τ is a single fixed constant (not a
-  distribution of turnover times by sector).
+- **TSSI-driven dynamics (fixed, optional).** By default TSSI is a
+  valuation layer only, and the capital-mobility term uses profit rates
+  with constant capital at current (simultaneist or market) prices.
+  `tssi_dynamics = true` (`simulate_Ndept_custom`, coupled systems) makes
+  the rate that drives accumulation the rate on capital advanced at
+  historical cost, `Sᵢ/(Bᵢ + Vᵢ)` (`Πᵢ/(Bᵢ + Vᵢ)` with market prices): the
+  state gains the book value `B` of each sector's fixed capital, bought at
+  the price of its capital good, depreciated at `δ`, with scrapping and net
+  disposals leaving at average book cost (`src/tssi.jl`). With market
+  prices capital is bought at market prices; without them, at TSSI
+  temporal prices that follow the TSSI map with a continuous lag `τ`. The
+  variant keeps homogeneity of degree 1, so balanced growth, its stability
+  and the Jacobian tools apply. The lag τ is still a single fixed constant
+  (not a distribution of turnover times by sector), and the TSSI prices
+  leave out imported inputs, so `import_coefficients` is not accepted.
 - **Depreciation at historical cost (fixed, optional).** By default
   depreciation `d = δC/x` is valued at base prices.
   `tssi_valuation(...; depreciation = :historical)` instead keeps a book

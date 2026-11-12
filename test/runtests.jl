@@ -1177,6 +1177,80 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, σ_schedule = Tuple{Float64, Float64}[])
     end
 
+    @testset "TSSI-driven dynamics" begin
+        Random.seed!(7); depts = create_departments(5, String[])
+        N = 5
+        # with market prices: B₀ = C, and the right-hand side starts as without TSSI
+        s0, _, p0 = simulate_Ndept_custom(deepcopy(depts); T = 30.0, seed = 2, coupled = true,
+                                          market_prices = true)
+        s1, _, p1 = simulate_Ndept_custom(deepcopy(depts); T = 30.0, seed = 2, coupled = true,
+                                          market_prices = true, tssi_dynamics = true)
+        @test !haskey(p0, :tssi_τ) && length(s0.u[1]) == 3N
+        @test p1.tssi_τ == 1.0 && length(s1.u[1]) == 4N && s1.retcode == ReturnCode.Success
+        X = s1.u[1]
+        @test _book(X, p1) ≈ X[1:N]
+        d0, d1 = zeros(3N), zeros(4N)
+        cross_dual_system!(d0, X[1:3N], p0, 0.0); cross_dual_system!(d1, X, p1, 0.0)
+        @test d1[1:3N] == d0
+        # at constant prices with B = C, the book value moves with C
+        @test d1[3N+1:4N] ≈ d1[1:N]
+        @test cross_dual_state(X[1:N], X[N+1:2N], X[2N+1:3N], p1; B = 2 .* X[1:N]).r ≈
+              cross_dual_state(X[1:N], X[N+1:2N], X[2N+1:3N], p1).Π ./ (2 .* X[1:N] .+ X[N+1:2N])
+        # later on the book value departs from C, and the rates with it
+        Xe = s1.u[end]
+        @test !(_book(Xe, p1) ≈ Xe[1:N])
+        # homogeneous of degree 1 in (C, V, B), invariant in q
+        f1 = _rhs(p1)
+        scale(X) = [2 .* X[1:2N]; X[2N+1:3N]; 2 .* X[3N+1:4N]]
+        @test f1(scale(Xe)) ≈ scale(f1(Xe))
+        # exact Jacobian against finite differences
+        J = system_jacobian(p1, Xe); h = 1e-6
+        Jfd = reduce(hcat, [(f1(Xe .+ h .* (1:4N .== j)) .- f1(Xe .- h .* (1:4N .== j))) ./ 2h for j in 1:4N])
+        @test maximum(abs.(J .- Jfd)) < 1e-6 * maximum(abs.(J))
+        # balanced growth with the book value in the state
+        eq = balanced_growth(p1, s1.u[1])
+        @test eq.converged && eq.stable
+        @test length(eq.z) == 2N - 1 + N - 1 + N && all(_book(eq.X, p1) .> 0)
+        @test eq.r ≈ cross_dual_state(eq.X[1:N], eq.X[N+1:2N], eq.X[2N+1:3N], p1; B = _book(eq.X, p1)).r
+        @test with_parameter(p1, :tssi_τ, 2.0).tssi_τ == 2.0
+        # with the linear form, the floor and the exit too
+        s2, _, p2 = simulate_Ndept_custom(deepcopy(depts); T = 20.0, seed = 2, coupled = true, market_prices = true,
+                                          tssi_dynamics = true, reinvestment_form = :linear, η = 0.3,
+                                          investment_floor = 0.7, exit_rate = 0.2)
+        @test s2.retcode == ReturnCode.Success && all(_book(s2.u[end], p2) .> 0)
+
+        # without market prices: TSSI prices and book value start at their joint fixed point
+        c1, _, q1 = simulate_Ndept_custom(deepcopy(depts); T = 30.0, seed = 2, coupled = true,
+                                          tssi_dynamics = true, τ = 0.5)
+        @test q1.tssi_τ == 0.5 && length(c1.u[1]) == 4N && c1.retcode == ReturnCode.Success
+        C0, V0, P0, B0 = c1.u[1][1:N], c1.u[1][N+1:2N], c1.u[1][2N+1:3N], c1.u[1][3N+1:4N]
+        @test B0 ≈ C0 .* _capital_goods_price(P0, q1.A)
+        @test P0 ≈ simultaneous_prices(_tssi_dynamics_data(C0, V0, B0, q1)).p
+        dq = zeros(4N); system_Ndept_io!(dq, c1.u[1], q1, 0.0)
+        @test maximum(abs.(dq[2N+1:3N])) < 1e-8
+        # the target prices satisfy the TSSI invariants (total price = total value)
+        Xc = c1.u[end]
+        data = _tssi_dynamics_data(Xc[1:N], Xc[N+1:2N], _book(Xc, q1), q1)
+        step = tssi_map(Xc[2N+1:3N], data)
+        @test sum(data.x .* step.p) ≈ sum(data.x .* step.λ)
+        # the profit rates are on the book value
+        @test growth_indicators(q1, Xc).r ≈ q1.e .* Xc[N+1:2N] ./ (_book(Xc, q1) .+ Xc[N+1:2N])
+        g1 = _rhs(q1)
+        scale_io(X) = [2 .* X[1:2N]; X[2N+1:3N]; 2 .* X[3N+1:4N]]
+        @test g1(scale_io(Xc)) ≈ scale_io(g1(Xc))
+        Jc = system_jacobian(q1, Xc)
+        Jcfd = reduce(hcat, [(g1(Xc .+ h .* (1:4N .== j)) .- g1(Xc .- h .* (1:4N .== j))) ./ 2h for j in 1:4N])
+        @test maximum(abs.(Jc .- Jcfd)) < 1e-6 * maximum(abs.(Jc))
+        z = _to_free(Xc, q1)
+        @test length(z) == 2N - 1 + 2N && _from_free(z, q1)[2N+1:3N] ≈ Xc[2N+1:3N]
+
+        @test_throws ArgumentError simulate_Ndept_custom(deepcopy(depts); tssi_dynamics = true)
+        @test_throws ArgumentError simulate_Ndept_custom(deepcopy(depts); coupled = true, tssi_dynamics = true, τ = 0.0)
+        @test_throws ArgumentError simulate_Ndept_custom(deepcopy(depts); coupled = true, rationing = true,
+                                                         tssi_dynamics = true, import_coefficients = fill(0.1, N))
+        @test length(simulate_Ndept(4; T = 2.0, seed = 1, coupled = true, tssi_dynamics = true)[1].u[1]) == 16
+    end
+
     @testset "Linear reinvestment form and the exit of unprofitable capital" begin
         fd(f, x; h = 1e-6) = reduce(hcat, map(eachindex(x)) do j
             hj = h * max(abs(x[j]), 1.0); δx = zeros(length(x)); δx[j] = hj

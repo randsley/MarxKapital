@@ -27,29 +27,48 @@ Full state from the free coordinates `z`: quantities
 mean-zero log prices `q = [z…; −Σ]` (only relative prices matter).
 """
 function _from_free(z, p)
-    nq = 2 * length(p.e)
+    N = length(p.e)
+    nq = 2N
     y = [z[1:nq-1]; 1 - sum(z[1:nq-1])]
-    _is_cross_dual(p) || return y
-    qf = z[nq:end]
-    return [y; qf; -sum(qf)]
+    if _is_cross_dual(p)
+        qf = z[nq:nq+N-2]
+        y = [y; qf; -sum(qf)]
+        _tssi_on(p) && (y = [y; z[nq+N-1:end]])     # book value B, relative to Σ(C+V)
+        return y
+    end
+    _tssi_on(p) && (y = [y; z[nq:end]])             # TSSI prices P, and B relative to Σ(C+V)
+    return y
 end
 
 """Free coordinates of a full state `X` (normalizes quantities and prices)."""
 function _to_free(X, p)
-    nq = 2 * length(p.e)
-    y = X[1:nq] ./ sum(X[1:nq])
-    _is_cross_dual(p) || return y[1:end-1]
-    q = X[nq+1:end] .- mean(X[nq+1:end])
-    return [y[1:end-1]; q[1:end-1]]
+    N = length(p.e)
+    nq = 2N
+    total = sum(X[1:nq])
+    y = X[1:nq] ./ total
+    B = _tssi_on(p) ? X[end-N+1:end] ./ total : X[1:0]
+    if _is_cross_dual(p)
+        q = X[nq+1:nq+N] .- mean(X[nq+1:nq+N])
+        return [y[1:end-1]; q[1:end-1]; B]
+    end
+    _tssi_on(p) && return [y[1:end-1]; X[nq+1:nq+N]; B]
+    return y[1:end-1]
 end
 
 """Projection of the right-hand side onto the normalized full state
 (quantities on the simplex, mean-zero log prices)."""
 function _project(fX, X, p)
-    nq = 2 * length(p.e)
-    hy = fX[1:nq] .- sum(fX[1:nq]) .* X[1:nq]
-    _is_cross_dual(p) || return hy
-    return [hy; fX[nq+1:end] .- mean(fX[nq+1:end])]
+    N = length(p.e)
+    nq = 2N
+    growth = sum(fX[1:nq])
+    hy = fX[1:nq] .- growth .* X[1:nq]
+    # the book value is degree 1, normalized by the same total as C and V
+    hB = _tssi_on(p) ? fX[end-N+1:end] .- growth .* X[end-N+1:end] : fX[1:0]
+    if _is_cross_dual(p)
+        return [hy; fX[nq+1:nq+N] .- mean(fX[nq+1:nq+N]); hB]
+    end
+    _tssi_on(p) && return [hy; fX[nq+1:nq+N]; hB]    # TSSI prices are degree 0
+    return hy
 end
 
 """Errors if `p` has a reinvestment schedule (`σ_schedule`): balanced growth needs an autonomous system."""
@@ -72,8 +91,11 @@ function normalized_system(p; t = 0.0)
     return function (z)
         X = _from_free(z, p)
         h = _project(f(X), X, p)
-        _is_cross_dual(p) || return h[1:nq-1]
-        return [h[1:nq-1]; h[nq+1:end-1]]
+        N = nq ÷ 2
+        if _is_cross_dual(p)
+            return [h[1:nq-1]; h[nq+1:nq+N-1]; h[nq+N+1:end]]
+        end
+        return [h[1:nq-1]; h[nq+1:end]]
     end
 end
 
@@ -117,10 +139,11 @@ function growth_indicators(p, X)
     base = (g = g, k = C ./ V, share_C = C ./ sum(C), share_V = V ./ sum(V),
             ω = sum(V) / (sum(V) + sum(S)), r_aggregate = sum(S) / sum(C .+ V))
     if _is_cross_dual(p)
-        ec = cross_dual_state(C, V, X[2N+1:3N], p)
+        ec = cross_dual_state(C, V, X[2N+1:3N], p; B = _tssi_on(p) ? _book(X, p) : nothing)
         return merge(base, (r = ec.r, r_dispersion = std(ec.r), P = ec.P, excess = ec.excess))
     end
-    r = haskey(p, :μ) ? _io_profit_rates(C, V, S, p) : S ./ (C .+ V)
+    r = _tssi_on(p) ? first(_book_rates(S, V, X, p)) :
+        haskey(p, :μ) ? _io_profit_rates(C, V, S, p) : S ./ (C .+ V)
     return merge(base, (r = r, r_dispersion = std(r)))
 end
 
@@ -181,6 +204,8 @@ end
   (`_exit_flow`); `:exit_hurdle` only matters once `exit_rate` is set;
 - `:investment_floor`: the floor `θ` on gross reinvestment, `θ·δ·C`
   (`_investment_floor`);
+- `:tssi_τ`: the lag of the TSSI prices (TSSI-driven dynamics,
+  `src/tssi.jl`);
 - `:ω`: uniform wage share, `eᵢ = (1−θ)/θ` in every sector;
 - `:e_scale`: proportional exploitation, `eᵢ = θ·e_ref,ᵢ` (keeps the
   heterogeneity across sectors; the resulting aggregate wage share is
@@ -194,9 +219,10 @@ function with_parameter(p, parameter::Symbol, θ; e_ref = p.e)
     parameter === :exit_rate && return merge(p, (exit_rate = θ, exit_hurdle = get(p, :exit_hurdle, 0.0)))
     parameter === :exit_hurdle && return merge(p, (exit_hurdle = θ,))
     parameter === :investment_floor && return merge(p, (investment_floor = θ,))
+    parameter === :tssi_τ && return merge(p, (tssi_τ = θ,))
     parameter === :ω && return merge(p, (e = fill((1 - θ) / θ, length(p.e)),))
     parameter === :e_scale && return merge(p, (e = θ .* e_ref,))
-    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :η, :exit_rate, :exit_hurdle, :investment_floor, :ω or :e_scale)")
+    error("unknown parameter: $parameter (use :μ, :μ_v, :exit_friction, :η, :exit_rate, :exit_hurdle, :investment_floor, :tssi_τ, :ω or :e_scale)")
 end
 
 """

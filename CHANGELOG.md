@@ -52,6 +52,16 @@ Format based on Keep a Changelog. Semantic versioning.
   how each NACE section is treated (market or non-market; the
   productive/unproductive distinction the model does not make), how the
   self-employed are counted, and what the floor on `e` does.
+- TSSI-driven dynamics, `tssi_dynamics = true` with lag `τ`
+  (`simulate_Ndept(_custom)`, both coupled systems; opt-in, the defaults are
+  bit-identical): the profit rate that drives mobility, reinvestment, the
+  floor and the exit is computed on capital advanced at historical cost,
+  with the book value of fixed capital appended to the state (`src/tssi.jl`:
+  `_book_value_flow`, `_tssi_price_flow`, `_tssi_initial`). Capital goods
+  are bought at market prices in the cross-dual system and at TSSI temporal
+  prices, which follow the TSSI map with a continuous lag, in the coupled
+  one. `balanced_growth`, the Jacobians and `with_parameter(:tssi_τ)` work
+  with it.
 - Estimating the mobility of variable capital `μ_v`
   (`src/mobility_estimation.jl`): `compute_labor_panel` builds the panel of
   the model's equation `dV/dt = σ_v·S + μ_v·(r − r̄_V)·V` (growth of the

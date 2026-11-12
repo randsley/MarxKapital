@@ -53,6 +53,17 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   como é tratada cada secção NACE (mercantil ou não mercantil; a distinção
   entre trabalho produtivo e improdutivo que o modelo não faz), como se
   contam os independentes, e o que faz o piso de `e`.
+- Dinâmica conduzida pela TSSI, `tssi_dynamics = true` com desfasamento
+  `τ` (`simulate_Ndept(_custom)`, nos dois sistemas acoplados; opcional, os
+  valores por omissão dão resultados idênticos bit a bit): a taxa de lucro
+  que conduz a mobilidade, o reinvestimento, o piso e a saída é calculada
+  sobre o capital adiantado a custo histórico, com o valor contabilístico
+  do capital fixo acrescentado ao estado (`src/tssi.jl`:
+  `_book_value_flow`, `_tssi_price_flow`, `_tssi_initial`). Os bens de
+  capital são comprados a preços de mercado no sistema cruzado e a preços
+  temporais TSSI, que seguem o mapa TSSI com um desfasamento contínuo, no
+  acoplado. `balanced_growth`, os jacobianos e `with_parameter(:tssi_τ)`
+  funcionam com ela.
 - Estimação da mobilidade do capital variável `μ_v`
   (`src/mobility_estimation.jl`): `compute_labor_panel` constrói o painel
   da equação do modelo `dV/dt = σ_v·S + μ_v·(r − r̄_V)·V` (crescimento da

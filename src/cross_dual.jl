@@ -21,7 +21,8 @@ Quantities of the cross-dual system at a state `(C, V, q)`:
 - `P`: market prices `exp(q)`, normalized so that total profit equals total
   surplus value (`ΣΠ = ΣS`); at `P = 1`, `Π = S`;
 - `Π`: profits at market prices, `(P − AᵀP)ᵢxᵢ − Vᵢ − δᵢCᵢ`;
-- `r`: profit rates `Π/(C + V)`;
+- `r`: profit rates `Π/(C + V)`, or `Π/(B + V)` when the book value `B` of
+  fixed capital is given (TSSI-driven dynamics, `src/tssi.jl`);
 - `investment`: gross investment spending per buying sector
   (`σ_cΠ + δC + μ(r − r̄)C`; with `p.reinvestment_form == :linear`,
   `_linear_reinvestment(σ_c·m(t), Π, C + V, η) + δC + μ(r − r̄)C`, and
@@ -38,7 +39,7 @@ Quantities of the cross-dual system at a state `(C, V, q)`:
 
 Walras's law: `Σ Pᵢ·demandᵢ = Σ Pᵢ·xᵢ` identically.
 """
-function cross_dual_state(C, V, q, p, t = 0.0)
+function cross_dual_state(C, V, q, p, t = 0.0; B = nothing)
     N = length(C)
     S = p.e .* V
     colsum = vec(sum(p.A, dims = 1))
@@ -47,14 +48,15 @@ function cross_dual_state(C, V, q, p, t = 0.0)
     P0 = exp.(q)
     P = P0 .* sum(W) ./ sum((P0 .- p.A' * P0) .* x)   # ΣΠ = ΣW − ΣV − ΣδC = ΣS
     Π = (P .- p.A' * P) .* x .- V .- p.δ .* C
-    r = Π ./ (C .+ V)
+    K = isnothing(B) ? C .+ V : B .+ V   # with B: capital advanced at historical cost
+    r = Π ./ K
     r̄ = sum(r .* C) / sum(C)
     mobility_C = _mobility_flow(r, C, p.μ, get(p, :exit_friction, 0.0))
     γ = 1 .- p.σ_c .- p.σ_v
     floor_on = haskey(p, :investment_floor)
     if _linear_form(p) || floor_on
         reinvestment = _linear_form(p) ?
-            _linear_reinvestment(_scheduled_σ(p, t), Π, C .+ V, get(p, :η, 0.0)) :
+            _linear_reinvestment(_scheduled_σ(p, t), Π, K, get(p, :η, 0.0)) :
             p.σ_c .* Π
         floor_on && (reinvestment = _investment_floor(reinvestment, C, p))
         investment = reinvestment .+ p.δ .* C .+ mobility_C
@@ -89,13 +91,17 @@ accumulation equations are those of `system_Ndept_io!` with `Π` in place of
 the linear reinvestment form (`p.reinvestment_form == :linear`, the only form
 with `η` here, since `Π` can be ≤ 0), the investment floor
 (`p.investment_floor`, `_investment_floor`) and the exit of unprofitable capital
-(`p.exit_rate`, `_exit_flow`; scrapping is not investment demand). The right-hand side is homogeneous of degree 1 in `(C, V)` and
+(`p.exit_rate`, `_exit_flow`; scrapping is not investment demand). With
+TSSI-driven dynamics (`p.tssi_τ`) the state is `[C; V; q; B]` and the profit
+rates are on the book value `B` of fixed capital (`src/tssi.jl`). The right-hand side is homogeneous of degree 1 in `(C, V)` and
 invariant to adding a constant to `q` (only relative prices matter).
 """
 function cross_dual_system!(dX, X, p, t)
     N = length(p.e)
     C, V, q = X[1:N], X[N+1:2N], X[2N+1:3N]
-    ec = cross_dual_state(C, V, q, p, t)
+    tssi = _tssi_on(p)
+    B = tssi ? X[3N+1:4N] : nothing
+    ec = cross_dual_state(C, V, q, p, t; B = B)
     if _linear_form(p) || haskey(p, :investment_floor)
         dX[1:N] = ec.reinvestment .- p.δ .* C .+ ec.mobility_C
     else
@@ -106,6 +112,11 @@ function cross_dual_system!(dX, X, p, t)
     dX[N+1:2N] = iszero(μ_v) ? p.σ_v .* ec.Π :
                  p.σ_v .* ec.Π .+ _mobility_flow(ec.r, V, μ_v, get(p, :exit_friction, 0.0))
     dX[2N+1:3N] = p.β .* ec.excess
+    if tssi   # book value of fixed capital, bought at market prices
+        scrapped = haskey(p, :exit_rate) ?
+            _exit_flow(ec.r, C, p.exit_rate, get(p, :exit_hurdle, 0.0)) : zero(C)
+        dX[3N+1:4N] = _book_value_flow(dX[1:N], C, B, p, _capital_goods_price(ec.P, p.A), scrapped)
+    end
 end
 
 """

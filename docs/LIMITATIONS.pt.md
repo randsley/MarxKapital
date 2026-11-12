@@ -476,7 +476,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 574 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 601 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -584,10 +584,24 @@ afirmado algebricamente.
   forma fechada do exemplo de 2 setores. É a Hessiana do ramo ativo: o mapa
   é suave por troços, pelo que não está definida em empates em κ nem em
   `ρᵢ = 1`, tal como o Jacobiano.
-- **A TSSI é só uma camada de valorização.** O termo de mobilidade de
-  capital continua a usar taxas de lucro simultaneístas (Sraffa); não há
-  uma variante da dinâmica conduzida pela TSSI. O desfasamento τ é um só
-  e fixo (não uma distribuição de tempos de rotação por setor).
+- **Dinâmica conduzida pela TSSI (resolvido, opcional).** Por omissão a
+  TSSI é só uma camada de valorização, e o termo de mobilidade de capital
+  usa taxas de lucro com o capital constante a preços correntes
+  (simultaneístas ou de mercado). `tssi_dynamics = true`
+  (`simulate_Ndept_custom`, sistemas acoplados) faz da taxa que conduz a
+  acumulação a taxa sobre o capital adiantado a custo histórico,
+  `Sᵢ/(Bᵢ + Vᵢ)` (`Πᵢ/(Bᵢ + Vᵢ)` com preços de mercado): o estado ganha o
+  valor contabilístico `B` do capital fixo de cada setor, comprado ao preço
+  do seu bem de capital, depreciado a `δ`, com o abate e as vendas líquidas
+  a saírem ao custo contabilístico médio (`src/tssi.jl`). Com preços de
+  mercado o capital é comprado a preços de mercado; sem eles, a preços
+  temporais TSSI que seguem o mapa TSSI com um desfasamento contínuo `τ`.
+  A variante mantém a homogeneidade de grau 1, pelo que o crescimento
+  equilibrado, a sua estabilidade e as ferramentas do jacobiano se
+  aplicam. O desfasamento τ continua a ser um só e fixo (não uma
+  distribuição de tempos de rotação por setor), e os preços TSSI deixam de
+  fora os consumos importados, pelo que `import_coefficients` não é
+  aceite.
 - **Depreciação a custo histórico (resolvido, opcional).** Por omissão, a
   depreciação `d = δC/x` é valorizada a preços-base.
   `tssi_valuation(...; depreciation = :historical)` mantém em vez disso um
