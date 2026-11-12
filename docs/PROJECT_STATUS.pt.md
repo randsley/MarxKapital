@@ -454,4 +454,5 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 - [x] Termo de mobilidade conserva capital constante agregado exatamente (`r̄` ponderado por `C`)
 - [x] Série temporal AMECO usa CCF real (não uma dedução fixa de 10%); `e` invariante sob deflator comum, verificado
 - [x] Piso `e=0.1` na calibração setorial reportado explicitamente (contagem de setores saturados)
+- [x] Piso de `e` separado por causa (opcional): só setores mercantis (`sectors = :market`), `e` sobre vários anos (`e_years`), `e_floor`, independentes imputados por hora (`:imputed_hours`); correspondência entre contas nacionais e C, V, S em `docs/NATIONAL_ACCOUNTS.pt.md`
 - [x] Artigo académico (`paper/main.tex`) — metodologia + aplicação empírica a Portugal, reproduzível

@@ -455,7 +455,7 @@ verifique-os manualmente com `check_ameco_sdmx()`,
 `check_eurostat_sectoral()` e `paper/matrix_audit.jl` antes de os usar
 numa análise real.
 
-## 8. Piso imposto em `e` (taxa de exploração) na calibração setorial (documentado)
+## 8. Piso imposto em `e` (taxa de exploração) na calibração setorial (mitigado, opcional)
 
 `estimate_sector_parameters` (`src/calibration_pt.jl`) impõe `e =
 max(0.1, surplus_value_rate)`: setores cujo rendimento empresarial (após
@@ -479,6 +479,33 @@ com os rácios brutos. O piso mantém-se, porque `Department` exige
 agricultura (A), as atividades de consultoria (M) e administrativas (N), as
 artes (R) e os outros serviços (S) juntam-se aos quatro acima, pelo que o
 piso pesa mais nesse caminho.
+
+**Mitigado (opcional):** o piso cobre três coisas diferentes, que
+`calibrate_portugal_model` pode agora separar (`docs/NATIONAL_ACCOUNTS.pt.md`
+§4; as predefinições não mudam, e por isso a Tabela 3 do artigo também não):
+- *Secções não mercantis.* O, P e Q têm `e` ≈ 0 por construção, porque as
+  contas valorizam a produção não mercantil pelo custo. `sectors = :market`
+  deixa-as de fora juntamente com o imobiliário (L, rendas imputadas), os
+  15 setores mercantis dos notebooks 9–12. Os consumos intermédios
+  comprados a elas são tratados como importações, e as suas compras
+  passam a procura pública. O piso aplica-se então só à eletricidade (1 de
+  15), e `r` é 11,3% em vez de 6,1%, porque o stock de capital de L sai.
+- *Anos excecionais.* O −0,53 da eletricidade é a crise energética de
+  2022. `e_years` calcula `e` sobre vários anos; em 2018–2022 D tem 3,70.
+  Uma janela de três anos, 2020–2022, é dominada pela pandemia (os
+  transportes e as artes descem abaixo do piso), pelo que a janela deve
+  cobrir um ciclo.
+- *A imputação dos independentes.* `self_employed = :imputed_hours` imputa
+  por hora trabalhada. Sobe a agricultura de −0,20 para 0,07, mas não M, N,
+  R e S, cujo `e` fica em zero ou abaixo com os independentes contados a um
+  salário. Isso está nas contas. Com os setores mercantis, uma janela de
+  cinco anos e qualquer das imputações, o piso aplica-se a 5 de 15 setores
+  (A, M, N, R, S).
+
+`e_floor` torna o piso um argumento (tem de continuar positivo). Fica em
+aberto um departamento com `e ≤ 0`, que o modelo não admite: o valor no
+piso nesses cinco setores é uma escolha de modelação, e `e_raw` guarda o
+medido.
 
 ## 9. Formato da série de exploração/depreciação AMECO (corrigido)
 

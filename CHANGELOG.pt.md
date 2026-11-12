@@ -9,19 +9,24 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
-- Opções de calibração para o mínimo de `e` (`calibrate_portugal_model`,
+- Opções de calibração para o piso de `e` (`calibrate_portugal_model`,
   todas opcionais; as predefinições não mudam):
   - `sectors = :market` deixa de fora o imobiliário e os serviços não
     mercantis (L, O, P, Q, `NON_MARKET_SECTIONS`). O que os setores
     mercantis lhes compram é tratado como importação, e o que eles compram
     aos setores mercantis passa a procura pública.
   - `e_years` calcula `e` sobre vários anos.
-  - `e_floor` fixa o mínimo (0,1 por omissão).
+  - `e_floor` fixa o piso (0,1 por omissão).
   - `self_employed = :imputed_hours` imputa o rendimento do trabalho dos
     independentes por hora trabalhada (`fetch_eurostat_sector_hours`).
 
-  Para Portugal em 2022 o mínimo aplica-se a 1 de 15 setores mercantis (a
+  Para Portugal em 2022 o piso aplica-se a 1 de 15 setores mercantis (a
   eletricidade, atingida pela crise energética) em vez de 4 de 19.
+- `docs/NATIONAL_ACCOUNTS.pt.md` (e `.md`), com ligação no README: que
+  rubrica do SEC 2010 e que série do Eurostat dão cada grandeza do modelo,
+  como é tratada cada secção NACE (mercantil ou não mercantil; a distinção
+  entre trabalho produtivo e improdutivo que o modelo não faz), como se
+  contam os independentes, e o que faz o piso de `e`.
 - Notebook 12, `12_incremental_profit_rates`: a tese de Shaikh de que a
   concorrência iguala as taxas de lucro incrementais, e não as médias, no
   painel setorial da UE. Os diferenciais da taxa incremental são sobretudo

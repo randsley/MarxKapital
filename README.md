@@ -236,6 +236,12 @@ params_pim = calibrate_portugal_model(year = 2022, data_source = :eurostat, perp
 # sector, so their income is not counted as surplus value (optional)
 params_se = calibrate_portugal_model(year = 2022, data_source = :eurostat, self_employed = :imputed)
 
+# Market sectors only (without real estate and the non-market services
+# L, O, P, Q), e over five years, and the self-employed imputed per hour
+# worked (all optional; see docs/NATIONAL_ACCOUNTS.md)
+params_mkt = calibrate_portugal_model(year = 2022, data_source = :eurostat, sectors = :market,
+                                      e_years = 5, self_employed = :imputed_hours)
+
 # Real final demand (from the same input-output table) in the dynamics:
 # real A, household consumption basket, and rationing net of final
 # consumption and exports (params_real.final_demand is nothing on synthetic data)
@@ -267,6 +273,13 @@ benchmark product (not annual — Portugal: 2010/2013/2015/2017/2020), a
 request for a year without a published table falls back to the nearest
 available year, with a warning. See `docs/LIMITATIONS.md` items 4 and
 4-bis for the exact status.
+
+[`docs/NATIONAL_ACCOUNTS.md`](docs/NATIONAL_ACCOUNTS.md) maps the national
+accounts to the model: which ESA 2010 item and Eurostat series gives `C`,
+`V`, `S`, `δ`, `σ_c`, `l` and `A`; how each NACE section is treated (market
+or non-market, and the productive/unproductive distinction the model does
+not make); how the self-employed are counted; and what the floor on `e`
+does (`sectors`, `e_years`, `e_floor`).
 
 ## Repository structure
 
@@ -300,6 +313,7 @@ marxkapital/
 │   ├── jupyter/            # twelve narrative notebooks, with outputs
 │   └── pluto/              # three interactive notebooks
 ├── docs/LIMITATIONS.md     # required reading (+ .pt.md in Portuguese)
+├── docs/NATIONAL_ACCOUNTS.md  # national accounts → C, V, S (+ .pt.md)
 ├── paper/                  # academic paper (LaTeX), reproducible from real data
 │   ├── main.tex            # methodology + empirical application (Portugal)
 │   ├── generate_results.jl # generates every figure/table in the paper

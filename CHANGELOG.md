@@ -22,6 +22,11 @@ Format based on Keep a Changelog. Semantic versioning.
 
   For Portugal 2022 the floor binds in 1 of 15 market sectors (electricity,
   hit by the energy crisis) instead of 4 of 19.
+- `docs/NATIONAL_ACCOUNTS.md` (and `.pt.md`), linked from the README: which
+  ESA 2010 item and Eurostat series gives each of the model's quantities,
+  how each NACE section is treated (market or non-market; the
+  productive/unproductive distinction the model does not make), how the
+  self-employed are counted, and what the floor on `e` does.
 - Notebook 12, `12_incremental_profit_rates`: Shaikh's claim that
   competition equalizes incremental, not average, rates of profit, on the
   EU sectoral panel. Incremental-rate gaps are mostly transitory (4–14%

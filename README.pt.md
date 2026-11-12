@@ -233,6 +233,12 @@ params_pim = calibrate_portugal_model(year = 2022, data_source = :eurostat, perp
 # empregado do seu setor, para que o seu rendimento não conte como mais-valia (opcional)
 params_se = calibrate_portugal_model(year = 2022, data_source = :eurostat, self_employed = :imputed)
 
+# Só os setores mercantis (sem o imobiliário e os serviços não mercantis
+# L, O, P, Q), e sobre cinco anos, e os independentes imputados por hora
+# trabalhada (tudo opcional; ver docs/NATIONAL_ACCOUNTS.pt.md)
+params_mkt = calibrate_portugal_model(year = 2022, data_source = :eurostat, sectors = :market,
+                                      e_years = 5, self_employed = :imputed_hours)
+
 # Procura final real (da mesma tabela input-output) na dinâmica: A real,
 # cabaz de consumo das famílias e racionamento líquido do consumo final e das
 # exportações (params_real.final_demand é nothing com dados sintéticos)
@@ -263,6 +269,14 @@ Como esta tabela é de referência (não anual — Portugal: 2010/2013/2015/
 2017/2020), um pedido para um ano sem tabela publicada cai para o ano mais
 próximo disponível, com aviso. Ver `docs/LIMITATIONS.pt.md` itens 4 e 4-bis
 para o estado exato.
+
+[`docs/NATIONAL_ACCOUNTS.pt.md`](docs/NATIONAL_ACCOUNTS.pt.md) liga as
+contas nacionais ao modelo: que rubrica do SEC 2010 e que série do
+Eurostat dão `C`, `V`, `S`, `δ`, `σ_c`, `l` e `A`; como é tratada cada
+secção NACE (mercantil ou não mercantil, e a distinção entre trabalho
+produtivo e improdutivo que o modelo não faz); como se contam os
+independentes; e o que faz o piso de `e` (`sectors`, `e_years`,
+`e_floor`).
 
 ## Estrutura do repositório
 
@@ -296,6 +310,7 @@ marxkapital/
 │   ├── jupyter/            # doze notebooks narrativos, com saídas
 │   └── pluto/              # três notebooks interativos
 ├── docs/LIMITATIONS.md     # leitura obrigatória (+ .pt.md em português)
+├── docs/NATIONAL_ACCOUNTS.md  # contas nacionais → C, V, S (+ .pt.md)
 ├── paper/                  # artigo académico (LaTeX), reproduzível a partir de dados reais
 │   ├── main.tex            # metodologia + aplicação empírica (Portugal)
 │   ├── generate_results.jl # gera todas as figuras/tabelas do artigo

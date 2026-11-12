@@ -469,4 +469,5 @@ Proposed sequence, from most structural to most exploratory:
 - [x] Mobility term conserves aggregate constant capital exactly (`r̄` weighted by `C`)
 - [x] AMECO time series uses real CCF (not a flat 10% deduction); `e` invariant under a common deflator, verified
 - [x] `e=0.1` floor in the sectoral calibration explicitly reported (count of saturated sectors)
+- [x] Floor on `e` separated by cause (opt-in): market sectors only (`sectors = :market`), `e` over several years (`e_years`), `e_floor`, self-employed imputed per hour (`:imputed_hours`); mapping of national accounts to C, V, S in `docs/NATIONAL_ACCOUNTS.md`
 - [x] Academic paper (`paper/main.tex`) — methodology + empirical application to Portugal, reproducible

@@ -463,7 +463,7 @@ do not run in CI — check them manually with `check_ameco_sdmx()`,
 `check_eurostat_sectoral()`, and `paper/matrix_audit.jl` before using
 them in a real analysis.
 
-## 8. Imposed floor on `e` (rate of exploitation) in the sectoral calibration (documented)
+## 8. Imposed floor on `e` (rate of exploitation) in the sectoral calibration (mitigated, opt-in)
 
 `estimate_sector_parameters` (`src/calibration_pt.jl`) imposes `e =
 max(0.1, surplus_value_rate)`: sectors whose business income (net of CCF)
@@ -486,6 +486,32 @@ requires `e > 0`. With the self-employed imputed (`self_employed =
 agriculture (A), professional (M) and administrative services (N), arts
 (R) and other services (S) join the four above, so the floor matters more
 on that path.
+
+**Mitigated (opt-in):** the floor covers three different things, which
+`calibrate_portugal_model` can now separate (`docs/NATIONAL_ACCOUNTS.md`
+§4; the defaults are unchanged, so the paper's Table 3 is too):
+- *Non-market sections.* O, P and Q have `e` ≈ 0 by construction, because
+  the accounts value non-market output at cost. `sectors = :market` leaves
+  them out together with real estate (L, imputed rents), the 15 market
+  sectors of notebooks 9–12. Inputs bought from them are treated like
+  imports, and their purchases become government demand. The floor then
+  binds only in electricity (1 of 15), and `r` is 11.3% instead of 6.1%,
+  because L's capital stock is gone.
+- *One-off years.* Electricity's −0.53 is the 2022 energy crisis.
+  `e_years` computes `e` over several years; over 2018–2022 D has 3.70.
+  A three-year window, 2020–2022, is dominated by the pandemic (transport
+  and the arts drop below the floor), so the window should span a cycle.
+- *The imputation of the self-employed.* `self_employed = :imputed_hours`
+  imputes per hour worked. It lifts agriculture from −0.20 to 0.07 but not
+  M, N, R and S, whose `e` stays at or below zero with the self-employed
+  counted at a wage. That is in the accounts. With the market sectors, a
+  five-year window and either imputation, the floor binds in 5 of 15
+  sectors (A, M, N, R, S).
+
+`e_floor` makes the floor a keyword (it must stay positive). What remains
+open is a department with `e ≤ 0`, which the model does not allow: the
+floored value in those five sectors is a modeling choice, and `e_raw`
+keeps the measured one.
 
 ## 9. AMECO exploitation/depreciation series format (fixed)
 
