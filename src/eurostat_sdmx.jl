@@ -35,6 +35,28 @@ const EUROSTAT_SDMX_BASE_URL = "https://ec.europa.eu/eurostat/api/dissemination/
 const NACE_SECTIONS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K",
                       "L", "M", "N", "O", "P", "Q", "R", "S"]
 
+"""Sections left out by `sectors=:market` in `calibrate_portugal_model`: real
+estate (L, dominated by the imputed rents of owner-occupied dwellings) and the
+non-market services of public administration, education and health (O, P, Q),
+whose operating surplus is by convention only depreciation, so that their
+rate of exploitation is ≈ 0 by construction. The same 15 market sectors as
+notebooks 9–12. See `docs/NATIONAL_ACCOUNTS.md`."""
+const NON_MARKET_SECTIONS = ["L", "O", "P", "Q"]
+
+"""
+    drop_sections(groups, outside = NON_MARKET_SECTIONS)
+
+`groups` (a list of lists of sections, e.g. `NACE_MEDIUM_GROUPS`) without the
+sections in `outside`, dropping the groups left empty. Returns
+`(groups, kept)`, `kept` the indices of the surviving groups, so that the
+groups' codes and names can be filtered the same way.
+"""
+function drop_sections(groups::Vector{Vector{String}}, outside::Vector{String} = NON_MARKET_SECTIONS)
+    filtered = [filter(s -> !(s in outside), g) for g in groups]
+    kept = findall(!isempty, filtered)
+    return filtered[kept], kept
+end
+
 """Macro aggregation (3 sectors: Primary/Secondary/Tertiary), used by the
 AMECO path (`src/ameco.jl`) and by `aggregation=:macro` in the INE path
 (`src/calibration_pt.jl`)."""
@@ -122,6 +144,19 @@ function fetch_eurostat_sector_employment(country_code::String, year::Int)
     _eurostat_sector_values("NAMA_10_A64_E", "A.THS_PER..EMP_DC.$country_code", year)
 end
 
+"""
+    fetch_eurostat_sector_hours(country_code, year; who = :employed)
+
+Hours worked per section (thousand hours, domestic concept, `THS_HW`): by
+everyone employed (`who = :employed`, `EMP_DC`) or by employees only
+(`who = :employees`, `SAL_DC`). Used by `self_employed = :imputed_hours`.
+"""
+function fetch_eurostat_sector_hours(country_code::String, year::Int; who::Symbol = :employed)
+    item = who == :employed ? "EMP_DC" : who == :employees ? "SAL_DC" :
+           throw(ArgumentError("who must be :employed or :employees, got :$who"))
+    _eurostat_sector_values("NAMA_10_A64_E", "A.THS_HW..$item.$country_code", year)
+end
+
 """Employees per section (thousand persons, domestic concept): `SAL_DC`, the
 part of `EMP_DC` (`fetch_eurostat_sector_employment`) that earns compensation
 of employees; the rest are the self-employed."""
@@ -133,10 +168,20 @@ end
 # Self-employment (shared by the INE/Eurostat and AMECO paths)
 # ----------------------------------------------------------------------------
 
-"""Checks the `self_employed` keyword (`:excluded` or `:imputed`)."""
-function _check_self_employed(self_employed::Symbol)
-    self_employed in (:excluded, :imputed) ||
-        throw(ArgumentError("self_employed must be :excluded or :imputed, got :$self_employed"))
+"""
+Checks the `self_employed` keyword: `:excluded` or `:imputed`, and also
+`:imputed_hours` where `hours_ok` (only the Portuguese sectoral calibration,
+which fetches hours worked; the AMECO path and the EU sectoral extract have
+no hours series).
+"""
+function _check_self_employed(self_employed::Symbol; hours_ok::Bool = false)
+    if self_employed == :imputed_hours && !hours_ok
+        throw(ArgumentError("self_employed=:imputed_hours is only available in calibrate_portugal_model " *
+                            "(data_source=:eurostat); this path has no hours-worked series"))
+    end
+    allowed = hours_ok ? (:excluded, :imputed, :imputed_hours) : (:excluded, :imputed)
+    self_employed in allowed ||
+        throw(ArgumentError("self_employed must be one of $(join(":" .* string.(allowed), ", ")), got :$self_employed"))
     return self_employed
 end
 
@@ -162,8 +207,10 @@ are `Dict{String,Float64}` section → value, as returned by the Eurostat
 fetchers). Imputed at the 19 fine sections, before any aggregation, since the
 share of self-employment differs widely between sections (in Portugal, 2022,
 two thirds of those working in agriculture but 5% in manufacturing). Throws
-if a section's ratio is invalid (see `_self_employed_ratio`). Counts persons,
-not hours worked (`THS_HW` would be a possible variant). Pure (no network).
+if a section's ratio is invalid (see `_self_employed_ratio`). `employment` and
+`employees` can be persons (`self_employed = :imputed`) or hours worked
+(`:imputed_hours`, `fetch_eurostat_sector_hours`): by hours, a self-employed
+worker who works part of the year counts for less. Pure (no network).
 """
 function impute_self_employed(compensation::Dict{String, Float64}, employment::Dict{String, Float64},
                               employees::Dict{String, Float64}, sections::Vector{String})
@@ -395,6 +442,49 @@ function fetch_eurostat_import_coefficients(country_code::String, year::Int)
     iot_year = _nearest_iot_year(country_code, year)
     isnothing(iot_year) && error("Eurostat IOT (NAIO_10_CP1700) unavailable for $country_code.")
     return import_coefficients_from_iot(_fetch_iot(country_code, iot_year))
+end
+
+"""
+    outside_input_coefficients(A, sections, outside = NON_MARKET_SECTIONS)
+
+Inputs that each kept section buys from the sections in `outside`, per unit
+of its gross output: `Σᵢ∈outside A[i,j]` for every `j` not in `outside`, as a
+Dict section → coefficient. When `sectors=:market` drops those sections,
+these purchases come from outside the modelled economy, like imports, and are
+added to the import coefficients so that `_gross_output` (`src/core.jl`)
+still rebuilds gross output from value added. Pure (no network).
+"""
+function outside_input_coefficients(A::AbstractMatrix{<:Real}, sections::Vector{String},
+                                    outside::Vector{String} = NON_MARKET_SECTIONS)
+    out = [i for (i, s) in enumerate(sections) if s in outside]
+    Dict(s => sum(A[i, j] for i in out; init = 0.0)
+         for (j, s) in enumerate(sections) if !(s in outside))
+end
+
+"""
+    outside_purchases_from_iot(df, outside = NON_MARKET_SECTIONS, sections = NACE_SECTIONS)
+
+What the industries in `outside` buy from each section as intermediate input
+(million euros), from the product × industry cells of the domestic-use IOT
+(`df`, as returned by `_fetch_iot`), summed from A64 codes to sections, in the
+order of `sections`. When `sectors=:market` drops those industries, these
+purchases become exogenous demand for the kept sections and are added to
+government final demand (public administration, education and health are
+paid for out of revenue). Pure (no network).
+"""
+function outside_purchases_from_iot(df::DataFrame, outside::Vector{String} = NON_MARKET_SECTIONS,
+                                    sections::Vector{String} = NACE_SECTIONS)
+    idx = Dict(s => i for (i, s) in enumerate(sections))
+    total = zeros(length(sections))
+    for row in eachrow(df)
+        ismissing(row.OBS_VALUE) && continue
+        pu, pa = String(row.prd_use), String(row.prd_ava)
+        (startswith(pa, "CPA_") && startswith(pu, "CPA_")) || continue
+        _section_of_a64_code(pu) in outside || continue
+        si = _section_of_a64_code(pa)
+        haskey(idx, si) && (total[idx[si]] += max(Float64(row.OBS_VALUE), 0.0))
+    end
+    return total
 end
 
 """

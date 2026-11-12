@@ -416,6 +416,85 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ArgumentError calibrate_portugal_model(year = 2022, self_employed = :other)
     end
 
+    @testset "Market sectors, e window and floor" begin
+        # drop_sections removes sections and the groups left empty
+        g, kept = drop_sections(NACE_MEDIUM_GROUPS)
+        @test kept == [1, 2, 3, 4, 5, 6, 8, 10] && length(g) == 8
+        @test !any(s in NON_MARKET_SECTIONS for grp in g for s in grp)
+        gm, km = drop_sections(NACE_MACRO_GROUPS)
+        @test km == [1, 2, 3] && gm[3] == ["G", "H", "I", "J", "K", "M", "N", "R", "S"]
+
+        # inputs bought from the dropped sections, per unit of gross output
+        A = [0.1 0.2 0.0; 0.3 0.1 0.4; 0.05 0.0 0.2]
+        oc = outside_input_coefficients(A, ["A", "L", "C"], ["L"])
+        @test sort(collect(keys(oc))) == ["A", "C"] && oc["A"] ≈ 0.3 && oc["C"] ≈ 0.4
+        keep = [1, 3]
+        @test vec(sum(A[keep, keep]; dims = 1)) .+ [oc["A"], oc["C"]] ≈ vec(sum(A[:, keep]; dims = 1))
+
+        # what the dropped industries buy from the kept sections (IOT layout)
+        rows = [("CPA_A01", "CPA_O84", 4.0), ("CPA_C10-12", "CPA_P85", 6.0), ("CPA_C13-15", "CPA_Q86", 1.0),
+                ("CPA_C10-12", "CPA_C13-15", 50.0),   # market to market: not counted
+                ("CPA_O84", "CPA_O84", 9.0),          # within the dropped sections
+                ("B1G", "CPA_O84", 99.0),             # value-added row: ignored
+                ("CPA_A01", "P3_S13", 7.0)]           # final use: ignored
+        df = DataFrame(prd_ava = first.(rows), prd_use = getindex.(rows, 2),
+                       OBS_VALUE = Union{Missing, Float64}[last.(rows)...])
+        push!(df, ("CPA_A01", "CPA_Q86", missing))
+        @test outside_purchases_from_iot(df, NON_MARKET_SECTIONS, ["A", "C", "O"]) == [4.0, 7.0, 9.0]
+
+        # the synthetic calibration with sectors = :market
+        Random.seed!(3)
+        pm = calibrate_portugal_model(year = 2022, sectors = :market)
+        @test pm.N == 15 && size(pm.A) == (15, 15)
+        @test isempty(intersect(pm.nace_codes, NON_MARKET_SECTIONS))
+        Random.seed!(3)
+        pall = calibrate_portugal_model(year = 2022)
+        keep = findall(c -> !(c in NON_MARKET_SECTIONS), pall.nace_codes)
+        @test pm.A == pall.A[keep, keep]                     # same random A, restricted
+        @test pm.e_raw == pall.e_raw[keep]
+        pmed = calibrate_portugal_model(year = 2022, sectors = :market, aggregation = :medium)
+        @test pmed.N == 8 && pmed.nace_codes == ["A", "BCDE", "F", "GHI", "J", "K", "MN", "RS"]
+        @test calibrate_portugal_model(year = 2022, sectors = :market, aggregation = :macro).N == 3
+
+        # the floor is a keyword
+        pf = calibrate_portugal_model(year = 2022, e_floor = 0.5)
+        @test pf.e == max.(0.5, pf.e_raw) && any(pf.e_raw .< 0.5)
+        @test pf.r ≈ pf.e ./ (pf.k .+ 1)
+        @test_throws ArgumentError calibrate_portugal_model(year = 2022, e_floor = 0.0)
+        @test_throws ArgumentError calibrate_portugal_model(year = 2022, e_floor = -0.1)
+        @test_throws ArgumentError estimate_sector_parameters(process_supply_use(generate_synthetic_portugal_data(2022)),
+                                                              zeros(19, 19); e_floor = Inf)
+
+        # e over a window: process_supply_use reads the window sums, aggregate_sectors sums them
+        d = generate_synthetic_portugal_data(2022).supply_use
+        d.compensation_e = 3 .* d.compensation
+        d.business_income_e = 2 .* d.business_income
+        @test process_supply_use(INEData(2022, d, d, d, d, Dict{String, Any}())).surplus_value_rate ≈
+              (2 / 3) .* d.business_income ./ d.compensation
+        da, _ = aggregate_sectors(d, zeros(19, 19), NACE_MACRO_GROUPS, ["P", "S", "T"], ["p", "s", "t"])
+        @test da.compensation_e ≈ [sum(d.compensation_e[in.(d.nace_code, Ref(g))]) for g in NACE_MACRO_GROUPS]
+
+        # argument checks
+        @test_throws ArgumentError calibrate_portugal_model(year = 2022, sectors = :other)
+        @test_throws ArgumentError calibrate_portugal_model(year = 2022, e_years = 3)       # synthetic
+        @test_throws ArgumentError calibrate_portugal_model(year = 2022, e_years = 0)
+        @test_throws ArgumentError calibrate_portugal_model(year = 2022, self_employed = :imputed_hours)
+        @test_throws ArgumentError fetch_portugal_eurostat_data(2022; e_years = 0)
+        @test_throws ArgumentError fetch_eurostat_sector_hours("PT", 2022; who = :other)
+
+        # hours: only the Portuguese sectoral calibration accepts :imputed_hours
+        @test _check_self_employed(:imputed_hours; hours_ok = true) == :imputed_hours
+        @test_throws ArgumentError _check_self_employed(:imputed_hours)
+        @test_throws ArgumentError calibrate_with_ameco_v2("Portugal", year = 2022, method = :synthetic,
+                                                           self_employed = :imputed_hours)
+        raw = DataFrame(geo = ["PT"], section = ["A"], year = [2020], GVA = [1.0], V = [0.5], CFC = [0.1],
+                        GFCF = [0.2], capital_stock = [2.0], employment = [3.0], employees = [1.0])
+        @test_throws ArgumentError compute_mobility_panel(raw; sections = ["A"], self_employed = :imputed_hours)
+        # impute_self_employed works with hours as with persons
+        hrs = impute_self_employed(Dict("A" => 10.0), Dict("A" => 425.0), Dict("A" => 190.0), ["A"])
+        @test hrs["A"] ≈ 10.0 * 425 / 190
+    end
+
     @testset "Capital mobility estimation" begin
         rng = MersenneTwister(11)
         # demean_fe equals OLS residuals on explicit dummies (unbalanced panel)

@@ -136,27 +136,53 @@ self-employed worker at the average employee's compensation in that section
 surplus value. The default, `:excluded`, uses compensation of employees as
 published. With `:imputed` the df also gets an `employees` column, and its
 `compensation` (hence `GOS` and `business_income`) is the imputed one.
+`:imputed_hours` imputes per hour worked instead of per person (`THS_HW`,
+`fetch_eurostat_sector_hours`; two more series that have to be complete).
+
+`e_years > 1` also requires GVA, compensation and CFC (and, when imputing,
+the labor series) for each of the `e_years` years ending in `year`, and adds
+the window sums `compensation_e` and `business_income_e`, from which
+`process_supply_use` computes `e`; the imputation is done year by year.
 """
 function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = false,
-                                      self_employed::Symbol = :excluded)
-    _check_self_employed(self_employed)
+                                      self_employed::Symbol = :excluded, e_years::Int = 1)
+    _check_self_employed(self_employed; hours_ok = true)
+    e_years >= 1 || throw(ArgumentError("e_years must be ≥ 1, got $e_years"))
     println("\n🌐 Fetching real sectoral data (Eurostat) for Portugal ($year)...")
 
-    gva, comp, cfc = fetch_eurostat_gva_compensation_cfc("PT", year)
+    imputed = self_employed in (:imputed, :imputed_hours)
+    by_hours = self_employed == :imputed_hours
+    window = (year - e_years + 1):year
+
+    # GVA, compensation and CFC as whole series (one download each), so that
+    # `e_years > 1` can sum over a window; `year` alone is the default.
+    gva_s  = _fetch_eurostat_sections("NAMA_10_A64", "A.CP_MEUR..B1G.PT")
+    comp_s = _fetch_eurostat_sections("NAMA_10_A64", "A.CP_MEUR..D1.PT")
+    cfc_s  = _fetch_eurostat_sections("NAMA_10_A64", "A.CP_MEUR..P51C.PT")
+    labor_item(item, unit) = _fetch_eurostat_sections("NAMA_10_A64_E", "A.$unit..$item.PT")
+    unit = by_hours ? "THS_HW" : "THS_PER"
+    labor_all_s = imputed ? labor_item("EMP_DC", unit) : Dict{String, Dict{Int, Float64}}()
+    labor_emp_s = imputed ? labor_item("SAL_DC", unit) : Dict{String, Dict{Int, Float64}}()
+    at(series, y) = Dict(s => v[y] for (s, v) in series if haskey(v, y))
+
+    gva, comp, cfc = at(gva_s, year), at(comp_s, year), at(cfc_s, year)
     employment = fetch_eurostat_sector_employment("PT", year)
     gfcf = fetch_eurostat_sector_gfcf("PT", year)
     stock = fetch_eurostat_sector_capital_stock("PT", year)
-    imputed = self_employed == :imputed
     employees = imputed ? fetch_eurostat_sector_employees("PT", year) : Dict{String, Float64}()
-    n_series = imputed ? 7 : 6
+    n_series = 6 + (imputed ? 1 : 0) + (by_hours ? 2 : 0)
 
+    has_window(series, s) = haskey(series, s) && all(y -> haskey(series[s], y), window)
     complete_sections = filter(s -> haskey(gva, s) && haskey(comp, s) && haskey(cfc, s) &&
                                     haskey(employment, s) && haskey(gfcf, s) && haskey(stock, s) &&
-                                    (!imputed || haskey(employees, s)),
+                                    (!imputed || haskey(employees, s)) &&
+                                    (!by_hours || (has_window(labor_all_s, s) && has_window(labor_emp_s, s))) &&
+                                    (e_years == 1 || all(x -> has_window(x, s), (gva_s, comp_s, cfc_s))) &&
+                                    (e_years == 1 || !imputed || (has_window(labor_all_s, s) && has_window(labor_emp_s, s))),
                                [s[1] for s in PT_SECTORS])
     length(complete_sections) < 10 &&
         error("Incomplete Eurostat data for Portugal/$year: only $(length(complete_sections))/19 " *
-              "sections have all $n_series series.")
+              "sections have all $n_series series" * (e_years > 1 ? " for $(first(window))–$year." : "."))
 
     names_by_code = Dict(s[1] => s[2] for s in PT_SECTORS)
     codes = complete_sections
@@ -167,10 +193,17 @@ function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = fal
         println("  ✓ capital stock recomputed by perpetual inventory.")
     end
 
+    # Compensation of the year `y`, with the self-employed imputed if asked
+    # (by persons or by hours worked, `impute_self_employed`).
+    compensation_in(y) = imputed ?
+        impute_self_employed(at(comp_s, y), at(labor_all_s, y), at(labor_emp_s, y), codes) :
+        at(comp_s, y)
+
     if imputed
         comp_published = comp
-        comp = impute_self_employed(comp, employment, employees, codes)
-        println("  ✓ self-employed imputed at the average employee's compensation, by section:")
+        comp = compensation_in(year)
+        println("  ✓ self-employed imputed at the average employee's compensation" *
+                (by_hours ? " per hour worked" : "") * ", by section:")
         println("    " * join(["$c ×$(round(comp[c] / comp_published[c], digits = 2))" for c in codes], "  "))
     end
 
@@ -189,12 +222,20 @@ function fetch_portugal_eurostat_data(year::Int; perpetual_inventory::Bool = fal
                    employment = employment_v, GFCF = GFCF, capital_stock = capital_stock)
     imputed && (df.employees = [employees[c] for c in codes])
 
+    if e_years > 1
+        # Window sums for `e` only (`process_supply_use`); k, δ and σ_c stay those of `year`.
+        comps = [compensation_in(y) for y in window]
+        df.compensation_e = [sum(cy[c] for cy in comps) for c in codes]
+        df.business_income_e = [sum(gva_s[c][y] - cfc_s[c][y] for y in window) for c in codes] .- df.compensation_e
+        println("  ✓ e computed over $(first(window))–$year.")
+    end
+
     println("  ✓ $(length(codes))/19 sections with complete real data.")
 
     metadata = Dict{String, Any}(
         "source" => "Eurostat (real data)",
         "year" => year, "GDP_total" => sum(GVA), "employment_total" => sum(employment_v),
-        "self_employed" => string(self_employed))
+        "self_employed" => string(self_employed), "e_years" => e_years)
 
     return INEData(year, df, df, df, df, metadata)
 end
@@ -206,7 +247,10 @@ function process_supply_use(data::INEData)
     df.mean_wage        = df.compensation ./ df.employment
     df.productivity        = df.GVA ./ df.employment
     df.capital_intensity  = df.capital_stock ./ df.employment
-    df.surplus_value_rate      = df.business_income ./ df.compensation
+    # `e` from the window sums when `e_years > 1` (`fetch_portugal_eurostat_data`)
+    df.surplus_value_rate      = "business_income_e" in names(df) ?
+                                 df.business_income_e ./ df.compensation_e :
+                                 df.business_income ./ df.compensation
     df.organic_composition  = df.capital_stock ./ df.compensation
     df.profit_rate           = df.business_income ./ (df.capital_stock .+ df.compensation)
     return df
@@ -216,21 +260,23 @@ end
 Estimates the Marxian parameters per sector from the processed supply and use
 table.
 
-`e` has a floor of 0.1: sectors whose business income (after CFC) is close to
+`e` has a floor, `e_floor` (0.1 by default): sectors whose business income (after CFC) is close to
 zero or negative relative to compensation (typically because of thin margins
 or high depreciation relative to the gross surplus) would produce a zero or
 negative `e`, which the model does not accept (`Department` requires
 `e>0`). The floor is an imposed value, not a pure empirical observation, and
 it is reported explicitly below."""
-function estimate_sector_parameters(df::DataFrame, A::Matrix{Float64})
+function estimate_sector_parameters(df::DataFrame, A::Matrix{Float64}; e_floor::Real = 0.1)
+    _check_e_floor(e_floor)
     println("\n📐 Estimating parameters...")
     N = nrow(df)
     C = df.capital_stock
     V = df.compensation
-    e = max.(0.1, df.surplus_value_rate)
-    n_saturated = count(df.surplus_value_rate .< 0.1)
-    n_saturated > 0 && println("  ⚠ e saturated at the 0.1 floor in $n_saturated/$N sectors " *
-                                "(surplus_value_rate < 0.1 before the floor)")
+    e = max.(e_floor, df.surplus_value_rate)
+    n_saturated = count(df.surplus_value_rate .< e_floor)
+    n_saturated > 0 && println("  ⚠ e saturated at the $e_floor floor in $n_saturated/$N sectors " *
+                                "(surplus_value_rate < $e_floor before the floor: " *
+                                join(df.nace_code[df.surplus_value_rate .< e_floor], ", ") * ")")
     k = C ./ V
     r = e ./ (k .+ 1)
 
@@ -252,6 +298,10 @@ function estimate_sector_parameters(df::DataFrame, A::Matrix{Float64})
     return (C = C, V = V, e = e, e_raw = df.surplus_value_rate, k = k, r = r, l = l,
             σ_c = σ_c, σ_v = σ_v, δ = δ)
 end
+
+"""`Department` requires `e > 0`, so the floor on `e` must be positive and finite."""
+_check_e_floor(e_floor::Real) = (isfinite(e_floor) && e_floor > 0) ||
+    throw(ArgumentError("e_floor must be positive and finite (Department requires e > 0), got $e_floor"))
 
 """Names of the 10 groups of `NACE_MEDIUM_GROUPS` (same order)."""
 const MEDIUM_GROUP_NAMES = [
@@ -290,7 +340,9 @@ function aggregate_sectors(df::DataFrame, A::Matrix{Float64}, groups::Vector{Vec
         GVA = total_sum(:GVA), compensation = total_sum(:compensation), GOS = total_sum(:GOS),
         CFC = total_sum(:CFC), business_income = total_sum(:business_income),
         employment = total_sum(:employment), GFCF = total_sum(:GFCF), capital_stock = total_sum(:capital_stock))
-    "employees" in names(df) && (df_aggregated.employees = total_sum(:employees))
+    for col in (:employees, :compensation_e, :business_income_e)
+        string(col) in names(df) && (df_aggregated[!, col] = total_sum(col))
+    end
 
     return df_aggregated, A_aggregated
 end
@@ -333,21 +385,56 @@ between the two cases.
   `impute_self_employed`). Needs `data_source=:eurostat`: the synthetic data
   have no employee counts. More sectors may then hit the 0.1 floor on `e`
   (`docs/LIMITATIONS.md` item 8); `e_raw` keeps the unfloored values.
+- `:imputed_hours`: the same, per hour worked instead of per person,
+  `Vᵢ × hoursᵢ / employee hoursᵢ` (`fetch_eurostat_sector_hours`), so that a
+  self-employed worker who works part of the year counts for less. Needs
+  `data_source=:eurostat`.
+
+`sectors`:
+- `:all` (default): the 19 sections.
+- `:market`: leaves out `NON_MARKET_SECTIONS` (L, O, P, Q: real estate, with
+  its imputed rents, and the non-market services, whose `e` is ≈ 0 by
+  construction), before any aggregation; groups left empty are dropped
+  (`:medium` has 8 groups, `:macro` still 3). `A` keeps the market rows and
+  columns. With `data_source=:eurostat`, what the market sectors buy from the
+  dropped ones is added to the import coefficients (inputs from outside the
+  modelled economy, `outside_input_coefficients`), and what the dropped ones
+  buy from the market sectors to government final demand
+  (`outside_purchases_from_iot`). See `docs/NATIONAL_ACCOUNTS.md`.
+
+`e_years` (default 1): computes `e` (and `e_raw`) from business income and
+compensation summed over the `e_years` years ending in `year`, which smooths
+one-off years (electricity in Portugal, 2022). `k`, `δ`, `σ_c` stay those of
+`year`. Needs `data_source=:eurostat` when > 1.
+
+`e_floor` (default 0.1): the floor on `e` (`docs/LIMITATIONS.md` item 8); it
+must be positive, since `Department` requires `e > 0`.
 """
 function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
                                   data_source = :synthetic, perpetual_inventory = false,
-                                  self_employed = :excluded)
-    _check_self_employed(self_employed)
-    (self_employed == :imputed && data_source != :eurostat) &&
-        throw(ArgumentError("self_employed=:imputed needs employee counts by sector, which only " *
+                                  self_employed = :excluded, sectors = :all, e_years = 1,
+                                  e_floor = 0.1)
+    _check_self_employed(self_employed; hours_ok = true)
+    (self_employed != :excluded && data_source != :eurostat) &&
+        throw(ArgumentError("self_employed=:$self_employed needs employee counts by sector, which only " *
                             "data_source=:eurostat provides"))
+    sectors in (:all, :market) ||
+        throw(ArgumentError("sectors must be :all or :market, got :$sectors"))
+    (e_years isa Integer && e_years >= 1) ||
+        throw(ArgumentError("e_years must be an integer ≥ 1, got $e_years"))
+    (e_years > 1 && data_source != :eurostat) &&
+        throw(ArgumentError("e_years > 1 needs a series of years, which only data_source=:eurostat provides"))
+    _check_e_floor(e_floor)
+    aggregation in (:detailed, :macro, :medium) ||
+        error("unknown aggregation '$aggregation' (use :detailed, :macro or :medium)")
     println("\n" * "="^70)
-    println("CALIBRATION FOR PORTUGAL (INE)  |  Year: $year  |  Aggregation: $aggregation  |  Source: $data_source")
+    println("CALIBRATION FOR PORTUGAL (INE)  |  Year: $year  |  Aggregation: $aggregation  |  Source: $data_source" *
+            (sectors == :market ? "  |  Market sectors" : ""))
     println("="^70)
 
     data = data_source == :eurostat ?
         fetch_portugal_eurostat_data(year; perpetual_inventory = perpetual_inventory,
-                                     self_employed = self_employed) :
+                                     self_employed = self_employed, e_years = e_years) :
         generate_synthetic_portugal_data(year)
     df19 = process_supply_use(data)
     N19 = nrow(df19)
@@ -358,36 +445,44 @@ function calibrate_portugal_model(; year = 2022, aggregation = :detailed,
     fd19 = data_source == :eurostat ?
         aggregate_final_demand(fetch_eurostat_final_demand("PT", year),
                                [[c] for c in df19.nace_code], df19.nace_code) : nothing
-    m = if data_source == :eurostat
-        m19 = fetch_eurostat_import_coefficients("PT", year)
-        gva19 = Dict(zip(df19.nace_code, df19.GVA))
-        groups = aggregation == :macro ? NACE_MACRO_GROUPS :
-                 aggregation == :medium ? NACE_MEDIUM_GROUPS : [[c] for c in df19.nace_code]
-        aggregate_import_coefficients(m19, groups, gva19)
-    else
-        nothing
-    end
-    fd = if isnothing(fd19) || aggregation == :detailed
-        fd19
-    elseif aggregation == :macro
-        aggregate_final_demand(fd19, NACE_MACRO_GROUPS, ["PRIM", "SEC", "TER"])
-    elseif aggregation == :medium
-        aggregate_final_demand(fd19, NACE_MEDIUM_GROUPS, MEDIUM_GROUP_CODES)
+    m19 = data_source == :eurostat ? fetch_eurostat_import_coefficients("PT", year) : nothing
+
+    # Market sectors: drop the non-market sections at the 19-section level,
+    # before any aggregation (see the docstring).
+    if sectors == :market
+        keep = findall(c -> !(c in NON_MARKET_SECTIONS), df19.nace_code)
+        if data_source == :eurostat
+            outside = outside_input_coefficients(A19, df19.nace_code)
+            m19 = Dict(c => get(m19, c, 0.0) + outside[c] for c in df19.nace_code[keep])
+            iot = _fetch_iot("PT", _nearest_iot_year("PT", year))
+            bought = outside_purchases_from_iot(iot, NON_MARKET_SECTIONS, df19.nace_code)
+            fd19 = merge(fd19, (government = fd19.government .+ bought,))
+            fd19 = aggregate_final_demand(fd19, [[c] for c in df19.nace_code[keep]], df19.nace_code[keep])
+        end
+        A19 = A19[keep, keep]
+        df19 = df19[keep, :]
+        println("  ✓ market sectors: left out $(join(NON_MARKET_SECTIONS, ", ")); $(nrow(df19)) sections remain.")
     end
 
-    df, A = if aggregation == :detailed
-        df19, A19
-    elseif aggregation == :macro
-        aggregate_sectors(df19, A19, NACE_MACRO_GROUPS, ["PRIM", "SEC", "TER"],
-                        ["Primary", "Secondary", "Tertiary"])
+    groups, codes, names_ = if aggregation == :macro
+        NACE_MACRO_GROUPS, ["PRIM", "SEC", "TER"], ["Primary", "Secondary", "Tertiary"]
     elseif aggregation == :medium
-        aggregate_sectors(df19, A19, NACE_MEDIUM_GROUPS, MEDIUM_GROUP_CODES, MEDIUM_GROUP_NAMES)
+        NACE_MEDIUM_GROUPS, MEDIUM_GROUP_CODES, MEDIUM_GROUP_NAMES
     else
-        error("unknown aggregation '$aggregation' (use :detailed, :macro or :medium)")
+        [[c] for c in df19.nace_code], df19.nace_code, df19.sector
     end
+    if sectors == :market
+        groups, kept = drop_sections(groups)
+        codes, names_ = codes[kept], names_[kept]
+    end
+
+    m = isnothing(m19) ? nothing : aggregate_import_coefficients(m19, groups, Dict(zip(df19.nace_code, df19.GVA)))
+    fd = (isnothing(fd19) || aggregation == :detailed) ? fd19 : aggregate_final_demand(fd19, groups, codes)
+
+    df, A = aggregation == :detailed ? (df19, A19) : aggregate_sectors(df19, A19, groups, codes, names_)
     aggregation == :detailed || (df = process_supply_use(INEData(data.year, df, df, df, df, data.metadata)))
     N = nrow(df)
-    p = estimate_sector_parameters(df, A)
+    p = estimate_sector_parameters(df, A; e_floor = e_floor)
 
     source = data_source == :eurostat ? "INE/Eurostat (real data)" : "INE (synthetic)"
     result = CalibratedParameters(N, df.sector, df.nace_code,

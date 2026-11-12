@@ -9,6 +9,19 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- Calibration options for the floor on `e` (`calibrate_portugal_model`, all
+  opt-in; the defaults are unchanged):
+  - `sectors = :market` leaves out real estate and the non-market services
+    (L, O, P, Q, `NON_MARKET_SECTIONS`). What the market sectors buy from
+    them is treated like imports, and what they buy from the market sectors
+    becomes government demand.
+  - `e_years` computes `e` over several years.
+  - `e_floor` sets the floor (0.1 by default).
+  - `self_employed = :imputed_hours` imputes the self-employed's labor
+    income per hour worked (`fetch_eurostat_sector_hours`).
+
+  For Portugal 2022 the floor binds in 1 of 15 market sectors (electricity,
+  hit by the energy crisis) instead of 4 of 19.
 - Notebook 12, `12_incremental_profit_rates`: Shaikh's claim that
   competition equalizes incremental, not average, rates of profit, on the
   EU sectoral panel. Incremental-rate gaps are mostly transitory (4–14%
