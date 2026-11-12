@@ -169,22 +169,73 @@ function _effect_labels(panel, e::Symbol)
 end
 
 """
-Driscoll–Kraay variance numerator of a slope: the year sums `hₜ = Σ xᵢₜuᵢₜ`
-(pooled over countries and sectors), with a Bartlett kernel over `lags`
-calendar years.
+Driscoll–Kraay "meat" of a regression with demeaned regressors `X` (n × k)
+and residuals `u`: the year sums `hₜ = Σ xᵢₜuᵢₜ` (pooled over countries and
+sectors) and their autocovariances up to `lags` calendar years, Bartlett
+weights. k × k.
 """
-function _driscoll_kraay_S(x, u, years; lags::Integer)
+function _driscoll_kraay_meat(X::AbstractMatrix, u, years; lags::Integer)
     ys = sort(unique(years))
     idx = Dict(y => k for (k, y) in enumerate(ys))
-    h = zeros(length(ys))
-    for i in eachindex(x)
-        h[idx[years[i]]] += x[i] * u[i]
+    h = zeros(length(ys), size(X, 2))
+    for i in eachindex(u)
+        @views h[idx[years[i]], :] .+= X[i, :] .* u[i]
     end
-    S = sum(abs2, h)
+    M = h'h
     for l in 1:lags, k in eachindex(ys), k2 in eachindex(ys)
-        ys[k2] - ys[k] == l && (S += 2 * (1 - l / (lags + 1)) * h[k] * h[k2])
+        if ys[k2] - ys[k] == l
+            w = 1 - l / (lags + 1)
+            @views M .+= w .* (h[k, :] * h[k2, :]' .+ h[k2, :] * h[k, :]')
+        end
     end
-    return S
+    return M
+end
+
+"""
+    estimate_fe_ols(panel, y, X; effects = (:geo_section, :geo_year), lags = 2)
+
+OLS of `y` on the columns of `X` (a vector or an n × k matrix, one row per
+row of `panel`) with the fixed effects `effects` swept out (`demean_fe`;
+same effect names as `estimate_mobility`). Returns `(β, se, se_DK,
+se_cluster, ssr, n, countries)`: coefficients; classical standard errors
+(degrees of freedom net of the absorbed effects, `_absorbed`);
+Driscoll–Kraay errors (any correlation within a year, serial correlation up
+to `lags` years, Bartlett kernel); errors clustered by country (`G/(G−1)`
+factor, `NaN` with fewer than 2 countries); and the residual sum of squares.
+"""
+function estimate_fe_ols(panel::AbstractDataFrame, y::AbstractVector, X::AbstractVecOrMat;
+                         effects = (:geo_section, :geo_year), lags::Integer = 2)
+    n = nrow(panel)
+    Xm = X isa AbstractVector ? reshape(X, :, 1) : X
+    (length(y) == n && size(Xm, 1) == n) ||
+        throw(DimensionMismatch("y and X need one row per row of the panel ($n)"))
+    k = size(Xm, 2)
+    n > k + 1 || throw(ArgumentError("panel too small ($n rows)"))
+    groups = [_effect_labels(panel, e) for e in effects]
+    yd = demean_fe(y, groups...)
+    Xd = reduce(hcat, [demean_fe(Xm[:, j], groups...) for j in 1:k])
+    XX = Symmetric(Xd'Xd)
+    F = cholesky(XX; check = false)
+    issuccess(F) || error("the regressors are collinear after the fixed effects")
+    β = F \ (Xd'yd)
+    u = yd .- Xd * β
+    ssr = sum(abs2, u)
+    dof = n - _absorbed(groups) - k
+    dof > 0 || error("no degrees of freedom left")
+    XXi = inv(F)
+    se = sqrt.(diag(XXi) .* (ssr / dof))
+    se_DK = sqrt.(diag(XXi * _driscoll_kraay_meat(Xd, u, panel.year; lags = lags) * XXi))
+    gc, G = _codes(panel.geo)
+    se_cl = if G >= 2
+        hg = zeros(G, k)
+        for i in eachindex(u)
+            @views hg[gc[i], :] .+= Xd[i, :] .* u[i]
+        end
+        sqrt.(diag(XXi * (G / (G - 1) .* (hg'hg)) * XXi))
+    else
+        fill(NaN, k)
+    end
+    return (β = β, se = se, se_DK = se_DK, se_cluster = se_cl, ssr = ssr, n = n, countries = G)
 end
 
 """
@@ -207,30 +258,10 @@ error clustered by country (`G/(G−1)` factor; `NaN` with fewer than 2
 countries).
 """
 function estimate_mobility(panel::AbstractDataFrame; effects = (:geo_section, :geo_year), lags::Integer = 2)
-    n = nrow(panel)
-    n >= 3 || throw(ArgumentError("panel too small ($n rows)"))
-    groups = [_effect_labels(panel, e) for e in effects]
-    yd = demean_fe(panel.y, groups...)
-    xd = demean_fe(panel.gap, groups...)
-    xx = dot(xd, xd)
-    xx > 0 || error("the gap has no variation left after the fixed effects")
-    b = dot(xd, yd) / xx
-    u = yd .- b .* xd
-    dof = n - _absorbed(groups) - 1
-    dof > 0 || error("no degrees of freedom left")
-    se = sqrt(sum(abs2, u) / dof / xx)
-    se_DK = sqrt(_driscoll_kraay_S(xd, u, panel.year; lags = lags)) / xx
-    gc, G = _codes(panel.geo)
-    se_cl = if G >= 2
-        hg = zeros(G)
-        for i in eachindex(u)
-            hg[gc[i]] += xd[i] * u[i]
-        end
-        sqrt(G / (G - 1) * sum(abs2, hg)) / xx
-    else
-        NaN
-    end
-    return (μ = b, se = se, se_DK = se_DK, se_cluster = se_cl, n = n, countries = G)
+    nrow(panel) >= 3 || throw(ArgumentError("panel too small ($(nrow(panel)) rows)"))
+    e = estimate_fe_ols(panel, panel.y, panel.gap; effects = effects, lags = lags)
+    return (μ = e.β[1], se = e.se[1], se_DK = e.se_DK[1], se_cluster = e.se_cluster[1], n = e.n,
+            countries = e.countries)
 end
 
 """
@@ -255,4 +286,88 @@ function estimate_mobility_between(panel::AbstractDataFrame; within_country::Boo
     b = dot(xd, yd) / dot(xd, xd)
     u = yd .- b .* xd
     return (μ = b, se = sqrt(sum(abs2, u) / (n - k) / dot(xd, xd)), n = n)
+end
+
+"""
+    compute_investment_panel(raw; sections, countries = nothing, self_employed = :excluded)
+
+The panel of `compute_mobility_panel` (same rows; `own = :current`) with the
+flows the model's investment function needs, per country, section and year:
+`gk = 100·GFCFₜ/Kₜ₋₁` (gross investment rate, %), `sk = 100·Sₜ/Kₜ₋₁` (%),
+`rbar` (the capital-weighted mean profit rate of the country in t−1, so that
+`gap = 100·(r − rbar)`), `σbar` (the gross reinvestment share
+`ΣGFCF/ΣS` of the country × sector over its valid years, the data's
+analogue of a department's `σ_c`) and `valid` (`r > 0`, `rbar > 0`, `S > 0`: rows the
+elasticity form `(rbar/r)^η` can use). `self_employed = :imputed` imputes
+the self-employed in `S` as in `compute_mobility_panel`.
+"""
+function compute_investment_panel(raw::AbstractDataFrame; sections, countries = nothing,
+                                  self_employed::Symbol = :excluded)
+    P = compute_mobility_panel(raw; sections = sections, countries = countries,
+                               self_employed = self_employed)
+    has_geo = "geo" in names(raw)
+    geo = has_geo ? String.(raw.geo) : fill("", nrow(raw))
+    V = Float64.(raw.compensation)
+    self_employed == :imputed && (V = V .* raw.employment ./ raw.employees)
+    flows = Dict((geo[i], String(raw.section[i]), Int(raw.year[i])) =>
+                 (Float64(raw.GFCF[i]), Float64(raw.GVA[i]) - V[i] - Float64(raw.CFC[i]))
+                 for i in 1:nrow(raw))
+    F = [flows[(P.geo[i], P.section[i], P.year[i])] for i in 1:nrow(P)]
+    P.gk = 100 .* first.(F) ./ P.K
+    P.sk = 100 .* last.(F) ./ P.K
+    P.rbar = P.r .- P.gap ./ 100
+    P.valid = (P.r .> 0) .& (P.rbar .> 0) .& (last.(F) .> 0)
+    gross, surplus = Dict{Tuple{String, String}, Float64}(), Dict{Tuple{String, String}, Float64}()
+    for i in 1:nrow(P)
+        P.valid[i] || continue
+        u = (P.geo[i], P.section[i])
+        gross[u] = get(gross, u, 0.0) + first(F[i])
+        surplus[u] = get(surplus, u, 0.0) + last(F[i])
+    end
+    P.σbar = [haskey(gross, u) ? gross[u] / surplus[u] : NaN for u in zip(P.geo, P.section)]
+    P.valid .&= .!isnan.(P.σbar)
+    return P
+end
+
+"""
+    estimate_investment_function(P; η_grid = 0:0.1:1.0, ratio_bounds = (0.0, Inf),
+                                 effects = (:geo_section, :geo_year), lags = 2)
+
+The model's investment function in data terms (`_reinvestment_share`),
+
+    gk = λ·σbarᵢ·(rbar/rᵢ)^η·sk + μ·gap + effects + u,
+
+estimated at each elasticity `η` of `η_grid`, on the valid rows of a
+`compute_investment_panel` panel with `rᵢ/rbar` inside `ratio_bounds`
+(trimming the years in which a sector's profit rate is close to 0, where
+`(rbar/rᵢ)^η` explodes). Depreciation is in the country × sector effects.
+`λ = 1` is the model's own level (each department reinvests its share
+`σ_c`); `λ < 1` means investment follows own surplus less than the average
+share implies.
+
+The EU sectoral panel does not identify `η` by itself (notebook 11): the fit
+is nearly flat in `η`, so this returns the whole profile rather than an
+estimate of `η`, for `η` to be calibrated and `μ` read off at it.
+
+Returns `(profile, n, dropped)`: `profile` a DataFrame with, per `η`, `λ`
+and `μ`, their country-clustered standard errors `se_λ`, `se_μ`, the
+Driscoll–Kraay error `se_DK_μ` and the residual sum of squares `ssr`; `n`
+the rows used; `dropped` the rows left out (invalid or outside the bounds).
+"""
+function estimate_investment_function(P::AbstractDataFrame; η_grid = 0:0.1:1.0,
+                                      ratio_bounds = (0.0, Inf),
+                                      effects = (:geo_section, :geo_year), lags::Integer = 2)
+    isempty(η_grid) && throw(ArgumentError("empty η_grid"))
+    all(η -> isfinite(η) && η >= 0, η_grid) || throw(ArgumentError("η_grid must hold finite values ≥ 0"))
+    lo, hi = ratio_bounds
+    0 <= lo < hi || throw(ArgumentError("ratio_bounds must satisfy 0 ≤ lower < upper"))
+    keep = P.valid .& (lo .<= P.r ./ P.rbar .<= hi)
+    Q = P[keep, :]
+    rows = map(collect(η_grid)) do η
+        e = estimate_fe_ols(Q, Q.gk, hcat(Q.σbar .* (Q.rbar ./ Q.r) .^ η .* Q.sk, Q.gap);
+                            effects = effects, lags = lags)
+        (η = Float64(η), λ = e.β[1], se_λ = e.se_cluster[1], μ = e.β[2], se_μ = e.se_cluster[2],
+         se_DK_μ = e.se_DK[2], ssr = e.ssr)
+    end
+    return (profile = DataFrame(rows), n = nrow(Q), dropped = nrow(P) - nrow(Q))
 end

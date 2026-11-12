@@ -19,6 +19,15 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   `parameter_jacobian(:η)` e `with_parameter(:η)` funcionam; não disponível
   com `market_prices`, e as ferramentas de crescimento equilibrado rejeitam
   um calendário.
+- `estimate_fe_ols` (`src/mobility_estimation.jl`): OLS com vários
+  regressores e quaisquer efeitos fixos, com erros clássicos, de
+  Driscoll–Kraay e agrupados por país; `estimate_mobility` passa a ser o seu
+  caso com um regressor (mesmos resultados), e o notebook 10 usa-o.
+  `compute_investment_panel` acrescenta ao painel de mobilidade a taxa de
+  investimento bruto, `S/K`, a taxa de lucro média do país e a parte
+  reinvestida de cada país × setor; `estimate_investment_function` estima a
+  função de investimento do modelo, `σ_c·(r̄/r)^η·S` mais o termo de
+  mobilidade, numa grelha de `η` (com um limite opcional para `r/r̄`).
 - Notebook 10, `10_eu_sectoral_mobility`: `μ` entre os 15 setores de
   mercado de 26 países da UE, sem rede, a partir de
   `data/eurostat_eu_sectors.csv`, com efeitos país × setor e país × ano (e

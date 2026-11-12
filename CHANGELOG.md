@@ -18,6 +18,15 @@ Format based on Keep a Changelog. Semantic versioning.
   Jacobians and Hessians (also through rationing), `parameter_jacobian(:η)`
   and `with_parameter(:η)` work; not available with `market_prices`, and a
   schedule is rejected by the balanced-growth tools.
+- `estimate_fe_ols` (`src/mobility_estimation.jl`): OLS with several
+  regressors and any fixed effects, with classical, Driscoll–Kraay and
+  country-clustered errors; `estimate_mobility` is now its one-regressor
+  case (same results), and notebook 10 uses it.
+  `compute_investment_panel` adds the gross investment rate, `S/K`, the
+  country's mean profit rate and each country × sector's reinvestment share
+  to the mobility panel; `estimate_investment_function` estimates the
+  model's investment function, `σ_c·(r̄/r)^η·S` plus the mobility term,
+  over a grid of `η` (with an optional bound on `r/r̄`).
 - Notebook 10, `10_eu_sectoral_mobility`: `μ` between the 15 market sectors
   of 26 EU countries, offline, from `data/eurostat_eu_sectors.csv`, with
   country × sector and country × year effects (and sector × year), errors
