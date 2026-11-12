@@ -442,11 +442,11 @@ function system_Ndept_io!(dX, X, p, t)
         # (`_ensure_output_admissibility`), not at every evaluation.
         W = p.δ .* C .+ V .+ S
         x = _gross_output(W, p)   # with imported inputs if p.import_coefficients
-        O = x  # genuine gross output, not W: fixes the external review's
-                # criticism that O left out circulating intermediate consumption.
-        # Optional (`final_demand_share`): the part of output taken by final
-        # consumption and exports is not available to investment demand.
-        haskey(p, :final_demand_share) && (O = (1 .- p.final_demand_share) .* x)
+        # Supply available to investment demand: gross output x (not W, which
+        # left out circulating intermediate consumption), optionally net of
+        # final consumption and exports (`final_demand_share`) and of the
+        # replacement of this period's intermediate inputs (`net_intermediate`).
+        O = _investable_supply(x, p)
         if p.rationing
             # Desired output expansion implied by planned reinvestment
             # σ_c,ⱼSⱼ, via the current capital/output ratio Cⱼ/xⱼ
@@ -487,6 +487,28 @@ function system_Ndept_io!(dX, X, p, t)
         dX[2N+1:3N] = _tssi_price_flow(P, C, V, B, p)
         dX[3N+1:4N] = _book_value_flow(dX[1:N], C, B, p, _capital_goods_price(P, p.A), scrapped)
     end
+end
+
+"""
+    _investable_supply(x, p)
+
+Supply each sector can offer to investment demand in the rationing step,
+from gross output `x`:
+
+- by default, `x` itself;
+- with `p.final_demand_share = φ`, `(1 − φ)·x`: the part taken by final
+  consumption and exports is not available;
+- with `p.net_intermediate` (`simulate_Ndept_custom(...; net_intermediate =
+  true)`), also net of the replacement of the intermediate inputs used up in
+  the period, `(A·x)ᵢ`: `max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)`, the fully netted
+  reproduction balance (`docs/LIMITATIONS.md` item 1). A sector whose
+  output is all taken by intermediate use and final demand has nothing left
+  for accumulation (`ρᵢ = 0`).
+"""
+function _investable_supply(x, p)
+    O = haskey(p, :final_demand_share) ? (1 .- p.final_demand_share) .* x : x
+    get(p, :net_intermediate, false) || return O
+    return max.(O .- p.A * x, zero(eltype(x)))
 end
 
 """
@@ -729,8 +751,8 @@ rationing; see the `system_Ndept_io!` docstring. `market_prices=true`
 basket `basket` (`basket_initial` by default). `exit_friction` (coupled
 only, 0 = off) damps capital outflows from sectors with small shares; see
 `_mobility_flow`. `η`, `σ_schedule`, `reinvestment_form`, `exit_rate`,
-`exit_hurdle`, `investment_floor`, `tssi_dynamics` and `τ`: see
-`simulate_Ndept_custom`.
+`exit_hurdle`, `investment_floor`, `tssi_dynamics`, `τ` and
+`net_intermediate`: see `simulate_Ndept_custom`.
 """
 function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
@@ -738,7 +760,8 @@ function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                        market_prices = false, β = 0.5, basket = nothing,
                        exit_friction = 0.0, η = 0.0, σ_schedule = nothing,
                        reinvestment_form = :power, exit_rate = 0.0, exit_hurdle = 0.0,
-                       investment_floor = nothing, tssi_dynamics = false, τ = 1.0)
+                       investment_floor = nothing, tssi_dynamics = false, τ = 1.0,
+                       net_intermediate = false)
     depts = create_departments(N, name_list)
     return simulate_Ndept_custom(depts, T = T, seed = seed, coupled = coupled, μ = μ,
                                      μ_v = μ_v, realization = realization,
@@ -747,7 +770,8 @@ function simulate_Ndept(N::Int; T = 100.0, name_list::Vector{String} = String[],
                                      exit_friction = exit_friction, η = η, σ_schedule = σ_schedule,
                                      reinvestment_form = reinvestment_form, exit_rate = exit_rate,
                                      exit_hurdle = exit_hurdle, investment_floor = investment_floor,
-                                     tssi_dynamics = tssi_dynamics, τ = τ)
+                                     tssi_dynamics = tssi_dynamics, τ = τ,
+                                     net_intermediate = net_intermediate)
 end
 
 """
@@ -831,6 +855,9 @@ Real-data options, typically from a calibration (`departments_from_params`):
   sector's output taken by final consumption and exports
   (`exogenous_demand_share(params.final_demand)`); rationing then allocates
   only `(1 − φ)·x` to investment demand.
+- `net_intermediate = true` (only with `rationing=true`): the supply
+  available to investment is also net of the replacement of the period's
+  intermediate inputs, `max(x − A·x − φ·x, 0)` (`_investable_supply`).
 """
 function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    seed = nothing, coupled = false, μ = 0.3, μ_v = 0.0,
@@ -840,8 +867,11 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
                                    import_coefficients = nothing, exit_friction = 0.0,
                                    η = 0.0, σ_schedule = nothing, reinvestment_form = :power,
                                    exit_rate = 0.0, exit_hurdle = 0.0, investment_floor = nothing,
-                                   tssi_dynamics = false, τ = 1.0)
+                                   tssi_dynamics = false, τ = 1.0, net_intermediate = false)
     N = length(depts)
+    net_intermediate isa Bool || throw(ArgumentError("net_intermediate must be true or false"))
+    (net_intermediate && !(coupled && rationing)) &&
+        throw(ArgumentError("net_intermediate requires coupled=true and rationing=true"))
     if tssi_dynamics
         coupled || throw(ArgumentError("tssi_dynamics requires coupled=true"))
         (τ isa Real && isfinite(τ) && τ > 0) || throw(ArgumentError("τ must be a finite number > 0, got $τ"))
@@ -923,6 +953,7 @@ function simulate_Ndept_custom(depts::Vector{Department}; T = 100.0,
             (p = merge(p, (final_demand_share = collect(Float64, final_demand_share),)))
         isnothing(import_coefficients) ||
             (p = merge(p, (import_coefficients = collect(Float64, import_coefficients),)))
+        net_intermediate && (p = merge(p, (net_intermediate = true,)))
         iszero(exit_friction) || (p = merge(p, (exit_friction = exit_friction,)))
         p = merge(p, reinvestment)
         if tssi_dynamics   # TSSI prices and book value, consistent with each other

@@ -9,6 +9,15 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- `net_intermediate = true` em `simulate_Ndept(_custom)` (exige
+  `coupled = true` e `rationing = true`; as predefinições são idênticas bit
+  a bit): o racionamento compara a procura de investimento com a oferta
+  líquida da reposição dos inputs intermédios do período,
+  `max(x − A·x − φ·x, 0)` (`_investable_supply`). Com a IOT portuguesa a
+  acumulação colapsa, porque o resíduo de linha da IOT é a FBCF, produzida
+  por poucos setores, enquanto a procura de investimento do modelo tem a
+  composição de uma coluna de `A`; `docs/LIMITATIONS.pt.md` §1 explica-o e
+  o que continua em aberto (uma matriz de bens de capital).
 - Uma forma linear do reinvestimento e uma saída para o capital pouco
   rentável (`simulate_Ndept(_custom)`, tudo opcional; as predefinições ficam
   idênticas bit a bit):

@@ -1177,6 +1177,26 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, σ_schedule = Tuple{Float64, Float64}[])
     end
 
+    @testset "Netted intermediate replacement in the rationing balance" begin
+        A = [0.2 0.1; 0.3 0.1]; x = [10.0, 20.0]; φ = [0.7, 0.2]
+        @test _investable_supply(x, (A = A,)) == x
+        @test _investable_supply(x, (A = A, final_demand_share = φ)) ≈ (1 .- φ) .* x
+        @test _investable_supply(x, (A = A, net_intermediate = true)) ≈ x .- A * x
+        # sector 1: 3 − 4 < 0 → nothing left for accumulation
+        @test _investable_supply(x, (A = A, final_demand_share = φ, net_intermediate = true)) ≈ [0.0, 16 - 5]
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, net_intermediate = true)
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, net_intermediate = true)
+        @test_throws ArgumentError simulate_Ndept(4, T = 1.0, coupled = true, rationing = true, net_intermediate = 1)
+        Random.seed!(4); g = simulate_Ndept(3, T = 50.0, coupled = true, rationing = true, seed = 4)[1]
+        Random.seed!(4); n, _, p = simulate_Ndept(3, T = 50.0, coupled = true, rationing = true, seed = 4,
+                                                  net_intermediate = true)
+        @test p.net_intermediate
+        @test all(isfinite, n.u[end]) && all(>(0), n.u[end][1:3])
+        @test sum(n.u[end][1:3]) < sum(g.u[end][1:3])   # less investable supply, less accumulation
+        Random.seed!(4); _, _, p0 = simulate_Ndept(3, T = 1.0, coupled = true, rationing = true, seed = 4)
+        @test !haskey(p0, :net_intermediate)
+    end
+
     @testset "TSSI-driven dynamics" begin
         Random.seed!(7); depts = create_departments(5, String[])
         N = 5

@@ -148,10 +148,32 @@ guardada em `params.final_demand` nos caminhos Eurostat. Com
 com `(1 − φᵢ)·xᵢ`, onde `φᵢ` é a parcela do output que vai para consumo
 final e exportações. Para Portugal 2022 (artigo, Secção 5.7, Tabela 4),
 isto não altera a parcela de setores racionados e reduz a acumulação em
-cerca de um quinto com 10 e 19 setores. Continua em aberto: a reposição
-intermédia não é descontada, pelo que `Dᵢ≤(1−φᵢ)xᵢ` continua a ser um
-limite superior à oferta investível, não um balanço de reprodução
-totalmente líquido.
+cerca de um quinto com 10 e 19 setores.
+
+**Implementado como opção, mas não utilizável com a IOT real (reposição
+descontada):** `net_intermediate = true` (com `rationing = true`)
+desconta também a reposição dos inputs intermédios do período,
+comparando `Dᵢ` com `max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)` (`_investable_supply`,
+`src/core.jl`). Em economias sintéticas funciona como esperado: raciona
+mais vezes e reduz a acumulação em 7 de 10 simulações sintéticas (3 e 6
+setores, 5 sementes). **Com a IOT portuguesa de 2022, a acumulação colapsa**
+(ΣC ×0,3 em 30 anos com 10 e 19 setores, contra ×56,6–×200,6 sem a opção;
+14–16 dos 19 setores ficam sem oferta investível). A razão é estrutural,
+não numérica. Na IOT o resíduo de linha `x − A·x − φ·x` é a formação
+bruta de capital fixo (mais existências e, em O e P, cerca de 3% de
+outras utilizações), e a FBCF é produzida
+por poucos setores: construção F (65% do seu output), J (18%), M (15%),
+L (12%), A (8%), G (5%), R (2%). As secções D, E, H, I, K, N, Q e S não
+produzem praticamente nenhuma. A procura de investimento do modelo, `A·Δx`, tem a composição
+dos inputs *circulantes* do output em expansão (uma coluna de `A`), que
+todos os setores fornecem. O mínimo em `κⱼ = minᵢ ρᵢ` fica então
+vinculado num setor sem resíduo, e o investimento para em toda a parte.
+O próprio `x` do modelo agrava isto: é 0,5–2,0 vezes o output da IOT por
+secção, pelo que em `t = 0` o balanço descontado já falha em D e E.
+**Continua em aberto:** um balanço totalmente líquido exige que o
+investimento procure bens de capital na composição da coluna de FBCF da
+IOT (uma matriz de bens de capital), e não as colunas de `A`. Até lá,
+`Dᵢ ≤ (1−φᵢ)xᵢ` continua a ser um limite superior à oferta investível.
 
 **Corrigido (inputs importados, opcional):** a matriz do Eurostat só cobre
 inputs domésticos, pelo que o `xᵢ` reconstruído a partir dela deixava de
@@ -476,7 +498,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 601 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 612 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,

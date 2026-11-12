@@ -9,6 +9,15 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- `net_intermediate = true` in `simulate_Ndept(_custom)` (needs
+  `coupled = true` and `rationing = true`; the defaults are bit-identical):
+  rationing compares investment demand with supply net of the replacement
+  of the period's intermediate inputs, `max(x − A·x − φ·x, 0)`
+  (`_investable_supply`). With Portugal's IOT accumulation collapses,
+  because the IOT's row residual is GFCF, which few sectors produce, while
+  the model's investment demand has the composition of a column of `A`;
+  `docs/LIMITATIONS.md` §1 explains it and what is still open (a
+  capital-goods matrix).
 - A linear reinvestment form and an exit for unprofitable capital
   (`simulate_Ndept(_custom)`, all opt-in; the defaults are bit-identical):
   - `reinvestment_form = :linear` reinvests `σ_c·[(1−η)Π + η·r̄·K]`, with

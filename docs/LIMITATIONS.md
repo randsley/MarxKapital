@@ -150,9 +150,32 @@ final demand.
 `(1 − φᵢ)·xᵢ`, where `φᵢ` is the share of output going to final
 consumption and exports. For Portugal 2022 (paper, Section 5.7, Table 4)
 this leaves the share of rationed sectors unchanged and lowers
-accumulation by about a fifth at 10 and 19 sectors. Still open:
-intermediate replacement is not netted, so `Dᵢ≤(1−φᵢ)xᵢ` remains an upper
-bound on investable supply, not a fully netted reproduction balance.
+accumulation by about a fifth at 10 and 19 sectors.
+
+**Implemented as an option, but not usable with the real IOT (netted
+replacement):** `net_intermediate = true` (with `rationing = true`) also
+nets the replacement of the period's intermediate inputs, comparing `Dᵢ`
+with `max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)` (`_investable_supply`, `src/core.jl`).
+In synthetic economies it works as expected: it rations more often and
+lowers accumulation in 7 of 10 synthetic runs (3 and 6 sectors, 5 seeds). **With Portugal's
+2022 IOT, accumulation collapses** (ΣC ×0.3 over 30 years at 10 and 19
+sectors, against ×56.6–×200.6 without it; 14–16 of the 19 sectors have
+no investable supply). The reason is structural, not numerical. In the
+IOT the row residual `x − A·x − φ·x` is gross fixed capital formation
+(plus inventories and, in O and P, about 3% of other uses), and GFCF is produced by a handful of
+sectors: construction F (65% of its output), J (18%), M (15%), L (12%),
+A (8%), G (5%), R (2%). Sections D, E, H, I, K, N, Q and S produce
+practically none. The
+model's investment demand, `A·Δx`, has the composition of the
+*circulating* inputs of expanding output (a column of `A`), which every
+sector supplies. The minimum in `κⱼ = minᵢ ρᵢ` then binds at a sector
+with no residual, and investment stops everywhere. The model's own `x`
+adds to this: it is 0.5–2.0 times the IOT output by section, so at
+`t = 0` the netted balance already fails in D and E. **Still open:** a
+fully netted balance needs investment to demand capital goods in the
+composition of the IOT's GFCF column (a capital-goods matrix), not the
+columns of `A`. Until then `Dᵢ ≤ (1−φᵢ)xᵢ` remains an upper bound on
+investable supply.
 
 **Fixed (imported inputs, optional):** Eurostat's matrix covers domestic
 inputs only, so the `xᵢ` reconstructed from it left out imported
@@ -481,7 +504,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 601 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 612 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
