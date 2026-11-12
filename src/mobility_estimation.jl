@@ -12,9 +12,11 @@
 # with r̄ the capital-weighted mean. These functions build that panel from a
 # sectoral extract (data/eurostat_eu_sectors.csv: one country or several)
 # and estimate μ with any set of fixed effects, Driscoll–Kraay and
-# country-clustered standard errors. Used by notebooks 09–12; notebook 12
+# country-clustered standard errors. Used by notebooks 09–14; notebook 12
 # compares the average rate with Shaikh's incremental rate of profit
-# (compute_incremental_panel, estimate_persistence).
+# (compute_incremental_panel, estimate_persistence), and notebook 14 estimates
+# the mobility of variable capital μ_v (compute_labor_panel,
+# estimate_variable_mobility).
 # ============================================================================
 
 const _MOBILITY_EFFECTS = (:geo, :section, :year, :geo_section, :geo_year, :section_year)
@@ -366,6 +368,88 @@ function compute_investment_panel(raw::AbstractDataFrame; sections, countries = 
     cfc = Dict((geo[i], String(raw.section[i]), Int(raw.year[i])) => Float64(raw.CFC[i]) for i in 1:nrow(raw))
     P.dk = [100 * cfc[(P.geo[i], P.section[i], P.year[i])] / P.K[i] for i in 1:nrow(P)]
     return P
+end
+
+"""
+    compute_labor_panel(raw; sections, countries = nothing, self_employed = :excluded)
+
+The panel of the model's equation for variable capital,
+
+    dVᵢ/dt = σ_v·Sᵢ + μ_v·(rᵢ − r̄_V)·Vᵢ,
+
+with `r̄_V` the V-weighted mean profit rate (`system_Ndept_io!`,
+`cross_dual_system!`, `_mobility_flow`), on the rows of
+`compute_mobility_panel`. Adds, per row (year `t`):
+
+- `vg = 100·(Vₜ − Vₜ₋₁)/Vₜ₋₁`: growth of the wage bill (%);
+- `eg = 100·(Eₜ − Eₜ₋₁)/Eₜ₋₁`: growth of employment (persons), the wage bill
+  at a constant wage, which strips out wage-rate growth;
+- `sv = 100·Sₜ₋₁/Vₜ₋₁`: last year's surplus over the wage bill (the rate of
+  exploitation, in %), so that `σ_v·S/V` is not mechanically tied to this
+  year's wages through `S = GVA − V − CFC`;
+- `gap_V = 100·(rₜ₋₁ − r̄_V,ₜ₋₁)`: the profit-rate gap to the V-weighted
+  mean of the country-year (pp), which sums to zero weighted by `Vₜ₋₁`;
+- `Vlag` (`Vₜ₋₁`) and `valid_V` (finite flows and `Vₜ₋₁ > 0`, `Eₜ₋₁ > 0`).
+
+`self_employed = :imputed` counts the self-employed at the average
+employee's compensation, as in `compute_mobility_panel`.
+"""
+function compute_labor_panel(raw::AbstractDataFrame; sections, countries = nothing,
+                             self_employed::Symbol = :excluded)
+    P = compute_mobility_panel(raw; sections = sections, countries = countries,
+                               self_employed = self_employed)
+    geo = "geo" in names(raw) ? String.(raw.geo) : fill("", nrow(raw))
+    V = Float64.(raw.compensation)
+    self_employed == :imputed && (V = V .* raw.employment ./ raw.employees)
+    key(i) = (geo[i], String(raw.section[i]), Int(raw.year[i]))
+    wages = Dict(key(i) => V[i] for i in 1:nrow(raw))
+    surplus = Dict(key(i) => Float64(raw.GVA[i]) - V[i] - Float64(raw.CFC[i]) for i in 1:nrow(raw))
+    jobs = Dict(key(i) => Float64(raw.employment[i]) for i in 1:nrow(raw))
+    at(d, i, lag) = d[(P.geo[i], P.section[i], P.year[i] - lag)]
+    Vt, Vl = [at(wages, i, 0) for i in 1:nrow(P)], [at(wages, i, 1) for i in 1:nrow(P)]
+    Et, El = [at(jobs, i, 0) for i in 1:nrow(P)], [at(jobs, i, 1) for i in 1:nrow(P)]
+    Sl = [at(surplus, i, 1) for i in 1:nrow(P)]
+    P.vg = 100 .* (Vt .- Vl) ./ Vl
+    P.eg = 100 .* (Et .- El) ./ El
+    P.sv = 100 .* Sl ./ Vl
+    P.Vlag = Vl
+    agg = Dict{Tuple{String, Int}, Tuple{Float64, Float64}}()
+    for i in 1:nrow(P)
+        a = get(agg, (P.geo[i], P.year[i]), (0.0, 0.0))
+        agg[(P.geo[i], P.year[i])] = (a[1] + P.r[i] * Vl[i], a[2] + Vl[i])
+    end
+    P.gap_V = [100 * (P.r[i] - (a = agg[(P.geo[i], P.year[i])]; a[1] / a[2])) for i in 1:nrow(P)]
+    P.valid_V = (Vl .> 0) .& (El .> 0) .& isfinite.(P.vg) .& isfinite.(P.eg) .& isfinite.(P.sv) .&
+                isfinite.(P.gap_V)
+    return P
+end
+
+"""
+    estimate_variable_mobility(P; dependent = :vg, effects = (:geo_section, :geo_year), lags = 2)
+
+The mobility of variable capital `μ_v` (`simulate_Ndept_custom(...; μ_v)`) on
+a `compute_labor_panel` panel:
+
+    dependent = λ_v·sv + μ_v·gap_V + effects + u,
+
+with `dependent` either `:vg` (growth of the wage bill, the model's `V`) or
+`:eg` (growth of employment, which leaves out wage-rate growth that is not
+common to the country-year). In the model's units `λ_v` is `σ_v`, the share
+of surplus spent on hiring, and `μ_v` is the coefficient of `_mobility_flow`.
+Country × year effects absorb common wage inflation and the business cycle;
+country × sector effects each sector's trend.
+
+Returns `(μ_v, se, se_DK, se_cluster, λ_v, se_λ_v, n, countries)`, with
+the standard errors of `estimate_fe_ols`; `se_λ_v` is clustered by country.
+"""
+function estimate_variable_mobility(P::AbstractDataFrame; dependent::Symbol = :vg,
+                                    effects = (:geo_section, :geo_year), lags::Integer = 2)
+    dependent in (:vg, :eg) || throw(ArgumentError("dependent must be :vg or :eg, got :$dependent"))
+    Q = P[P.valid_V, :]
+    nrow(Q) >= 4 || throw(ArgumentError("panel too small ($(nrow(Q)) valid rows)"))
+    e = estimate_fe_ols(Q, Q[!, dependent], hcat(Q.sv, Q.gap_V); effects = effects, lags = lags)
+    return (μ_v = e.β[2], se = e.se[2], se_DK = e.se_DK[2], se_cluster = e.se_cluster[2],
+            λ_v = e.β[1], se_λ_v = e.se_cluster[1], n = e.n, countries = e.countries)
 end
 
 """

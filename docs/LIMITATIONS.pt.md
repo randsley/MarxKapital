@@ -476,7 +476,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 555 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 574 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,

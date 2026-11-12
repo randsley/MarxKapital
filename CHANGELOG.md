@@ -52,6 +52,13 @@ Format based on Keep a Changelog. Semantic versioning.
   how each NACE section is treated (market or non-market; the
   productive/unproductive distinction the model does not make), how the
   self-employed are counted, and what the floor on `e` does.
+- Estimating the mobility of variable capital `μ_v`
+  (`src/mobility_estimation.jl`): `compute_labor_panel` builds the panel of
+  the model's equation `dV/dt = σ_v·S + μ_v·(r − r̄_V)·V` (growth of the
+  wage bill or of employment, last year's `S/V`, and the gap to the
+  V-weighted mean profit rate, which sums to zero), and
+  `estimate_variable_mobility` estimates `σ_v` and `μ_v` with fixed
+  effects and clustered or Driscoll–Kraay errors.
 - The perpetual inventory by asset type, `perpetual_inventory = :by_asset`
   (`calibrate_portugal_model`, `calibrate_with_ameco_v2`; `true` is now
   also `:single`). Each asset type's depreciation rate is backed out of

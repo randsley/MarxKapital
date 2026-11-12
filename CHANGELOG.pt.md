@@ -53,6 +53,13 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   como é tratada cada secção NACE (mercantil ou não mercantil; a distinção
   entre trabalho produtivo e improdutivo que o modelo não faz), como se
   contam os independentes, e o que faz o piso de `e`.
+- Estimação da mobilidade do capital variável `μ_v`
+  (`src/mobility_estimation.jl`): `compute_labor_panel` constrói o painel
+  da equação do modelo `dV/dt = σ_v·S + μ_v·(r − r̄_V)·V` (crescimento da
+  massa salarial ou do emprego, o `S/V` do ano anterior, e o diferencial
+  face à taxa de lucro média ponderada por V, que soma zero), e
+  `estimate_variable_mobility` estima `σ_v` e `μ_v` com efeitos fixos e
+  erros agrupados ou de Driscoll–Kraay.
 - O inventário perpétuo por tipo de ativo, `perpetual_inventory = :by_asset`
   (`calibrate_portugal_model`, `calibrate_with_ameco_v2`; `true` passa a
   ser também `:single`). A taxa de depreciação de cada tipo de ativo
