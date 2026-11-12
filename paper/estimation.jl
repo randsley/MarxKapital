@@ -110,6 +110,41 @@ record!("EstMuVMax", fmt(maximum(μvs_all); d = 3))
 μv_upper = maximum(r.vg.μ_v + 2r.vg.se_cluster for r in rows)
 record!("EstMuVUpper", fmt(μv_upper))
 
+# Average or incremental rates of profit (Shaikh 2016, ch. 7; notebook 12)
+println("\nIncremental rates of profit...")
+"""Rows whose incremental gap is inside its 1st–99th percentiles."""
+trim_I(P) = (b = quantile(P.gap_I, [0.01, 0.99]); P[b[1] .<= P.gap_I .<= b[2], :])
+"""Dispersion of the country × sector long-run mean gaps, net of sampling noise."""
+function permanent_sd(P, col)
+    m = combine(groupby(P, [:geo, :section]), col => mean => :m, col => var => :v, nrow => :T)
+    m = m[m.T .>= 2, :]
+    sqrt(max(var(m.m) - mean(m.v ./ m.T), 0.0))
+end
+P1 = compute_incremental_panel(eu; sections = MARKET).panel
+P3 = compute_incremental_panel(eu; sections = MARKET, window = 3).panel
+pers = [(estimate_persistence(Q, :gap), estimate_persistence(Q, :gap_I), Q)
+        for P in (P1, P3) for Q in (P, trim_I(P))]
+rng(v; d = 2) = fmt(minimum(v); d = d) * "--" * fmt(maximum(v); d = d)
+record!("IncBetweenAvg", rng([a.between_share for (a, _, _) in pers]))
+record!("IncBetweenInc", rng([b.between_share for (_, b, _) in pers]))
+record!("IncRhoOneYear", fmt(pers[1][2].ρ))
+trimmed = pers[[2, 4]]
+record!("IncPermAvg", rng([permanent_sd(Q, :gap) for (_, _, Q) in trimmed]; d = 0))
+record!("IncPermInc", rng([permanent_sd(Q, :gap_I) for (_, _, Q) in trimmed]; d = 0))
+# horse race in the investment function at η = 1, on notebook 11's sample (r/r̄ ∈ [1/3, 3])
+J = innerjoin(trim_I(P3), select(base.IP, :geo, :section, :year, :gk, :sk, :rbar, :σbar, :valid);
+              on = [:geo, :section, :year])
+J = J[J.valid .& (1/3 .<= J.r ./ J.rbar .<= 3), :]
+own = J.σbar .* (J.rbar ./ J.r) .* J.sk
+fa = estimate_fe_ols(J, J.gk, hcat(own, J.gap))
+fb = estimate_fe_ols(J, J.gk, hcat(own, J.gap, J.gap_I))
+record!("IncRows", string(nrow(J)))
+record!("IncMuAvg", fmt(fa.β[2]; d = 3))
+record!("IncMuAvgSe", fmt(fa.se_cluster[2]; d = 3))
+record!("IncBothAvg", fmt(fb.β[2]; d = 3))
+record!("IncBothInc", fmt(fb.β[3]; d = 4))
+record!("IncBothIncSe", fmt(fb.se_cluster[3]; d = 4))
+
 # Table 5
 cell(b, se; d = 3) = @sprintf("\\(%.*f\\) (%.*f)", d, b, d, se)   # math mode: a real minus sign
 open(joinpath(FIG_DIR, "table5_estimates.tex"), "w") do io

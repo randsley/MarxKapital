@@ -252,7 +252,8 @@ Format based on Keep a Changelog. Semantic versioning.
   it was frozen:
   - a new Section 5.8 estimates the accumulation parameters on the EU
     sectoral panel (Table 5, Figure 12), from the new offline script
-    `paper/estimation.jl`;
+    `paper/estimation.jl`, including average against incremental rates of
+    profit (Shaikh);
   - Section 5.6 places the estimated `μ_v` against the Hopf point of
     Portugal's calibrated economy;
   - Section 5.7 gains Table 4b (imported inputs, the netted balance, the

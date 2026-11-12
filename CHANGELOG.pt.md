@@ -265,7 +265,8 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   foi congelado:
   - uma nova Secção 5.8 estima os parâmetros de acumulação no painel
     setorial da UE (Tabela 5, Figura 12), a partir do novo script offline
-    `paper/estimation.jl`;
+    `paper/estimation.jl`, incluindo taxas de lucro médias contra
+    incrementais (Shaikh);
   - a Secção 5.6 situa o `μ_v` estimado face ao ponto de Hopf da economia
     portuguesa calibrada;
   - a Secção 5.7 ganha a Tabela 4b (inputs importados, o balanço
