@@ -1,8 +1,8 @@
 # ============================================================================
 # Builds data/eurostat_eu_sectors.csv: a static Eurostat extract of the
 # annual sectoral accounts of the EU countries (19 NACE sections, every year
-# published), so that notebooks/jupyter/09_sectoral_mobility and
-# 10_eu_sectoral_mobility run offline. Uses the package's own Eurostat parser
+# published), so that notebooks 9–12 (notebooks/jupyter/09_… to 12_…) run
+# offline. Uses the package's own Eurostat parser
 # (`_fetch_eurostat_sections_by_geo`, src/eurostat_sdmx.jl), so the dataflows,
 # keys and units are the ones the calibration uses.
 #
@@ -12,7 +12,9 @@
 # eurostat_eu_sectors_PROVENANCE.md next to this file. A country is kept
 # only if every series is published for every section over a run of
 # consecutive years; otherwise it is dropped with a warning, and the
-# provenance file records why.
+# provenance file records why. The volume series (VOLUMES) are optional: they
+# don't decide which countries and years are kept, and a value Eurostat
+# doesn't publish is left empty.
 # ============================================================================
 
 include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
@@ -34,6 +36,12 @@ const SERIES = [
     "employees"     => ("NAMA_10_A64_E",  "A.THS_PER..SAL_DC.$GEO",    "employees, domestic concept, thousand persons"),
 ]
 
+# Chain-linked volumes, for real flows (notebook 12). Optional columns.
+const VOLUMES = [
+    "GVA_volume"    => ("NAMA_10_A64",    "A.CLV15_MEUR..B1G.$GEO",       "gross value added, chain-linked volumes (2015), million euros"),
+    "GFCF_volume"   => ("NAMA_10_A64_P5", "A.CLV15_MEUR..N11G.P51G.$GEO", "gross fixed capital formation, all fixed assets, chain-linked volumes (2015), million euros"),
+]
+
 """Years in which every series is published for every section of `geo`, or a reason it is dropped."""
 function country_years(data, geo)
     for (col, _) in SERIES
@@ -52,7 +60,7 @@ end
 
 function main()
     data = Dict{String, Dict{String, Dict{String, Dict{Int, Float64}}}}()
-    for (col, (flow, key, _)) in SERIES
+    for (col, (flow, key, _)) in vcat(SERIES, VOLUMES)
         d = _fetch_eurostat_sections_by_geo(flow, key; readtimeout = 600)
         isempty(d) && error("$col ($flow): no data returned")
         data[col] = d
@@ -72,13 +80,20 @@ function main()
     isempty(kept) && error("no country with complete data")
 
     csv = joinpath(@__DIR__, "eurostat_eu_sectors.csv")
-    cols = first.(SERIES)
+    cols, vcols = first.(SERIES), first.(VOLUMES)
     names_by_code = Dict(PT_SECTORS)
+    nmissing = Dict(c => 0 for c in vcols)
+    optional(c, geo, s, y) = begin
+        v = get(get(get(data[c], geo, Dict()), s, Dict()), y, nothing)
+        v === nothing && (nmissing[c] += 1)
+        v === nothing ? "" : @sprintf("%.6g", v)
+    end
     open(csv, "w") do io
-        println(io, join(vcat("geo", "section", "sector", "year", cols), ","))
+        println(io, join(vcat("geo", "section", "sector", "year", cols, vcols), ","))
         for (geo, years) in kept, s in NACE_SECTIONS, y in years
             vals = [@sprintf("%.6g", data[c][geo][s][y]) for c in cols]
-            println(io, join(vcat(geo, s, "\"$(names_by_code[s])\"", string(y), vals), ","))
+            vvals = [optional(c, geo, s, y) for c in vcols]
+            println(io, join(vcat(geo, s, "\"$(names_by_code[s])\"", string(y), vals, vvals), ","))
         end
     end
 
@@ -104,12 +119,19 @@ function main()
         (`_fetch_eurostat_sections_by_geo`, `src/eurostat_sdmx.jl`), so the
         dataflows and keys are the ones `calibrate_portugal_model(...;
         data_source = :eurostat)` uses. Values are stored to six significant
-        figures. Read it with `CSV.read` (see notebooks 09 and 10).
+        figures. Read it with `CSV.read` (see notebooks 9–12).
 
         **Prices.** Flows are at current prices and the capital stock at
         current replacement cost, so ratios such as the rate of profit compare
         like with like (the `:current_cost` valuation of the AMECO time
         series). Recent years are provisional and may be revised.
+
+        **Volumes.** `GVA_volume` and `GFCF_volume` are chain-linked volumes
+        (reference year 2015), used for real flows (notebook 12): the sector's
+        GVA deflator is `GVA/GVA_volume`. Chain-linked volumes are not additive
+        across sections, so use them only in ratios within a section. They are
+        optional columns: they don't decide which countries and years are
+        kept, and a value Eurostat doesn't publish is left empty.
 
         | country | years |
         |---|---|
@@ -128,9 +150,11 @@ function main()
         | column | dataflow | key | content |
         |---|---|---|---|
         """)
-        for (col, (flow, key, desc)) in SERIES
+        for (col, (flow, key, desc)) in vcat(SERIES, VOLUMES)
             println(io, "| `$col` | `$flow` | `$(replace(key, GEO => "<geo>"))` | $desc |")
         end
+        println(io, "\nEmpty volume cells: ",
+                join(("`$c` $(nmissing[c])" for c in vcols), ", "), ".")
     end
     @info "wrote" csv prov countries = length(kept) dropped = first.(dropped)
 end
