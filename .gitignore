@@ -44,3 +44,6 @@ _site_src/
 
 # Claude Code project instructions (local only)
 CLAUDE.md
+
+# Reference papers (local only)
+ExtRef/
