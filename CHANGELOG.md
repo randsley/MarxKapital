@@ -52,6 +52,12 @@ Format based on Keep a Changelog. Semantic versioning.
   how each NACE section is treated (market or non-market; the
   productive/unproductive distinction the model does not make), how the
   self-employed are counted, and what the floor on `e` does.
+- Website: the home page (both languages) has an "Empirical findings"
+  block with plots from notebooks 10, 11 and 13 (capital mobility and
+  reinvestment), taken from the executed notebooks by `build_site.py`
+  (`NOTEBOOK_FIGURES`), and links to `docs/NATIONAL_ACCOUNTS.md`, which is
+  now a site page. The notebooks section no longer says every notebook
+  runs on synthetic data.
 - Notebook 13, `13_investment_floor_and_market_prices`: the linear
   reinvestment form estimated on every row of the EU panel, loss years
   included (`η̂` = 0.15, se 0.18; `μ̂` = 0.063), against notebook 11's

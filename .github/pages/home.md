@@ -20,9 +20,47 @@ Version **@@VERSION@@** · [![DOI](https://zenodo.org/badge/DOI/@@DOI@@.svg)](ht
 
 Rate of exploitation, organic composition and rate of profit for Portugal,
 from national accounts, with variable capital at current and at deflated
-prices.
+prices. How the national accounts map onto constant capital, variable
+capital and surplus value, and which sectors are left out, is set out in
+[From national accounts to C, V and S](national-accounts.html).
 
 <div class="fig-banner"><img src="assets/figures/fig1_time_series.png" alt="Rate of exploitation, organic composition and profit rate, Portugal, over time"></div>
+
+## Empirical findings: capital mobility and reinvestment
+
+The model's capital-mobility coefficient $$\mu$$ and its investment
+function, estimated on Eurostat's accounts for the 15 market sectors of 26
+EU countries (notebooks 9–13).
+
+<div class="fig-grid">
+<figure><img src="assets/figures/nb10_mobility.png" alt="Capital received beyond own surplus against the profit-rate gap, 26 EU countries">
+<figcaption><strong>A fixed reinvestment share fails.</strong> If every
+sector reinvests a fixed share of its own surplus, capital seems to flee
+profit: \(\hat\mu = -0.14\), negative in 21 of 26 countries. The fault
+is the fixed share (<a href="notebooks/jupyter/10_eu_sectoral_mobility.html">notebook 10</a>).</figcaption></figure>
+<figure><img src="assets/figures/nb11_mobility_eta.png" alt="Estimated mu against the reinvestment elasticity eta">
+<figcaption><strong>Mobility turns positive.</strong> Once the share
+reinvested may fall with relative profitability (elasticity \(\eta\)),
+\(\hat\mu\) is positive for every \(\eta\), 0.05 to 0.13
+(<a href="notebooks/jupyter/11_reinvestment_and_mobility.html">notebook 11</a>).</figcaption></figure>
+<figure><img src="assets/figures/nb13_eta_profile.png" alt="Fit of the investment function against eta">
+<figcaption><strong>Own surplus comes first.</strong> On every row, loss
+years included, \(\hat\eta = 0.15\) (se 0.18) and
+\(\hat\mu = 0.06\). Investment does not stop when profits do: it has a
+floor at about 0.7 of depreciation
+(<a href="notebooks/jupyter/13_investment_floor_and_market_prices.html">notebook 13</a>).</figcaption></figure>
+<figure><img src="assets/figures/nb13_balanced_growth.png" alt="Largest real part of the eigenvalues at balanced growth against eta">
+<figcaption><strong>A stable economy at the estimates.</strong> With market
+prices, Portugal's market sectors have a stable interior balanced growth
+path for every \(\eta\) up to 0.9; only \(\eta = 1\) has none
+(<a href="notebooks/jupyter/13_investment_floor_and_market_prices.html">notebook 13</a>).</figcaption></figure>
+</div>
+
+Notebook 12 tests Shaikh's claim that competition equalizes incremental,
+not average, rates of profit: incremental-rate gaps are mostly transitory
+but not equalized, and capital follows the average-rate gap. The
+[known limitations](limitations.html) record what these results do and do
+not settle.
 
 ## What the model does
 
@@ -52,6 +90,9 @@ share makes balanced growth more robust to capital mobility.</figcaption></figur
 - **Calibration:** Portuguese INE/Eurostat data (19, 10 or 3 sectors) and
   any country in AMECO, through the official SDMX APIs. Defaults are
   synthetic; real data are opt-in.
+- **Estimation:** capital mobility and the investment function from
+  sectoral panels, with fixed effects and clustered or Driscoll–Kraay
+  errors.
 - **Dynamics:** exact Jacobians by automatic differentiation, TSSI
   valuation, balanced growth, bifurcation continuation, Lyapunov exponents.
 
@@ -77,8 +118,9 @@ The [overview](overview.html) covers the full API; read the
 
 ## Notebooks
 
-Worked examples, rendered with their outputs. They run offline on the
-synthetic defaults.
+Worked examples, rendered with their outputs. They run offline:
+notebooks 1–6 on the synthetic defaults, 7–13 on static extracts of AMECO
+and Eurostat data.
 
 @@GALLERY@@
 

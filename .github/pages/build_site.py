@@ -33,20 +33,30 @@ PAGES = {
     "README.md": ("overview.md", {"title": "Overview", "nav_order": 2}),
     "notebooks/README.md": ("notebooks/index.md", {"title": "Notebooks", "nav_order": 3}),
     "docs/LIMITATIONS.md": ("limitations.md", {"title": "Known limitations", "nav_order": 4}),
-    "docs/PROJECT_STATUS.md": ("status.md", {"title": "Project status", "nav_order": 5}),
-    "docs/GLOSSARY.md": ("glossary.md", {"title": "Glossary", "nav_order": 6}),
-    "CHANGELOG.md": ("changelog.md", {"title": "Changelog", "nav_order": 7}),
+    "docs/NATIONAL_ACCOUNTS.md": ("national-accounts.md", {"title": "National accounts → C, V, S", "nav_order": 5}),
+    "docs/PROJECT_STATUS.md": ("status.md", {"title": "Project status", "nav_order": 6}),
+    "docs/GLOSSARY.md": ("glossary.md", {"title": "Glossary", "nav_order": 7}),
+    "CHANGELOG.md": ("changelog.md", {"title": "Changelog", "nav_order": 8}),
     "home.pt.md": ("index.pt.md", {"title": "Português", "nav_order": 9, "has_children": True}),
     "README.pt.md": ("overview.pt.md", {"title": "Visão geral", "parent": "Português", "nav_order": 1}),
     "docs/LIMITATIONS.pt.md": ("limitations.pt.md", {"title": "Limitações conhecidas", "parent": "Português", "nav_order": 2}),
-    "docs/PROJECT_STATUS.pt.md": ("status.pt.md", {"title": "Estado do projeto", "parent": "Português", "nav_order": 3}),
-    "CHANGELOG.pt.md": ("changelog.pt.md", {"title": "Registo de alterações", "parent": "Português", "nav_order": 4}),
+    "docs/NATIONAL_ACCOUNTS.pt.md": ("national-accounts.pt.md", {"title": "Contas nacionais → C, V, S", "parent": "Português", "nav_order": 3}),
+    "docs/PROJECT_STATUS.pt.md": ("status.pt.md", {"title": "Estado do projeto", "parent": "Português", "nav_order": 4}),
+    "CHANGELOG.pt.md": ("changelog.pt.md", {"title": "Registo de alterações", "parent": "Português", "nav_order": 5}),
 }
 HOME_PAGES = {"home.md", "home.pt.md"}
 NOTEBOOK_DIR = "notebooks/jupyter"
 PAPER = "paper/main.pdf"
 FIGURES = ["fig1_time_series", "fig2_matrix_A", "fig3_transformation",
            "fig10b_accumulation_cycles", "fig11b_hopf_boundary"]
+# plots of the executed notebooks shown on the home pages:
+# site name -> (notebook, index of the PNG output among the notebook's plots)
+NOTEBOOK_FIGURES = {
+    "nb10_mobility": ("10_eu_sectoral_mobility", 0),
+    "nb11_mobility_eta": ("11_reinvestment_and_mobility", 0),
+    "nb13_eta_profile": ("13_investment_floor_and_market_prices", 0),
+    "nb13_balanced_growth": ("13_investment_floor_and_market_prices", 1),
+}
 
 ACRONYMS = {"tssi", "ad"}
 SELF_LINK = re.compile(r" · \*(?:Website|Site): <https://randsley\.github\.io/[^>]*>\*")
@@ -115,19 +125,33 @@ def notebooks_table():
     return rows
 
 
+def notebook_pngs(name):
+    """The PNG outputs of a notebook, in order, as bytes."""
+    with open(os.path.join(REPO, NOTEBOOK_DIR, name + ".ipynb"), encoding="utf-8") as f:
+        nb = json.load(f)
+    pngs = [o["data"]["image/png"] for c in nb["cells"] if c["cell_type"] == "code"
+            for o in c.get("outputs", []) if "image/png" in o.get("data", {})]
+    return [base64.b64decode("".join(p) if isinstance(p, list) else p) for p in pngs]
+
+
 def write_thumbnails(out):
     """First PNG output of each notebook -> notebooks/thumbs/NAME.png."""
     thumbs = os.path.join(out, "notebooks", "thumbs")
     os.makedirs(thumbs, exist_ok=True)
     for name, _ in notebooks_table():
-        with open(os.path.join(REPO, NOTEBOOK_DIR, name + ".ipynb"), encoding="utf-8") as f:
-            nb = json.load(f)
-        png = next((o["data"]["image/png"] for c in nb["cells"] if c["cell_type"] == "code"
-                    for o in c.get("outputs", []) if "image/png" in o.get("data", {})), None)
-        if png is not None:
-            data = "".join(png) if isinstance(png, list) else png
+        pngs = notebook_pngs(name)
+        if pngs:
             with open(os.path.join(thumbs, name + ".png"), "wb") as f:
-                f.write(base64.b64decode(data))
+                f.write(pngs[0])
+
+
+def write_notebook_figures(out):
+    """NOTEBOOK_FIGURES -> assets/figures/NAME.png (fails if a plot is missing)."""
+    fig_out = os.path.join(out, "assets", "figures")
+    os.makedirs(fig_out, exist_ok=True)
+    for site_name, (name, k) in NOTEBOOK_FIGURES.items():
+        with open(os.path.join(fig_out, site_name + ".png"), "wb") as f:
+            f.write(notebook_pngs(name)[k])
 
 
 def gallery(dst, out):
@@ -161,6 +185,7 @@ def main(out):
     targets = site_targets()
     cite = citation()
     write_figures(out)
+    write_notebook_figures(out)
     write_thumbnails(out)
 
     for src, (dst, fields) in PAGES.items():

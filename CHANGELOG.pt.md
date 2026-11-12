@@ -53,6 +53,12 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   como é tratada cada secção NACE (mercantil ou não mercantil; a distinção
   entre trabalho produtivo e improdutivo que o modelo não faz), como se
   contam os independentes, e o que faz o piso de `e`.
+- Site: a página inicial (nas duas línguas) tem um bloco "Resultados
+  empíricos" com gráficos dos notebooks 10, 11 e 13 (mobilidade do capital
+  e reinvestimento), tirados dos notebooks executados por `build_site.py`
+  (`NOTEBOOK_FIGURES`), e uma ligação a `docs/NATIONAL_ACCOUNTS.pt.md`,
+  que passa a ser uma página do site. A secção dos notebooks já não diz
+  que todos correm com dados sintéticos.
 - Notebook 13, `13_investment_floor_and_market_prices`: a forma linear
   da parte reinvestida estimada em todas as linhas do painel da UE,
   incluindo os anos de prejuízo (`η̂` = 0,15, erro 0,18; `μ̂` = 0,063),
