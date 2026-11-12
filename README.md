@@ -84,7 +84,7 @@ one.*
 [`notebooks/`](notebooks/README.md) has worked examples, in English, that
 run offline:
 
-- twelve Jupyter notebooks, committed with their outputs so they can be read on
+- thirteen Jupyter notebooks, committed with their outputs so they can be read on
   GitHub: accumulation basics, values and prices, calibration and wage
   shocks, coupled sectors and automatic differentiation, TSSI valuation,
   balanced growth, cycles and chaos, profit rates across the EU27 from
@@ -92,7 +92,8 @@ run offline:
   coefficient `μ` estimated from EU capital flows, and the same coefficient
   between Portugal's sectors and between the sectors of 26 EU countries,
   from Eurostat's accounts by industry, the model's investment
-  function on the same panel, and Shaikh's incremental rate of profit;
+  function on the same panel, Shaikh's incremental rate of profit, and
+  the floor on investment and reinvestment at market prices;
 - three interactive Pluto notebooks with sliders: the wage–profit frontier,
   accumulation with coupling and wage shocks, and accumulation cycles in
   the cross-dual model.
@@ -310,7 +311,7 @@ marxkapital/
 │   └── notebooks.jl        # smoke test: runs every notebook offline
 ├── examples/demo.jl
 ├── notebooks/              # worked examples (see notebooks/README.md)
-│   ├── jupyter/            # twelve narrative notebooks, with outputs
+│   ├── jupyter/            # thirteen narrative notebooks, with outputs
 │   └── pluto/              # three interactive notebooks
 ├── docs/LIMITATIONS.md     # required reading (+ .pt.md in Portuguese)
 ├── docs/NATIONAL_ACCOUNTS.md  # national accounts → C, V, S (+ .pt.md)
@@ -322,7 +323,7 @@ marxkapital/
 │   ├── jacobian_bifurcation.jl # exact Jacobian, bifurcations, TSSI (offline)
 │   ├── accumulation_bifurcation.jl # balanced growth, Hopf, cycles (offline)
 │   └── figures/
-├── data/                   # static extracts for notebooks 7–12 and their build scripts; other downloads not version-controlled
+├── data/                   # static extracts for notebooks 7–13 and their build scripts; other downloads not version-controlled
 ├── install_deps.jl
 ├── Project.toml
 ├── CHANGELOG.md

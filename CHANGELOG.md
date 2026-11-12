@@ -52,6 +52,15 @@ Format based on Keep a Changelog. Semantic versioning.
   how each NACE section is treated (market or non-market; the
   productive/unproductive distinction the model does not make), how the
   self-employed are counted, and what the floor on `e` does.
+- Notebook 13, `13_investment_floor_and_market_prices`: the linear
+  reinvestment form estimated on every row of the EU panel, loss years
+  included (`η̂` = 0.15, se 0.18; `μ̂` = 0.063), against notebook 11's
+  calibrated `η` = 1; no exit of capital through investment (the exit
+  coefficient has the wrong sign), but a floor on gross investment at
+  0.69 of depreciation (se 0.18); and, with market prices, a stable
+  interior balanced growth path of Portugal's market sectors for every
+  `η` ≤ 0.9, with the floor dampening the fall of capital after a price
+  shock.
 - Notebook 12, `12_incremental_profit_rates`: Shaikh's claim that
   competition equalizes incremental, not average, rates of profit, on the
   EU sectoral panel. Incremental-rate gaps are mostly transitory (4–14%

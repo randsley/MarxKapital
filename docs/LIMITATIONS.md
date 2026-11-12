@@ -643,9 +643,15 @@ algebraically.
   follows own surplus at about a tenth of the average share, which
   calibrates `η` ≈ 1 and gives `μ̂` = 0.13 (se 0.04). In the model, `η` = 1
   with that `μ` lets unprofitable sectors accumulate until their profit
-  rate reaches zero: the calibrated investment function needs an exit for
-  unprofitable capital, and `η` in the cross-dual system, before it can be
-  used for long-run simulations.
+  rate reaches zero. Notebook 13 estimates the linear reinvestment form
+  (below) on every row, the loss years included: `η̂` = 0.15 (se 0.18;
+  0.09–0.45 across variants) and `μ̂` = 0.063 (se 0.011), so own surplus
+  matters more than notebook 11's calibration assumed. Capital does not
+  leave unprofitable sectors through investment (the exit coefficient has
+  the wrong sign at every hurdle); instead gross investment has a floor
+  near replacement, `θ̂` = 0.69 (se 0.18) of depreciation in the loss
+  years. With market prices, Portugal's market sectors then have a stable
+  interior balanced growth path for every `η` ≤ 0.9; only `η` = 1 has none.
 - **The mobility term uses the average rate of profit, and the data agree.**
   Shaikh (2016, ch. 7) argues that competition equalizes the incremental
   rate, the return on new investment, so average rates may differ forever.
@@ -669,10 +675,15 @@ algebraically.
   the default) and a piecewise-constant multiplier `m(t)` (`σ_schedule`).
   Notebooks 10–11 motivate `η`: under a fixed share the EU panel gives a
   negative `μ̂`. The gross reinvestment share did not change after 2008,
-  so the data do not call for a schedule; it is there for scenarios. Only in the
-  coupled system without market prices: in the cross-dual system profits at
-  market prices can be ≤ 0, so `(r̄/rᵢ)^η` is undefined there (not yet
-  supported). A schedule makes the system non-autonomous, so the
+  so the data do not call for a schedule; it is there for scenarios. In the
+  cross-dual system profits at market prices can be ≤ 0, so `(r̄/rᵢ)^η` is
+  undefined there; it needs `reinvestment_form = :linear`,
+  `σ_c,ᵢ·m(t)·[(1−η)Πᵢ + η·r̄·Kᵢ]` with `r̄ = ΣΠ/ΣK`, which is defined
+  for losses and estimated in notebook 13. Two further options cover what
+  happens when profits collapse: `investment_floor = θ` (gross investment
+  ≥ `θ·δ·C`, supported by the data) and `exit_rate`/`exit_hurdle`
+  (scrapping below a hurdle; not supported by the investment data, kept
+  for scenarios). A schedule makes the system non-autonomous, so the
   balanced-growth and bifurcation tools reject it.
 - **`μ_v` (mobility of variable capital) is off by default.** Accumulation
   cycles appear from `μ_v ≈ 0.5–1.3` (supercritical Hopf in all 30 random

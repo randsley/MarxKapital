@@ -642,9 +642,17 @@ afirmado algebricamente.
   investimento segue o excedente próprio a cerca de um décimo da parte
   média, o que calibra `η` ≈ 1 e dá `μ̂` = 0,13 (erro 0,04). No modelo,
   `η` = 1 com esse `μ` deixa os setores pouco rentáveis acumular até a taxa
-  de lucro chegar a zero: a função de investimento calibrada precisa de uma
-  saída para o capital pouco rentável, e de `η` no sistema cruzado, antes
-  de poder ser usada em simulações de longo prazo.
+  de lucro chegar a zero. O notebook 13 estima a forma linear da parte
+  reinvestida (abaixo) em todas as linhas, incluindo os anos de prejuízo:
+  `η̂` = 0,15 (erro 0,18; 0,09–0,45 nas variantes) e `μ̂` = 0,063 (erro
+  0,011), pelo que o excedente próprio conta mais do que a calibração do
+  notebook 11 supunha. O capital não sai dos setores pouco rentáveis pelo
+  investimento (o coeficiente de saída tem o sinal errado em todos os
+  limiares); em vez disso, o investimento bruto tem um piso perto da
+  reposição, `θ̂` = 0,69 (erro 0,18) das amortizações nos anos de
+  prejuízo. Com preços de mercado, os setores mercantis de Portugal têm
+  então um crescimento equilibrado interior estável para todo `η` ≤ 0,9;
+  só `η` = 1 não o tem.
 - **O termo de mobilidade usa a taxa de lucro média, e os dados
   concordam.** Shaikh (2016, cap. 7) defende que a concorrência iguala a
   taxa incremental, o rendimento do investimento novo, pelo que as taxas
@@ -671,11 +679,17 @@ afirmado algebricamente.
   (`σ_schedule`). Os notebooks 10–11 justificam `η`: com uma parte fixa o
   painel da UE dá um `μ̂` negativo. A parte reinvestida bruta não mudou
   depois de 2008, pelo que os dados não pedem um calendário; fica
-  disponível para cenários. Só no sistema acoplado sem preços de mercado: no sistema
-  cruzado os lucros a preços de mercado podem ser ≤ 0, pelo que `(r̄/rᵢ)^η`
-  não está definido (ainda não suportado). Um calendário torna o sistema não
-  autónomo, pelo que as ferramentas de crescimento equilibrado e de
-  bifurcação o rejeitam.
+  disponível para cenários. No sistema cruzado os lucros a preços de
+  mercado podem ser ≤ 0, pelo que `(r̄/rᵢ)^η` não está definido; aí é
+  preciso `reinvestment_form = :linear`,
+  `σ_c,ᵢ·m(t)·[(1−η)Πᵢ + η·r̄·Kᵢ]` com `r̄ = ΣΠ/ΣK`, que está definida com
+  prejuízos e é estimada no notebook 13. Duas outras opções tratam do que
+  acontece quando os lucros caem: `investment_floor = θ` (investimento
+  bruto ≥ `θ·δ·C`, apoiado pelos dados) e `exit_rate`/`exit_hurdle`
+  (abate abaixo de um limiar; não apoiado pelos dados do investimento,
+  mantido para cenários). Um calendário torna o sistema não autónomo, pelo
+  que as ferramentas de crescimento equilibrado e de bifurcação o
+  rejeitam.
 - **`μ_v` (mobilidade do capital variável) está desligado por omissão.**
   Os ciclos de acumulação aparecem a partir de `μ_v ≈ 0.5–1.3` (Hopf
   supercrítico em todas as 30 economias aleatórias testadas, com

@@ -53,6 +53,15 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   como é tratada cada secção NACE (mercantil ou não mercantil; a distinção
   entre trabalho produtivo e improdutivo que o modelo não faz), como se
   contam os independentes, e o que faz o piso de `e`.
+- Notebook 13, `13_investment_floor_and_market_prices`: a forma linear
+  da parte reinvestida estimada em todas as linhas do painel da UE,
+  incluindo os anos de prejuízo (`η̂` = 0,15, erro 0,18; `μ̂` = 0,063),
+  contra o `η` = 1 calibrado no notebook 11; nenhuma saída de capital pelo
+  investimento (o coeficiente de saída tem o sinal errado), mas um piso do
+  investimento bruto em 0,69 das amortizações (erro 0,18); e, com preços
+  de mercado, um crescimento equilibrado interior estável dos setores
+  mercantis de Portugal para todo `η` ≤ 0,9, com o piso a amortecer a
+  queda do capital depois de um choque de preço.
 - Notebook 12, `12_incremental_profit_rates`: a tese de Shaikh de que a
   concorrência iguala as taxas de lucro incrementais, e não as médias, no
   painel setorial da UE. Os diferenciais da taxa incremental são sobretudo
