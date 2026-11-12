@@ -416,6 +416,109 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test_throws ArgumentError calibrate_portugal_model(year = 2022, self_employed = :other)
     end
 
+    @testset "Capital mobility estimation" begin
+        rng = MersenneTwister(11)
+        # demean_fe equals OLS residuals on explicit dummies (unbalanced panel)
+        a = repeat(1:4, inner = 6); b = repeat(1:6, outer = 4)
+        keep = trues(24); keep[[2, 9, 15, 20]] .= false
+        a, b = a[keep], b[keep]
+        c = rand(rng, 1:3, length(a))
+        v = randn(rng, length(a))
+        onehot(g) = Float64[gi == l for gi in g, l in sort(unique(g))]
+        for (groups, D) in (((a, b), hcat(ones(length(a)), onehot(a)[:, 2:end], onehot(b)[:, 2:end])),
+                            ((a, b, c), hcat(ones(length(a)), onehot(a)[:, 2:end], onehot(b)[:, 2:end],
+                                             onehot(c)[:, 2:end])))
+            @test demean_fe(v, groups...) ≈ v - D * (D \ v) atol = 1e-9
+        end
+        @test demean_fe(v, a) ≈ v .- [mean(v[a .== ai]) for ai in a]
+        @test _absorbed([repeat(1:5, inner = 7), repeat(1:7, outer = 5)]) == 5 + 7 - 1
+        # two countries whose effects never meet: one redundancy per country
+        @test _absorbed([[1, 1, 2, 2, 3, 3, 4, 4], [1, 2, 1, 2, 3, 4, 3, 4]]) == 4 + 4 - 2
+
+        # the panel, built per country, from a hand-made two-country extract
+        secs, yrs = ["A", "C", "J"], 2000:2005
+        raw = DataFrame(geo = String[], section = String[], year = Int[], GVA = Float64[],
+                        compensation = Float64[], CFC = Float64[], GFCF = Float64[],
+                        capital_stock = Float64[], employment = Float64[], employees = Float64[])
+        for g in ("AA", "BB"), s in secs, y in yrs
+            K = 100 + 50rand(rng)
+            push!(raw, (g, s, y, 20 + 5rand(rng), 8 + 2rand(rng), 0.05K, 0.05K + 3randn(rng), K,
+                        12 + rand(rng), 10.0))
+        end
+        P = compute_mobility_panel(raw; sections = secs)
+        @test nrow(P) == 2 * length(secs) * (length(yrs) - 2)
+        @test sort(unique(P.year)) == collect(2002:2005)
+        for sub in groupby(P, [:geo, :year])                 # Σ R = 0 in every country-year
+            @test abs(sum(sub.R)) < 1e-9 * sum(abs, sub.R)
+        end
+        # one entry by hand: country BB, sector C, 2003
+        cell(s, y, col) = raw[(raw.geo .== "BB") .& (raw.section .== s) .& (raw.year .== y), col][1]
+        S(s, y) = cell(s, y, :GVA) - cell(s, y, :compensation) - cell(s, y, :CFC)
+        rr(s) = S(s, 2002) / (cell(s, 2001, :capital_stock) + cell(s, 2002, :compensation))
+        r̄ = sum(rr(s) * cell(s, 2001, :capital_stock) for s in secs) /
+             sum(cell(s, 2001, :capital_stock) for s in secs)
+        σ = sum(cell(s, 2003, :GFCF) - cell(s, 2003, :CFC) for s in secs) / sum(S(s, 2003) for s in secs)
+        R = cell("C", 2003, :GFCF) - cell("C", 2003, :CFC) - σ * S("C", 2003)
+        row = P[(P.geo .== "BB") .& (P.section .== "C") .& (P.year .== 2003), :][1, :]
+        @test row.gap ≈ 100 * (rr("C") - r̄)
+        @test row.y ≈ 100 * R / cell("C", 2002, :capital_stock)
+        @test row.σ ≈ σ && row.K == cell("C", 2002, :capital_stock)
+        # one country without a geo column is the same panel
+        P1 = compute_mobility_panel(select(raw[raw.geo .== "BB", :], Not(:geo)); sections = secs)
+        @test P1.y ≈ P[P.geo .== "BB", :y] && all(P1.geo .== "")
+        @test compute_mobility_panel(raw; sections = secs, countries = ["AA"]).y ≈ P[P.geo .== "AA", :y]
+        Pi = compute_mobility_panel(raw; sections = secs, self_employed = :imputed, own = :lagged)
+        @test nrow(Pi) == nrow(P) && !(Pi.y ≈ P.y)
+        @test_throws ArgumentError compute_mobility_panel(raw; sections = secs, own = :other)
+        @test_throws ArgumentError compute_mobility_panel(select(raw, Not(:geo)); sections = secs,
+                                                          countries = ["AA"])
+        @test_throws ErrorException compute_mobility_panel(raw[.!((raw.section .== "J") .& (raw.year .== 2003)), :];
+                                                           sections = secs)
+        @test_throws ErrorException compute_mobility_panel(raw[raw.year .!= 2003, :]; sections = secs)
+
+        # single balanced country: the matrix formulas of notebook 9
+        N, T = 15, 22
+        Y, X = randn(rng, N, T), randn(rng, N, T) .+ 0.3 .* (1:N)
+        Pm = DataFrame(geo = "", section = repeat(string.(1:N), outer = T), year = repeat(1:T, inner = N),
+                       y = vec(Y), gap = vec(X))
+        tw(M) = M .- mean(M; dims = 2) .- mean(M; dims = 1) .+ mean(M)
+        Yd, Xd = tw(Y), tw(X)
+        bm = dot(Xd, Yd) / dot(Xd, Xd)
+        U = Yd .- bm .* Xd
+        h = vec(sum(Xd .* U; dims = 1))
+        Sdk = sum(abs2, h) + 2 * sum((1 - l / 3) * sum(h[l+1:end] .* h[1:end-l]) for l in 1:2)
+        est = estimate_mobility(Pm; effects = (:section, :year))
+        @test est.μ ≈ bm
+        @test est.se ≈ sqrt(sum(abs2, U) / (N * T - N - T) / dot(Xd, Xd))
+        @test est.se_DK ≈ sqrt(Sdk) / dot(Xd, Xd)
+        @test isnan(est.se_cluster) && est.countries == 1
+        @test estimate_mobility(Pm).μ ≈ bm                  # default effects, one country
+        my, mx = vec(mean(Y; dims = 2)), vec(mean(X; dims = 2))
+        Xb = hcat(ones(N), mx); βb = Xb \ my; ub = my - Xb * βb
+        btw = estimate_mobility_between(Pm)
+        @test btw.μ ≈ βb[2] && btw.se ≈ sqrt(inv(Xb'Xb)[2, 2] * sum(abs2, ub) / (N - 2)) && btw.n == N
+        @test_throws ArgumentError estimate_mobility(Pm; effects = (:sector,))
+
+        # synthetic multi-country panel with known μ: country-year shocks move
+        # gaps and transfers together, so only country × year effects remove them
+        μ0, G, Ns, Ty = 0.25, 8, 10, 25
+        rows = DataFrame(geo = String[], section = String[], year = Int[], y = Float64[], gap = Float64[])
+        αcs, ψst = randn(rng, G, Ns), randn(rng, Ns, Ty)
+        for g in 1:G
+            λ = 3 .* randn(rng, Ty)                         # national credit cycle
+            load = randn(rng, Ns)                            # sectors exposed to it unequally
+            for s in 1:Ns, t in 1:Ty
+                gap = αcs[g, s] + load[s] * λ[t] + ψst[s, t] + randn(rng)
+                y = μ0 * gap + 2αcs[g, s] + 4λ[t] + 1.5ψst[s, t] + 0.5randn(rng)
+                push!(rows, ("G$g", "S$s", 2000 + t, y, gap))
+            end
+        end
+        full = estimate_mobility(rows; effects = (:geo_section, :geo_year, :section_year))
+        @test abs(full.μ - μ0) < 4 * full.se_cluster && abs(full.μ - μ0) < 0.05
+        @test full.countries == G && full.n == G * Ns * Ty
+        @test abs(estimate_mobility(rows; effects = (:geo_section, :year)).μ - μ0) > 0.1
+    end
+
     @testset "Wage-profit frontier" begin
         A = create_technical_matrix(6, seed = 5)
         l = fill(0.4, 6) .+ 0.1 .* (1:6) ./ 6

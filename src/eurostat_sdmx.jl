@@ -60,35 +60,47 @@ const NACE_MEDIUM_GROUPS = [
 
 """
 Calls Eurostat's SDMX API for `dataflow`/`key_` and returns a
-Dict{String,Dict{Int,Float64}} NACE section → (year → value). Filters the
-response to rows whose `nace_r2` is a 1-letter section (A-S); ignores the
-finer A64 subdivisions and the T/U sections (household and extraterritorial
-activities, irrelevant here). A failure (network, format, no data) returns
-an empty dictionary; it never throws.
+Dict{String,Dict{String,Dict{Int,Float64}}} country (`geo`) → NACE section →
+(year → value). The key may name several countries (`…AT+BE+PT`) or leave
+`geo` open. Filters the response to rows whose `nace_r2` is a 1-letter section
+(A-S); ignores the finer A64 subdivisions and the T/U sections (household and
+extraterritorial activities, irrelevant here). A failure (network, format, no
+data) returns an empty dictionary; it never throws.
 """
-function _fetch_eurostat_sections(dataflow::String, key_::String)
+function _fetch_eurostat_sections_by_geo(dataflow::String, key_::String; readtimeout = 30)
+    none = Dict{String, Dict{String, Dict{Int, Float64}}}()
     url = "$EUROSTAT_SDMX_BASE_URL/data/ESTAT,$dataflow,1.0/$key_?format=SDMX-CSV"
     try
         resp = HTTP.get(url, ["Accept-Encoding" => "identity"],
-                        retry = true, readtimeout = 30, status_exception = false)
-        resp.status == 200 || return Dict{String, Dict{Int, Float64}}()
+                        retry = true, readtimeout = readtimeout, status_exception = false)
+        resp.status == 200 || return none
         df = CSV.read(IOBuffer(resp.body), DataFrame)
-        (nrow(df) == 0 || !("nace_r2" in names(df)) ||
-         !("TIME_PERIOD" in names(df)) || !("OBS_VALUE" in names(df))) &&
-            return Dict{String, Dict{Int, Float64}}()
+        (nrow(df) == 0 || !all(c -> c in names(df), ("nace_r2", "geo", "TIME_PERIOD", "OBS_VALUE"))) &&
+            return none
 
-        result = Dict{String, Dict{Int, Float64}}()
+        result = none
         for row in eachrow(df)
             section = String(row.nace_r2)
             (length(section) == 1 && section in NACE_SECTIONS) || continue
             ismissing(row.OBS_VALUE) && continue
-            d = get!(result, section, Dict{Int, Float64}())
+            d = get!(get!(result, String(row.geo), Dict{String, Dict{Int, Float64}}()),
+                     section, Dict{Int, Float64}())
             d[Int(row.TIME_PERIOD)] = Float64(row.OBS_VALUE)
         end
         return result
     catch
-        return Dict{String, Dict{Int, Float64}}()
+        return none
     end
+end
+
+"""
+Like `_fetch_eurostat_sections_by_geo`, for a key naming a single country:
+returns a Dict{String,Dict{Int,Float64}} NACE section → (year → value), empty
+on any failure.
+"""
+function _fetch_eurostat_sections(dataflow::String, key_::String)
+    by_geo = _fetch_eurostat_sections_by_geo(dataflow, key_)
+    length(by_geo) == 1 ? only(values(by_geo)) : Dict{String, Dict{Int, Float64}}()
 end
 
 """Like `_fetch_eurostat_sections`, but already reduced to a single year (Dict{String,Float64})."""

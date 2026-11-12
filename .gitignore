@@ -14,7 +14,7 @@ data/*.xlsx
 !data/.gitkeep
 # ...except the small static extracts the notebooks read (data/build_*.jl)
 !data/ameco_eu27.csv
-!data/eurostat_pt_sectors.csv
+!data/eurostat_eu_sectors.csv
 
 # Saídas / gráficos
 *.png

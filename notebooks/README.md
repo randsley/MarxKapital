@@ -5,7 +5,7 @@ Worked examples of MarxKapital in two formats:
 - **`jupyter/`**: nine narrative notebooks, committed with their outputs, so they can be read on GitHub without running anything.
 - **`pluto/`**: three interactive [Pluto](https://plutojl.org) notebooks with sliders, which recompute as you change the parameters.
 
-Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthetic defaults; notebooks 7 and 8 use real AMECO data from a static extract, `data/ameco_eu27.csv` (rebuild it with `julia data/build_ameco_eu.jl`, which needs network; provenance in `data/ameco_eu27_PROVENANCE.md`), and notebook 9 real Eurostat sectoral accounts for Portugal from `data/eurostat_pt_sectors.csv` (`julia data/build_eurostat_pt_sectors.jl`; provenance in `data/eurostat_pt_sectors_PROVENANCE.md`). The prose and the MarxKapital API are both in English.
+Everything runs offline. Notebooks 1–6 and the Pluto notebooks use the synthetic defaults; notebooks 7 and 8 use real AMECO data from a static extract, `data/ameco_eu27.csv` (rebuild it with `julia data/build_ameco_eu.jl`, which needs network; provenance in `data/ameco_eu27_PROVENANCE.md`), and notebook 9 real Eurostat sectoral accounts for Portugal from `data/eurostat_eu_sectors.csv` (26 EU countries; `julia data/build_eurostat_sectors.jl`; provenance in `data/eurostat_eu_sectors_PROVENANCE.md`). The prose and the MarxKapital API are both in English.
 
 ## Jupyter
 

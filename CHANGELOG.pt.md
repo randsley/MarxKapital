@@ -9,11 +9,23 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 ## [Não publicado]
 
 ### Acrescentado
+- `src/mobility_estimation.jl`: `compute_mobility_panel` constrói o painel
+  da equação de mobilidade do capital a partir das contas por ramo, país a
+  país (transferência `R = I − σS`, que soma zero em cada país-ano, e
+  desvio face à taxa de lucro média ponderada pelo capital);
+  `estimate_mobility` estima `μ` com qualquer conjunto de efeitos fixos
+  (`demean_fe`, projeções alternadas) e erros de Driscoll–Kraay e
+  agrupados por país; `estimate_mobility_between` dá a estimativa entre
+  unidades. O notebook 9 passa a usá-las (mesmos resultados).
+- `data/eurostat_eu_sectors.csv`: contas por ramo do Eurostat para as 19
+  secções NACE de 26 países da UE (UE27 sem Malta), construído por
+  `data/build_eurostat_sectors.jl` com `_fetch_eurostat_sections_by_geo`
+  (um pedido por série para todos os países), com um ficheiro de
+  proveniência. Substitui o extrato só de Portugal; as linhas de Portugal
+  não mudam.
 - Notebook 9, `09_sectoral_mobility`: o coeficiente de mobilidade do capital
   `μ` entre os 15 setores de mercado de Portugal, 2002–2023, sem rede, a
-  partir de `data/eurostat_pt_sectors.csv` (contas por ramo do Eurostat,
-  construído por `data/build_eurostat_pt_sectors.jl`, com um ficheiro de
-  proveniência). A transferência é o investimento líquido para além de uma
+  partir das linhas de Portugal de `data/eurostat_eu_sectors.csv`. A transferência é o investimento líquido para além de uma
   parte comum do excedente próprio. Dentro de cada setor `μ̂` ≈ 0,11 (erro de
   Driscoll–Kraay 0,05), mas −0,19 a −0,35 com os trabalhadores por conta
   própria imputados, porque o excedente entra dos dois lados; entre setores
@@ -27,7 +39,7 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   `xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)`. `_gross_output` centraliza a reconstrução,
   e `_ensure_output_admissibility` aceita `m`. Portugal: a parte de setores
   racionados não muda, e a acumulação sobe 8% (10 setores) e 31% (19).
-  Opcional. 312 testes.
+  Opcional.
 - Notebook 7, `07_eu_profit_rates`: `e`, `k` e `r` para os 27 Estados-Membros
   da UE e o agregado UE27, 1995–2024, a partir de dados reais do AMECO, sem
   rede. Ajusta as remunerações aos trabalhadores por conta própria, decompõe

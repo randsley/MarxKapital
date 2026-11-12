@@ -454,7 +454,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 312 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 347 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,

@@ -9,10 +9,22 @@ Format based on Keep a Changelog. Semantic versioning.
 ## [Unreleased]
 
 ### Added
+- `src/mobility_estimation.jl`: `compute_mobility_panel` builds the panel
+  of the capital-mobility equation from sectoral accounts, per country
+  (transfer `R = I − σS` summing to zero in every country-year, gap to the
+  capital-weighted mean profit rate); `estimate_mobility` estimates `μ`
+  with any set of fixed effects (`demean_fe`, alternating projections),
+  Driscoll–Kraay and country-clustered standard errors;
+  `estimate_mobility_between` gives the between estimate. Notebook 9 now
+  uses them (same results).
+- `data/eurostat_eu_sectors.csv`: Eurostat accounts by industry for the
+  19 NACE sections of 26 EU countries (EU27 without Malta), built by
+  `data/build_eurostat_sectors.jl` with `_fetch_eurostat_sections_by_geo`
+  (one request per series for every country), with a provenance file. It
+  replaces the Portugal-only extract; Portugal's rows are unchanged.
 - Notebook 9, `09_sectoral_mobility`: the capital-mobility coefficient `μ`
   between Portugal's 15 market sectors, 2002–2023, offline, from
-  `data/eurostat_pt_sectors.csv` (Eurostat accounts by industry, built by
-  `data/build_eurostat_pt_sectors.jl`, with a provenance file). The
+  Portugal's rows of `data/eurostat_eu_sectors.csv`. The
   transfer is net investment beyond a common share of own surplus. Within
   sectors `μ̂` ≈ 0.11 (Driscoll–Kraay se 0.05), but −0.19 to −0.35 with the
   self-employed imputed, because the surplus enters both sides; between
@@ -25,7 +37,7 @@ Format based on Keep a Changelog. Semantic versioning.
   the real domestic matrix `xⱼ = Wⱼ/(1 − Σᵢ A[i,j] − mⱼ)`. `_gross_output`
   centralizes the reconstruction, and `_ensure_output_admissibility` takes
   `m`. Portugal: the share of rationed sectors does not change, and
-  accumulation rises by 8% (10 sectors) and 31% (19). Opt-in. 312 tests.
+  accumulation rises by 8% (10 sectors) and 31% (19). Opt-in.
 - Notebook 7, `07_eu_profit_rates`: `e`, `k` and `r` for the 27 EU member
   states and the EU27 aggregate, 1995–2024, from real AMECO data, offline.
   It adjusts compensation for the self-employed, splits the change in `r`

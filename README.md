@@ -284,6 +284,7 @@ marxkapital/
 │   ├── bifurcation.jl      # continuation and bifurcations: maps, Hopf, limit cycles (BifurcationKit)
 │   ├── calibration_pt.jl   # Portuguese (INE) calibration, synthetic and real (Eurostat)
 │   ├── ameco.jl            # AMECO: synthetic, calibration, comparison, series
+│   ├── mobility_estimation.jl # estimating capital mobility μ from sectoral accounts
 │   ├── ameco_sdmx.jl       # official AMECO SDMX API
 │   ├── ameco_download.jl   # automatic download + TXT/CSV parser (legacy)
 │   ├── eurostat_sdmx.jl    # Eurostat SDMX API: real sectoral data + IOT
@@ -329,7 +330,7 @@ derived from the spectral radius of `Aᵀ`.
 julia --project=. test/runtests.jl
 ```
 
-312 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
+347 tests, run automatically in CI (GitHub Actions, Julia 1.10 and 1) on
 every push to `main` — see `.github/workflows/test.yml`. CI then runs every
 notebook (`julia test/notebooks.jl`, see `notebooks/README.md`). The suite covers
 the default synthetic/opt-in paths and runs fully offline; the real-data
