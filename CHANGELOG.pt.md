@@ -12,6 +12,9 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
 - `docs/LIMITATIONS.md` abre com uma tabela-resumo (estado e o que ainda
   está em aberto, por item), cada secção começa com um resumo curto do
   estado atual, e a secção 1 divide-se em subsecções por mecanismo.
+- `docs/PROJECT_STATUS.md` é reescrito para a versão 1.2.0: o que o
+  modelo faz, os dados, os notebooks e os testes, e o que continua em
+  aberto. Tinha parado na versão 0.6.0; a história está neste registo.
 
 ## [1.2.0] — 2026-11-13
 

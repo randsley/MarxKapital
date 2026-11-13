@@ -12,6 +12,9 @@ Format based on Keep a Changelog. Semantic versioning.
 - `docs/LIMITATIONS.md` opens with a summary table (status and what is
   still open, per item), each section starts with a short summary of where
   things stand, and section 1 is split into subsections by mechanism.
+- `docs/PROJECT_STATUS.md` is rewritten for version 1.2.0: what the model
+  does, its data, notebooks and tests, and what is still open. It had
+  stopped at version 0.6.0; the history is in this changelog.
 
 ## [1.2.0] — 2026-11-13
 
