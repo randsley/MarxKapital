@@ -254,6 +254,15 @@ Format based on Keep a Changelog. Semantic versioning.
     sectoral panel (Table 5, Figure 12), from the new offline script
     `paper/estimation.jl`, including average against incremental rates of
     profit (Shaikh);
+  - Sections 5.2 and 6.1 take the capital stock at current cost
+    (`valuation = :current_cost`) as the reference for Portugal's and
+    Spain's profit rates, recast the unadjusted series as the valuation
+    inconsistency it is, drop the "investment-deflated" variant (it
+    deflated output and wages by different indices, so its `e` was not
+    the current-price one, and it set the old 15.1% upper bound), report
+    the self-employed adjustment, and add the EU27 from the static AMECO
+    extract (new offline script `paper/eu_profit_rates.jl`). The numbers
+    are macros (`figures/ameco_stats.tex`, `figures/eu_stats.tex`);
   - Section 5.6 places the estimated `μ_v` against the Hopf point of
     Portugal's calibrated economy;
   - Section 5.7 gains Table 4b (imported inputs, the netted balance, the

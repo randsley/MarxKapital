@@ -24,51 +24,77 @@ println("="^70)
 # Figure 1 — aggregate profit-rate trend, Portugal, 1996-2022 (real AMECO data)
 # ----------------------------------------------------------------------------
 
-println("\n[1/6] Time series (e, k, r), Portugal 1996-2022, two valuation conventions...")
+println("\n[1/6] Time series (e, k, r), Portugal and Spain 1996-2022, four valuation conventions...")
 years = 1996:2022
 data_pt = fetch_ameco_data("Portugal", years = years, method = :sdmx)
-st_current    = analyze_time_series_with_data(data_pt; valuation = :current)
-st_consistent = analyze_time_series_with_data(data_pt; valuation = :consistent)
-
-p1 = plot(years, st_current.e, xlabel = "Year", ylabel = "e", title = "Rate of exploitation",
-          label = "current-price V, GVA", lw = 2, color = :steelblue)
-plot!(p1, years, st_consistent.e, label = "deflated V, GVA", lw = 2, color = :steelblue,
-      linestyle = :dash)
-p2 = plot(years, st_current.k, xlabel = "Year", ylabel = "k", title = "Organic composition",
-          label = "current-price V, GVA", lw = 2, color = :firebrick)
-plot!(p2, years, st_consistent.k, label = "deflated V, GVA", lw = 2, color = :firebrick,
-      linestyle = :dash)
-p3 = plot(years, st_current.r .* 100, xlabel = "Year", ylabel = "r (%)", title = "Profit rate",
-          label = "current-price V, GVA", lw = 2, color = :seagreen)
-plot!(p3, years, st_consistent.r .* 100, label = "deflated V, GVA", lw = 2, color = :seagreen,
-      linestyle = :dash)
-fig1 = plot(p1, p2, p3, layout = (1, 3), size = (1350, 380), margin = 6Plots.mm,
-            legend = :outerbottom, legendcolumns = 2)
-savefig(fig1, joinpath(FIG_DIR, "fig1_time_series.pdf"))
-println("  ✓ [corrente]    e: $(round(st_current.e[1],digits=3)) -> $(round(st_current.e[end],digits=3))  ",
-        "k: $(round(st_current.k[1],digits=2)) -> $(round(st_current.k[end],digits=2))  ",
-        "r: $(round(st_current.r[1]*100,digits=2))% -> $(round(st_current.r[end]*100,digits=2))%")
-println("  ✓ [consistent] e: $(round(st_consistent.e[1],digits=3)) -> $(round(st_consistent.e[end],digits=3))  ",
-        "k: $(round(st_consistent.k[1],digits=2)) -> $(round(st_consistent.k[end],digits=2))  ",
-        "r: $(round(st_consistent.r[1]*100,digits=2))% -> $(round(st_consistent.r[end]*100,digits=2))%")
-
-println("\n[1b/6] Portugal vs. Spain, consistent valuation...")
 data_es = fetch_ameco_data("Spain", years = years, method = :sdmx)
-st_es = analyze_time_series_with_data(data_es; valuation = :consistent)
-fig1b = plot(years, st_consistent.r .* 100, xlabel = "Year", ylabel = "r (%)",
-             title = "Profit rate, consistent valuation: Portugal vs. Spain",
-             label = "Portugal", lw = 2, color = :seagreen, size = (700, 420), margin = 5Plots.mm)
-plot!(fig1b, years, st_es.r .* 100, label = "Spain", lw = 2, color = :darkorange)
-savefig(fig1b, joinpath(FIG_DIR, "fig1b_pt_vs_es.pdf"))
-println("  ✓ Spain [consistent] e: $(round(st_es.e[1],digits=3)) -> $(round(st_es.e[end],digits=3))  ",
-        "k: $(round(st_es.k[1],digits=2)) -> $(round(st_es.k[end],digits=2))  ",
-        "r: $(round(st_es.r[1]*100,digits=2))% -> $(round(st_es.r[end]*100,digits=2))%")
+# :current mixes constant-price C with current-price V, Y (the inconsistency);
+# :consistent deflates V, Y, CFC by the GDP deflator; :current_cost revalues C
+# with the investment deflator (the reference); :consistent_gfcf deflates V,
+# CFC by the investment deflator but Y by the GDP deflator, so its e is not the
+# current-price e (reported to explain the earlier draft's 15.1% upper bound).
+conventions = (Cur = :current, Gdp = :consistent, Cc = :current_cost, Mix = :consistent_gfcf)
+series = Dict((c, v, se) => analyze_time_series_with_data(d; valuation = conventions[v],
+                                                          self_employed = se)
+              for (c, d) in (("Pt", data_pt), ("Es", data_es)),
+                  v in keys(conventions), se in (:excluded, :imputed))
+st_current    = series[("Pt", :Cur, :excluded)]
+st_consistent = series[("Pt", :Gdp, :excluded)]
+st_cc         = series[("Pt", :Cc, :excluded)]
 
-println("\n[1c/6] Robustness: GDP deflator vs. investment-goods deflator, Portugal...")
-st_gfcf = analyze_time_series_with_data(data_pt; valuation = :consistent_gfcf)
-println("  ✓ [consistente_fbcf] e: $(round(st_gfcf.e[1],digits=3)) -> $(round(st_gfcf.e[end],digits=3))  ",
-        "k: $(round(st_gfcf.k[1],digits=2)) -> $(round(st_gfcf.k[end],digits=2))  ",
-        "r: $(round(st_gfcf.r[1]*100,digits=2))% -> $(round(st_gfcf.r[end]*100,digits=2))%")
+lab = ("C constant, V current (mixed)", "GDP-deflated", "current cost")
+sty = (:solid, :dash, :dot)
+panels = map(((:e, "e", "Rate of exploitation", 1.0, :steelblue),
+              (:k, "k", "Organic composition", 1.0, :firebrick),
+              (:r, "r (%)", "Profit rate", 100.0, :seagreen))) do (f, yl, ti, sc, col)
+    pl = plot(xlabel = "Year", ylabel = yl, title = ti, legend = f == :k ? :topright : false)
+    for (st, l, ls) in zip((st_current, st_consistent, st_cc), lab, sty)
+        plot!(pl, years, sc .* getfield(st, f), label = l, lw = 2, color = col, linestyle = ls)
+    end
+    pl
+end
+fig1 = plot(panels..., layout = (1, 3), size = (1350, 380), margin = 6Plots.mm)
+savefig(fig1, joinpath(FIG_DIR, "fig1_time_series.pdf"))
+
+fig1b = plot(xlabel = "Year", ylabel = "r (%)", size = (700, 420), margin = 5Plots.mm,
+             title = "Profit rate at current cost: Portugal vs. Spain")
+for (c, name, col) in (("Pt", "Portugal", :seagreen), ("Es", "Spain", :darkorange))
+    plot!(fig1b, years, 100 .* series[(c, :Cc, :excluded)].r, label = name, lw = 2, color = col)
+    plot!(fig1b, years, 100 .* series[(c, :Cc, :imputed)].r, label = "$name, self-employed imputed",
+          lw = 2, color = col, linestyle = :dash)
+end
+savefig(fig1b, joinpath(FIG_DIR, "fig1b_pt_vs_es.pdf"))
+
+for ((c, v, se), st) in sort(collect(series), by = first)
+    @printf("  %s %-3s %-8s e %.3f -> %.3f  k %.2f -> %.2f  r %.1f%% -> %.1f%% (range %.1f-%.1f)\n",
+            c, v, se, st.e[1], st.e[end], st.k[1], st.k[end], 100st.r[1], 100st.r[end],
+            100minimum(st.r), 100maximum(st.r))
+end
+
+# Section 5.2 / 6.1 numbers. Macro names: \Am<country><convention><Ex|Imp><stat>.
+self_emp_pct(d, i) = 100 * (1 - d.employees[i] / d.employment[i])
+open(joinpath(FIG_DIR, "ameco_stats.tex"), "w") do io
+    println(io, "% Generated by paper/generate_results.jl (AMECO SDMX). Do not edit by hand.")
+    println(io, "\\newcommand{\\AmFirstYear}{$(first(years))}")
+    println(io, "\\newcommand{\\AmLastYear}{$(last(years))}")
+    for ((c, v, se), st) in sort(collect(series), by = first)
+        tag = "Am$(c)$(v)$(se == :imputed ? "Imp" : "Ex")"
+        for (name, x, fmt) in (("EFirst", st.e[1], "%.3f"), ("ELast", st.e[end], "%.3f"),
+                               ("KFirst", st.k[1], "%.2f"), ("KLast", st.k[end], "%.2f"),
+                               ("RFirst", 100st.r[1], "%.1f"), ("RLast", 100st.r[end], "%.1f"),
+                               ("RMin", 100minimum(st.r), "%.1f"), ("RMax", 100maximum(st.r), "%.1f"))
+            println(io, "\\newcommand{\\$(tag)$(name)}{$(Printf.format(Printf.Format(fmt), x))}")
+        end
+    end
+    for (c, d) in (("Pt", data_pt), ("Es", data_es))
+        # e is the current-price rate under :current, :consistent and :current_cost
+        gap = maximum(maximum(abs.(series[(c, v, :excluded)].e .- series[(c, :Cur, :excluded)].e))
+                      for v in (:Gdp, :Cc))
+        println(io, "\\newcommand{\\Am$(c)EGapExp}{$(gap == 0 ? "0" : @sprintf("%.0e", gap))}")
+        @printf(io, "\\newcommand{\\Am%sSelfEmpPct}{%.1f}\n", c, self_emp_pct(d, length(years)))
+    end
+end
+println("  ✓ figures/ameco_stats.tex")
 
 # ----------------------------------------------------------------------------
 # Table 1 — 19-sector calibration profile, Portugal 2022 (real Eurostat data)

@@ -321,6 +321,7 @@ marxkapital/
 │   ├── jacobian_bifurcation.jl # jacobiana exata, bifurcações, TSSI (offline)
 │   ├── accumulation_bifurcation.jl # crescimento equilibrado, Hopf, ciclos (offline)
 │   ├── estimation.jl       # parâmetros de acumulação no painel setorial da UE (offline)
+│   ├── eu_profit_rates.jl  # taxas de lucro da UE27 a partir do extrato estático do AMECO (offline)
 │   └── figures/
 ├── data/                   # extratos estáticos dos notebooks 7–14 e os scripts que os constroem; outros dados descarregados não versionados
 ├── install_deps.jl
@@ -387,7 +388,8 @@ opcional.
 como ponto fixo) e uma aplicação empírica a Portugal, com todas as
 figuras/tabelas geradas de forma reproduzível a partir de dados reais
 (`paper/generate_results.jl`, `paper/monte_carlo.jl`, `paper/matrix_audit.jl`,
-`paper/estimation.jl` — nenhum número inserido manualmente). A Secção 5.8
+`paper/estimation.jl`, `paper/eu_profit_rates.jl` — nenhum número inserido
+manualmente). A Secção 5.8
 estima os parâmetros de acumulação (μ, η, o piso do investimento, μ_v) no
 painel setorial da UE. Compilar com `latexmk -pdf
 paper/main.tex`.

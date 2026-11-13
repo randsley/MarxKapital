@@ -267,6 +267,17 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
     setorial da UE (Tabela 5, Figura 12), a partir do novo script offline
     `paper/estimation.jl`, incluindo taxas de lucro médias contra
     incrementais (Shaikh);
+  - as Secções 5.2 e 6.1 tomam o stock de capital a custo corrente
+    (`valuation = :current_cost`) como referência para as taxas de lucro
+    de Portugal e Espanha, tratam a série sem ajuste como a
+    inconsistência de valoração que é, retiram a variante "deflacionada
+    pelo investimento" (deflacionava produto e salários por índices
+    diferentes, pelo que o seu `e` não era o de preços correntes, e dava
+    o antigo limite superior de 15,1%), reportam o ajuste dos
+    trabalhadores por conta própria e juntam a UE27 a partir do extrato
+    estático do AMECO (novo script offline `paper/eu_profit_rates.jl`).
+    Os números são macros (`figures/ameco_stats.tex`,
+    `figures/eu_stats.tex`);
   - a Secção 5.6 situa o `μ_v` estimado face ao ponto de Hopf da economia
     portuguesa calibrada;
   - a Secção 5.7 ganha a Tabela 4b (inputs importados, o balanço

@@ -427,7 +427,8 @@ Sequência proposta, do mais estruturante ao mais exploratório:
 10. ~~Escrever artigo académico (metodologia + aplicação empírica)~~ —
     feito, `paper/main.tex`, reproduzível a partir de dados reais
     (`paper/generate_results.jl`, `paper/monte_carlo.jl`,
-    `paper/matrix_audit.jl`, `paper/estimation.jl`).
+    `paper/matrix_audit.jl`, `paper/estimation.jl`,
+    `paper/eu_profit_rates.jl`).
 11. Extensões de médio prazo (financeirização, ecologia, troca desigual, agentes
    heterogéneos) — ainda por fazer.
 
