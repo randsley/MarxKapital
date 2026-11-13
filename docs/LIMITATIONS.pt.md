@@ -6,7 +6,50 @@ Este ficheiro documenta, sem rodeios, o que ainda não está correto ou
 completo. Nenhum destes pontos impede a execução, mas todos afetam a
 interpretação dos resultados.
 
-## 1. A matriz técnica A não realimenta a dinâmica de N departamentos
+Cada secção começa com um resumo curto do estado atual; o resto é o
+detalhe e a história de cada correção.
+
+## Visão geral
+
+| § | Tema | Estado | Ainda em aberto |
+|---|---|---|---|
+| 1 | Acoplamento setorial através de `A` | Corrigido (opcional): mobilidade de capital, pressão de realização e racionamento por setor, sobre o output bruto genuíno, com inputs importados e procura final | Descontar a reposição dos inputs intermédios (`net_intermediate`) só se aguenta pouco tempo com tabelas reais: nada mantém as proporções setoriais alinhadas com `A` |
+| 2 | `R_max` no choque salarial | Corrigido | — |
+| 3 | Download AMECO | Corrigido: API SDMX oficial | O stock de capital bruto não é publicado; `method = :auto` recorre a dados sintéticos, com aviso |
+| 4 | Calibração AMECO (3 setores macro) | Corrigido: depreciação real, capital a custo corrente; dados setoriais reais e o ajuste dos trabalhadores por conta própria são opcionais | Os pesos setoriais por omissão são aproximações fixas |
+| 4-bis | Matriz técnica `A` real | Corrigido: a tabela certa do Eurostat | As tabelas input-output só existem para anos de referência; usa-se a mais próxima |
+| 5 | `aggregation` na calibração INE | Corrigido | — |
+| 6 | Dados sintéticos por omissão | Por desenho: os dados reais são opcionais | — |
+| 7 | Stock de capital e depreciação | Corrigido; o inventário permanente por tipo de ativo é opcional | Construção e finanças mantêm desvios grandes face ao stock reportado |
+| 8 | Piso de `e` | Mitigado (opcional): setores de mercado, `e` plurianual, imputação por hora | Não se admite um departamento com `e ≤ 0`, pelo que alguns setores continuam no piso |
+| 9 | Deflação das séries AMECO | Corrigido; `:consistent_gfcf` obsoleto | — |
+| 10 | Diferenciação automática, TSSI, bifurcações | Alcance | A convergência global do racionamento não está provada; só o modelo cruzado tem bifurcações |
+| 11 | Dinâmica cruzada e ciclos | Alcance: parâmetros estimados no painel da UE | Os ciclos ficam fora do intervalo estimado; o caos é evidência numérica, não prova |
+| 12 | Anos de previsão da AMECO | Corrigido | Os ficheiros TXT/CSV legados não trazem data de edição, pelo que aí as previsões não são retiradas |
+
+**Testes.** A suite de testes (`test/runtests.jl`, 639 testes) corre localmente e em CI
+(GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
+`.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
+por omissão; os caminhos de dados reais (`data_source=:eurostat`,
+`sector_data=:eurostat`, `method=:sdmx`) exigem rede e não correm em CI —
+verifique-os manualmente com `check_ameco_sdmx()`,
+`check_eurostat_sectoral()` e `paper/matrix_audit.jl` antes de os usar
+numa análise real.
+
+
+## 1. Acoplamento setorial através da matriz técnica A
+
+**Em resumo:** por omissão os setores acumulam de forma independente e `A`
+só entra nos valores e preços. `coupled = true` acopla-os através de `A`
+por mobilidade de capital, opcionalmente com pressão de realização ou
+racionamento de quantidades exato por setor, sobre o output bruto
+reconstruído a partir do próprio estado do modelo (com inputs importados e
+procura final como opções). Ainda em aberto: descontar a reposição dos
+inputs intermédios da oferta disponível para investimento só funciona com
+tabelas reais durante alguns anos, porque nada no sistema acoplado mantém
+as proporções setoriais alinhadas com `A`.
+
+### Modelo por omissão: setores independentes
 
 Em `system_Ndept!` (ficheiro `src/core.jl`), a acumulação de cada
 departamento depende apenas da sua própria mais-valia:
@@ -21,16 +64,13 @@ simulação temporal trata os setores como independentes. Isto contradiz a
 lógica da reprodução ampliada, onde o consumo de capital constante de um
 setor é o output de outro.
 
-**Consequência:** os ciclos e a (não-)convergência das taxas de lucro na
-simulação N-dept refletem apenas heterogeneidade de parâmetros iniciais, não
-interdependência setorial real.
+Neste modelo os ciclos e a (não-)convergência das taxas de lucro
+refletem apenas heterogeneidade de parâmetros iniciais, não
+interdependência setorial. O sistema acoplado abaixo resolve isso.
 
-**Correção pendente:** acoplar a acumulação via A, por exemplo exigindo que a
-procura de capital constante do setor i (ΔCᵢ) seja satisfeita pelo output dos
-setores fornecedores (colunas/linhas de A), e introduzir um mecanismo de
-mobilidade de capital que desloque investimento para setores com r > r̄.
+### Mobilidade de capital (`coupled = true`)
 
-**Corrigido:** `system_Ndept_io!` (`src/core.jl`), selecionável
+`system_Ndept_io!` (`src/core.jl`), selecionável
 com `coupled=true` em `simulate_Ndept`/`simulate_Ndept_custom`, acopla A à
 dinâmica através de um termo de mobilidade de capital `μ·(rᵢ − r̄)·Cᵢ`, com `rᵢ`
 calculado sobre capital valorizado a preços de produção de Sraffa (que dependem
@@ -42,8 +82,9 @@ usada até uma correção posterior) — a única escolha para a qual
 realoca capital constante agregado entre setores em vez de o criar ou
 destruir. Verificado por teste (`test/runtests.jl`, "Capital mobility — exact conservation").
 
-**Corrigido (segundo mecanismo, opcional):** `system_Ndept_io!`
-aceita agora `realization=true` (transportado via `p.realization`, kwarg de
+### Pressão de realização (`realization = true`)
+
+`system_Ndept_io!` aceita `realization=true` (transportado via `p.realization`, kwarg de
 `simulate_Ndept`/`simulate_Ndept_custom`), que acresce uma pressão de
 realização escalando o reinvestimento planeado por
 `ρ_real = Σ min(xᵢ,(A·x)ᵢ) / Σ(A·x)ᵢ` (≤ 1), travando a acumulação quando
@@ -52,18 +93,19 @@ a estrutura técnica não consegue sustentar os níveis de output correntes.
 `Wᵢ=δᵢCᵢ+Vᵢ+Sᵢ` (capital constante *transferido*, não o stock `Cᵢ`) usado
 numa correção anterior: `Wᵢ` omite o consumo intermédio circulante que a
 matriz `A` efetivamente precifica. Reconstrói-se `xᵢ` a partir da própria
-identidade custo-output do modelo — ver mais abaixo, "Corrigido (output
-bruto genuíno...)". Verificado por teste
+identidade custo-output do modelo (ver "Output bruto, não valor
+acrescentado" abaixo). Verificado por teste
 (`test/runtests.jl`, "N-dept simulation with realization pressure") e por
 robustez em 20 combinações seed/μ sem falhas do solver.
 
-**Corrigido (terceiro mecanismo, exato por setor, opcional):**
-`system_Ndept_io!` aceita agora `rationing=true` (tem precedência sobre
+### Racionamento de quantidades por setor (`rationing = true`)
+
+`system_Ndept_io!` aceita `rationing=true` (tem precedência sobre
 `realization`), que resolve **racionamento de quantidades por setor** — não
 apenas uma pressão agregada. A expansão de output *desejada* de cada setor
 `j`, `Δxⱼ=σ_c,ⱼ·Sⱼ·xⱼ/Cⱼ` (investimento planeado convertido para escala de
 output via o rácio capital-output corrente, não a despesa `σ_c,ⱼSⱼ`
-diretamente — uma correção posterior, ver abaixo), exige inputs dos
+diretamente; ver "Procura de investimento em unidades de output" abaixo), exige inputs dos
 fornecedores na proporção `A[:,j]` (tecnologia
 Leontief, sem substituição entre inputs), pelo que o reinvestimento
 realizado fica limitado pelo input mais escasso — e o racionamento sofrido
@@ -105,7 +147,8 @@ este diagnóstico não modela), e não usa o racionamento por setor (esse
 já está embutido em `κ` dentro de `system_Ndept_io!` quando
 `rationing=true`).
 
-**Corrigido (output bruto genuíno, não um fluxo tipo valor-acrescentado):**
+### Output bruto, não valor acrescentado
+
 `Oᵢ`/`xᵢ` acima já não é `Wᵢ=δᵢCᵢ+Vᵢ+Sᵢ` (que omite consumo intermédio
 circulante — materiais, energia, serviços comprados — e não é gross
 output no sentido input-output usado para construir `A`). Reconstrói-se
@@ -127,8 +170,9 @@ uniformemente se necessário, com aviso — não um clamp silencioso
 reaplicado a cada avaliação. Verificado por teste
 (`test/runtests.jl`, "Reconstructed gross output..." e "Admissibility of the gross output reconstruction").
 
-**Corrigido (procura de investimento em escala de output, não despesa):**
-o `Δxⱼ` na fórmula do racionamento acima substitui uma versão anterior
+### Procura de investimento em unidades de output
+
+O `Δxⱼ` na fórmula do racionamento acima substitui uma versão anterior
 que aplicava `A[i,j]` diretamente à despesa de investimento planeada
 `σ_c,ⱼSⱼ`, como se uma unidade de despesa exigisse a mesma composição de
 inputs que uma unidade de output físico — um problema dimensional
@@ -139,7 +183,9 @@ setor, antes de `A` ser aplicada. Por omissão, todo o `xᵢ` reconstruído
 descontar a reposição de inputs intermédios (já contada em `zᵢ`) nem
 outra procura final.
 
-**Corrigido em parte (opcional):** as colunas de utilização final da
+### Procura final (`final_demand_share`, opcional)
+
+As colunas de utilização final da
 mesma IOT (`NAIO_10_CP1700`, uso doméstico) dão a procura final por
 produto (`final_demand_from_iot`, `fetch_eurostat_final_demand`), agora
 guardada em `params.final_demand` nos caminhos Eurostat. Com
@@ -150,8 +196,9 @@ final e exportações. Para Portugal 2022 (artigo, Secção 5.7, Tabela 4),
 isto não altera a parcela de setores racionados e reduz a acumulação em
 cerca de um quinto com 10 e 19 setores.
 
-**Corrigido em parte (opcional; reposição descontada e matriz de bens de
-capital):** `net_intermediate = true` (com `rationing = true`) desconta
+### Desconto da reposição intermédia (`net_intermediate`, opcional; em parte em aberto)
+
+`net_intermediate = true` (com `rationing = true`) desconta
 também a reposição dos inputs intermédios do período, comparando `Dᵢ` com
 `max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)` (`_investable_supply`, `src/core.jl`).
 
@@ -207,7 +254,9 @@ Uma observação relacionada, para o modelo predefinido: com `σ_v` = 0,01,
 importações, contra ×73,7 com o valor calibrado de 0,15). Os ×56–×200 da
 Tabela 4 do artigo vêm do capital variável a crescer a `σ_v` = 0,15.
 
-**Corrigido (inputs importados, opcional):** a matriz do Eurostat só cobre
+### Inputs importados (`import_coefficients`, opcional)
+
+A matriz do Eurostat só cobre
 inputs domésticos, pelo que o `xᵢ` reconstruído a partir dela deixava de
 fora os inputs intermédios importados. A própria linha `IMP` da IOT dá-os
 por ramo comprador, e `fetch_eurostat_import_coefficients` converte-os em
@@ -225,7 +274,10 @@ com 19 (×72,4 → ×94,7). É opcional, pelo que os números do artigo não
 mudam. Não está disponível no modelo cross-dual (`market_prices`), cujos
 lucros precisariam também de um preço das importações, nem na camada TSSI.
 
-## 2. R_max no choque salarial usa uma matriz auxiliar (corrigido)
+## 2. R_max no choque salarial (corrigido)
+
+**Em resumo:** `R_max` usa agora a matriz e os coeficientes de trabalho do
+próprio cenário simulado, não uma matriz auxiliar de referência.
 
 Em `simulate_wage_shock` (`src/shocks.jl`), o `R_max` reportado era
 calculado com uma matriz `A_ref` gerada só para dar uma referência de
@@ -243,7 +295,13 @@ Mitigação já aplicada (mantida): a mesma `seed` é passada aos dois cenários
 (base e choque), pelo que as matrizes técnicas das duas simulações são
 idênticas e a comparação base-vs-choque é reprodutível.
 
-## 3. Download AMECO (corrigido: API SDMX oficial substitui o ficheiro TXT)
+## 3. Download AMECO: a API SDMX oficial (corrigido)
+
+**Em resumo:** os dados vêm da API SDMX oficial da AMECO, que mapeia 24 de
+25 variáveis; a antiga distribuição TXT foi descontinuada. O stock de
+capital bruto não é publicado. Se todos os caminhos falharem,
+`method = :auto` recorre a dados sintéticos com um aviso, pelo que convém
+verificar o campo `source` do resultado.
 
 **Contexto histórico:** esta secção descrevia as URLs heurísticas do antigo
 ficheiro TXT estático (`AMECO_URLS_TO_TRY`, `src/ameco_download.jl`) e o
@@ -311,7 +369,14 @@ Se todas as vias falharem, `fetch_ameco_data(..., method=:auto)` recorre
 silenciosamente a **dados sintéticos** (com aviso). Verifique sempre o campo
 `source` do resultado.
 
-## 4. Calibração AMECO é macro (3 setores), com pesos fixos por omissão (corrigido)
+## 4. Calibração AMECO (3 setores macro)
+
+**Em resumo:** a calibração usa a depreciação real da AMECO e valoriza o
+stock de capital ao custo de substituição corrente. Por omissão a
+repartição pelos 3 setores macro usa pesos fixos; `sector_data =
+:eurostat` usa dados setoriais reais e a matriz `A` real, e
+`self_employed = :imputed` conta os trabalhadores por conta própria ao
+salário médio.
 
 `calibrate_with_ameco_data` só implementa a agregação `:macro`
 (Primário/Secundário/Terciário). Por omissão (`sector_data=:fixed`), a
@@ -382,7 +447,13 @@ grupo `j`). A ressalva sobre a linha do Terciário que constava aqui numa
 versão anterior descrevia um sintoma da tabela errada usada nessa altura
 (ver item 4-bis) — resolvida, não contornada, com a correção do dataflow.
 
-## 4-bis. Matriz técnica A real — dataflow errado, encontrado e corrigido
+## 4-bis. Matriz técnica A real (corrigido: dataflow errado)
+
+**Em resumo:** `A` constrói-se a partir da tabela input-output simétrica do
+Eurostat (`NAIO_10_CP1700`, uso doméstico), depois de uma auditoria ter
+detetado que uma versão anterior lia uma tabela satélite de margens
+comerciais. A tabela só existe para anos de referência (Portugal: 2010,
+2013, 2015, 2017, 2020); os outros anos usam o mais próximo, com aviso.
 
 **Histórico do bug (2026-07/08):** uma auditoria pedida em revisão externa
 (quantificar o efeito de um passo de "clipping" de margens, reconciliar
@@ -430,7 +501,10 @@ setores CAE — ver item 5) e, agregada via `aggregate_io_matrix`, por
 reconciliação, questão doméstico/importado) em `paper/matrix_audit.jl`,
 corrido manualmente contra a API ao vivo.
 
-## 5. `aggregation` na calibração INE não está totalmente ligada (corrigido)
+## 5. `aggregation` na calibração INE (corrigido)
+
+**Em resumo:** `:detailed` (19), `:medium` (10, NACE A10) e `:macro` (3)
+funcionam todos, com dados sintéticos e reais.
 
 `calibrate_portugal_model` aceitava o argumento `aggregation` mas só corria em
 `:detailed` (19 setores); os modos `:medium` e `:macro` eram ignorados
@@ -446,7 +520,11 @@ do item 4 — funciona tanto com `data_source=:synthetic` (A aleatória) como
 Verificado: as 6 combinações (`:detailed`/`:macro`/`:medium` ×
 `:synthetic`/`:eurostat`) produzem matrizes não-negativas com ρ(A)<1.
 
-## 6. Todos os dados por omissão são SINTÉTICOS (dados reais agora opcionais)
+## 6. Os dados por omissão são sintéticos; os reais são opcionais
+
+**Em resumo:** sem opções, os dois caminhos de calibração usam dados
+gerados, para demonstração e testes offline. Os dados reais têm de ser
+pedidos explicitamente.
 
 Tanto o caminho INE como o AMECO usam, **por omissão**, dados **gerados** com
 padrões plausíveis. Servem para demonstração, testes e desenvolvimento
@@ -464,7 +542,13 @@ compatibilidade com o comportamento histórico e para manter a suite de
 testes totalmente offline (ver `check_eurostat_sectoral()` para uma
 verificação manual, fora dos testes automáticos).
 
-## 7. Stock de capital e depreciação são aproximados (corrigido, com ressalva; opcionalmente por tipo de ativo)
+## 7. Stock de capital e depreciação
+
+**Em resumo:** o capital constante aproxima-se pelo stock de capital
+líquido, e a depreciação vem do consumo de capital fixo reportado em todos
+os caminhos de dados reais. Um inventário permanente opcional por tipo de
+ativo acompanha de perto o stock reportado (desvio agregado de −1,9% em
+2022); construção e finanças mantêm os maiores desvios.
 
 O capital constante é aproximado pelo stock de capital. A depreciação vem
 dos dados sempre que estes existem: os caminhos de dados reais e o caminho
@@ -528,18 +612,15 @@ chegar ao ano pedido, ou `δ` estimado não for válido, esse setor
 individualmente cai para o valor reportado pelo Eurostat, sem afetar os
 restantes.
 
----
+## 8. O piso de `e` na calibração setorial (mitigado)
 
-A suite de testes (`test/runtests.jl`, 639 testes) corre localmente e em CI
-(GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
-`.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
-por omissão; os caminhos de dados reais (`data_source=:eurostat`,
-`sector_data=:eurostat`, `method=:sdmx`) exigem rede e não correm em CI —
-verifique-os manualmente com `check_ameco_sdmx()`,
-`check_eurostat_sectoral()` e `paper/matrix_audit.jl` antes de os usar
-numa análise real.
-
-## 8. Piso imposto em `e` (taxa de exploração) na calibração setorial (mitigado, opcional)
+**Em resumo:** o modelo exige `e > 0`, pelo que a calibração impõe um piso
+a `e` (0,1 por omissão) e reporta o valor medido em `e_raw`. Há opções que
+separam as causas: setores não mercantis (`sectors = :market`), anos
+excecionais (`e_years`) e a imputação dos trabalhadores por conta
+própria. Com os setores de mercado, `e` a cinco anos e os trabalhadores
+por conta própria imputados, o piso continua a aplicar-se em 5 de 15
+setores.
 
 `estimate_sector_parameters` (`src/calibration_pt.jl`) impõe `e =
 max(0.1, surplus_value_rate)`: setores cujo rendimento empresarial (após
@@ -591,7 +672,12 @@ aberto um departamento com `e ≤ 0`, que o modelo não admite: o valor no
 piso nesses cinco setores é uma escolha de modelação, e `e_raw` guarda o
 medido.
 
-## 9. Formato da série de exploração/depreciação AMECO (corrigido)
+## 9. Deflação das séries temporais AMECO (corrigido)
+
+**Em resumo:** as séries usam a depreciação real da AMECO, e a taxa de
+exploração é idêntica em todas as valorizações consistentes. O custo
+corrente é a valorização de referência; `:consistent_gfcf`, que misturava
+deflatores, está obsoleto.
 
 `analyze_time_series_with_data` (`src/ameco.jl`) usava, numa versão
 anterior, uma dedução fixa de 10% do stock de capital (a preços
@@ -616,6 +702,12 @@ deflator do investimento dá exatamente o `e`, o `k` e o `r` de
 obsoleto deste, com um aviso.
 
 ## 10. Diferenciação automática, TSSI e bifurcações — alcance
+
+**Em resumo:** o racionamento converge localmente (provado), mas a
+convergência global não está provada; jacobianas e hessianas através do
+racionamento são exatas; a TSSI pode conduzir a dinâmica (opcional); o
+crescimento equilibrado e as suas bifurcações só existem no modelo
+cruzado.
 
 - **Convergência do racionamento: local provada, global não.** A
   jacobiana exata (`rationing_jacobian`) é triangular com os setores
@@ -698,6 +790,13 @@ obsoleto deste, com um aviso.
   verificação empírica, não uma prova de estabilidade para todo o `A`.
 
 ## 11. Dinâmica cruzada (preços de mercado) e ciclos de acumulação — alcance
+
+**Em resumo:** os parâmetros de acumulação estão agora estimados no painel
+setorial da UE (μ, η, o piso do investimento θ, μ_v e σ_v). Os ciclos só
+aparecem com uma mobilidade do capital variável muito acima da estimada
+(33 vezes na economia portuguesa calibrada). O caos assenta em evidência
+numérica, não em prova, e o modelo cruzado não se combina com o
+racionamento.
 
 - **Hipóteses do modelo cruzado.** Os preços de mercado respondem ao
   excesso de procura relativo com velocidade única `β`; os bens de capital
@@ -851,6 +950,10 @@ obsoleto deste, com um aviso.
   testes usam horizontes curtos.
 
 ## 12. Anos de previsão da AMECO (corrigido)
+
+**Em resumo:** os anos de previsão da AMECO são retirados no caminho SDMX,
+com aviso (`include_forecasts = true` mantém-nos). Os ficheiros TXT/CSV
+legados não trazem data de edição, pelo que aí nada é retirado.
 
 A AMECO publica as previsões da Comissão para o ano da edição e o seguinte
 nas mesmas séries que os dados observados, e nada na resposta SDMX as

@@ -6,6 +6,13 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
+## [Não publicado]
+
+### Alterado
+- `docs/LIMITATIONS.md` abre com uma tabela-resumo (estado e o que ainda
+  está em aberto, por item), cada secção começa com um resumo curto do
+  estado atual, e a secção 1 divide-se em subsecções por mecanismo.
+
 ## [1.2.0] — 2026-11-13
 
 ### Acrescentado

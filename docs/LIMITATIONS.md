@@ -6,7 +6,50 @@ This file documents, plainly, what is not yet correct or complete.
 None of these points prevent the code from running, but all of them
 affect how the results should be interpreted.
 
-## 1. The technical matrix A did not feed back into the N-department dynamics
+Each section starts with a short summary of where things stand now;
+the rest is the detail and the history of each fix.
+
+## At a glance
+
+| § | Topic | Status | Still open |
+|---|---|---|---|
+| 1 | Sectoral coupling through `A` | Fixed (opt-in): capital mobility, realization pressure and per-sector rationing, on genuine gross output with imported inputs and final demand | Netting intermediate replacement (`net_intermediate`) holds only briefly with real tables: nothing keeps sectoral proportions in line with `A` |
+| 2 | `R_max` in the wage shock | Fixed | — |
+| 3 | AMECO download | Fixed: official SDMX API | Gross capital stock is not published; `method = :auto` falls back to synthetic data, with a warning |
+| 4 | AMECO calibration (3 macro sectors) | Fixed: real depreciation, capital at current cost; real sector data and the self-employed adjustment are opt-in | The default sector weights are fixed approximations |
+| 4-bis | Real technical matrix `A` | Fixed: the right Eurostat table | Input-output tables exist only for benchmark years; the nearest one is used |
+| 5 | `aggregation` in the INE calibration | Fixed | — |
+| 6 | Synthetic default data | By design: real data are opt-in | — |
+| 7 | Capital stock and depreciation | Fixed; perpetual inventory by asset type is opt-in | Construction and finance keep large gaps against the reported stock |
+| 8 | Floor on `e` | Mitigated (opt-in): market sectors, multi-year `e`, imputation per hour | A department with `e ≤ 0` is not allowed, so some sectors stay floored |
+| 9 | Deflating the AMECO series | Fixed; `:consistent_gfcf` deprecated | — |
+| 10 | Automatic differentiation, TSSI, bifurcations | Scope | Global convergence of rationing is not proved; bifurcations exist only in the cross-dual model |
+| 11 | Cross-dual dynamics and cycles | Scope: parameters estimated on the EU panel | The cycles lie outside the estimated range; chaos is numerical evidence, not proof |
+| 12 | AMECO forecast years | Fixed | Legacy TXT/CSV files carry no release date, so forecasts are not dropped there |
+
+**Testing.** The test suite (`test/runtests.jl`, 639 tests) runs locally and in CI
+(GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
+`.github/workflows/test.yml`. It covers the default synthetic/opt-in
+paths; the real-data paths (`data_source=:eurostat`,
+`sector_data=:eurostat`, `method=:sdmx`) require network access and
+do not run in CI — check them manually with `check_ameco_sdmx()`,
+`check_eurostat_sectoral()`, and `paper/matrix_audit.jl` before using
+them in a real analysis.
+
+
+## 1. Sectoral coupling through the technical matrix A
+
+**In short:** by default the sectors accumulate independently and `A`
+only enters values and prices. `coupled = true` couples them through
+`A` by capital mobility, optionally with realization pressure or exact
+per-sector quantity rationing, on gross output reconstructed from the
+model's own state (with imported inputs and final demand as options).
+Still open: netting the replacement of intermediate inputs out of
+investable supply works with real tables only for a few years, because
+nothing in the coupled system keeps sectoral proportions in line with
+`A`.
+
+### Default model: independent sectors
 
 In `system_Ndept!` (file `src/core.jl`), each department's
 accumulation depends only on its own surplus value:
@@ -21,17 +64,13 @@ correctly), but the time simulation treats sectors as independent. This
 contradicts the logic of expanded reproduction, where one sector's
 constant-capital consumption is another sector's output.
 
-**Consequence:** the cycles and (non-)convergence of profit rates in the
-N-department simulation reflect only heterogeneity in initial
-parameters, not genuine sectoral interdependence.
+In this model the cycles and (non-)convergence of profit rates reflect
+only heterogeneity in initial parameters, not sectoral
+interdependence. The coupled system below fixes that.
 
-**Pending fix (historical):** couple accumulation through A — for
-example, requiring that sector i's constant-capital demand (ΔCᵢ) be met
-by the output of supplying sectors (columns/rows of A), and introduce a
-capital-mobility mechanism that shifts investment toward sectors with
-r > r̄.
+### Capital mobility (`coupled = true`)
 
-**Fixed:** `system_Ndept_io!` (`src/core.jl`), selectable
+`system_Ndept_io!` (`src/core.jl`), selectable
 with `coupled=true` in `simulate_Ndept`/`simulate_Ndept_custom`,
 couples A to the dynamics through a capital-mobility term
 `μ·(rᵢ − r̄)·Cᵢ`, with `rᵢ` computed on capital valued at Sraffian prices
@@ -45,8 +84,9 @@ reallocates aggregate constant capital between sectors rather than
 creating or destroying it. Verified by test (`test/runtests.jl`,
 "Capital mobility — exact conservation").
 
-**Fixed (second mechanism, optional):** `system_Ndept_io!`
-now accepts `realization=true` (passed via `p.realization`, a keyword of
+### Realization pressure (`realization = true`)
+
+`system_Ndept_io!` accepts `realization=true` (passed via `p.realization`, a keyword of
 `simulate_Ndept`/`simulate_Ndept_custom`), which adds a realization
 pressure that scales planned reinvestment by
 `ρ_real = Σ min(xᵢ,(A·x)ᵢ) / Σ(A·x)ᵢ` (≤ 1), damping accumulation
@@ -55,18 +95,19 @@ whenever the technical structure cannot sustain current output levels.
 `Wᵢ=δᵢCᵢ+Vᵢ+Sᵢ` (constant capital *transferred*, not the stock `Cᵢ`) used
 in an earlier fix: `Wᵢ` omits the circulating intermediate consumption
 that the matrix `A` actually prices. `xᵢ` is reconstructed from the
-model's own cost-output identity — see further below, "Fixed (genuine
-gross output...)". Verified by test
+model's own cost-output identity (see "Gross output, not value added"
+below). Verified by test
 (`test/runtests.jl`, "N-dept simulation with realization pressure") and by
 robustness across 20 seed/μ combinations with no solver failures.
 
-**Fixed (third mechanism, exact per sector, optional):**
-`system_Ndept_io!` now accepts `rationing=true` (takes precedence
+### Per-sector quantity rationing (`rationing = true`)
+
+`system_Ndept_io!` accepts `rationing=true` (takes precedence
 over `realization`), which solves **per-sector quantity rationing** — not
 just an aggregate pressure. Each sector `j`'s *desired* output
 expansion, `Δxⱼ=σ_c,ⱼ·Sⱼ·xⱼ/Cⱼ` (planned investment converted to output
 scale via the current capital-output ratio, not the expenditure
-`σ_c,ⱼSⱼ` directly — a later fix, see below), requires inputs from
+`σ_c,ⱼSⱼ` directly; see "Investment demand in output units" below), requires inputs from
 suppliers in the proportions `A[:,j]` (Leontief technology, no
 substitution between inputs), so realized reinvestment is bounded by the
 scarcest input — and the rationing a sector suffers reduces its
@@ -108,7 +149,8 @@ diagnostic does not model), and it does not use the per-sector rationing
 (that is already embedded in `κ` inside `system_Ndept_io!` when
 `rationing=true`).
 
-**Fixed (genuine gross output, not a value-added-type flow):**
+### Gross output, not value added
+
 `Oᵢ`/`xᵢ` above is no longer `Wᵢ=δᵢCᵢ+Vᵢ+Sᵢ` (which omits circulating
 intermediate consumption — materials, energy, purchased services — and
 is not gross output in the input-output sense used to build `A`). `xᵢ`
@@ -129,8 +171,9 @@ simulation is assembled (`_ensure_output_admissibility`,
 a silent clamp reapplied at every evaluation. Verified by test
 (`test/runtests.jl`, "Reconstructed gross output..." and "Admissibility of the gross output reconstruction").
 
-**Fixed (investment demand in output scale, not expenditure):**
-the `Δxⱼ` in the rationing formula above replaces an earlier version
+### Investment demand in output units
+
+The `Δxⱼ` in the rationing formula above replaces an earlier version
 that applied `A[i,j]` directly to planned investment expenditure
 `σ_c,ⱼSⱼ`, as if a unit of expenditure required the same input
 composition as a unit of physical output — a dimensional problem
@@ -141,7 +184,9 @@ treated as available for investment demand `Dᵢ`, without netting out the
 replacement of intermediate inputs (already counted in `zᵢ`) or other
 final demand.
 
-**Partly fixed (optional):** the final-use columns of the same IOT
+### Final demand (`final_demand_share`, opt-in)
+
+The final-use columns of the same IOT
 (`NAIO_10_CP1700`, domestic use) give final demand by product
 (`final_demand_from_iot`, `fetch_eurostat_final_demand`), now stored in
 `params.final_demand` on the Eurostat paths. With
@@ -152,8 +197,9 @@ consumption and exports. For Portugal 2022 (paper, Section 5.7, Table 4)
 this leaves the share of rationed sectors unchanged and lowers
 accumulation by about a fifth at 10 and 19 sectors.
 
-**Partly fixed (optional; netted replacement and a capital-goods
-matrix):** `net_intermediate = true` (with `rationing = true`) also nets
+### Netting intermediate replacement (`net_intermediate`, opt-in; partly open)
+
+`net_intermediate = true` (with `rationing = true`) also nets
 the replacement of the period's intermediate inputs, comparing `Dᵢ` with
 `max(xᵢ − (A·x)ᵢ − φᵢxᵢ, 0)` (`_investable_supply`, `src/core.jl`).
 
@@ -207,7 +253,9 @@ A related observation for the default model: at `σ_v` = 0.01, ΣC grows
 imports, against ×73.7 at the calibrated 0.15). The ×56–×200 of the
 paper's Table 4 come from variable capital growing at `σ_v` = 0.15.
 
-**Fixed (imported inputs, optional):** Eurostat's matrix covers domestic
+### Imported inputs (`import_coefficients`, opt-in)
+
+Eurostat's matrix covers domestic
 inputs only, so the `xᵢ` reconstructed from it left out imported
 intermediate inputs. The IOT's own `IMP` row gives them per buying
 industry, and `fetch_eurostat_import_coefficients` turns them into
@@ -225,7 +273,10 @@ years rises by 8% at 10 sectors (×200.6 → ×215.9) and by 31% at 19
 available in the cross-dual model (`market_prices`), whose profits would
 also need a price of imports, nor in the TSSI layer.
 
-## 2. R_max in the wage shock used an auxiliary matrix (fixed)
+## 2. R_max in the wage shock (fixed)
+
+**In short:** `R_max` now uses the simulated scenario's own matrix and
+labor coefficients, not an auxiliary reference matrix.
 
 In `simulate_wage_shock` (`src/shocks.jl`), the reported `R_max` was
 computed with an `A_ref` matrix generated only to give a feasibility
@@ -243,7 +294,12 @@ Mitigation already applied (kept): the same `seed` is passed to both
 scenarios (base and shock), so the two simulations' technical matrices
 are identical and the base-vs-shock comparison is reproducible.
 
-## 3. AMECO download (fixed: the official SDMX API replaces the TXT file)
+## 3. AMECO download: the official SDMX API (fixed)
+
+**In short:** data come from AMECO's official SDMX API, which maps 24 of
+25 variables; the old TXT distribution was discontinued. Gross capital
+stock is not published. If every path fails, `method = :auto` falls back
+to synthetic data with a warning, so check the result's `source`.
 
 **Historical context:** this section used to describe the old static TXT
 file's heuristic URLs (`AMECO_URLS_TO_TRY`, `src/ameco_download.jl`) and
@@ -314,7 +370,13 @@ If every path fails, `fetch_ameco_data(..., method=:auto)` silently
 falls back to **synthetic data** (with a warning). Always check the
 result's `source` (source) field.
 
-## 4. AMECO calibration is macro (3 sectors), with fixed weights by default (fixed)
+## 4. AMECO calibration (3 macro sectors)
+
+**In short:** the calibration uses AMECO's real depreciation and values
+the capital stock at current replacement cost. By default the split into
+3 macro sectors uses fixed weights; `sector_data = :eurostat` uses real
+sector data and the real matrix `A`, and `self_employed = :imputed`
+counts the self-employed at the average wage.
 
 `calibrate_with_ameco_data` only implements the `:macro` aggregation
 (Primary/Secondary/Tertiary). By default (`sector_data=:fixed`), the
@@ -385,7 +447,13 @@ groups by the standard Leontief aggregation formula
 earlier version described a symptom of the wrong table used at the time
 (see item 4-bis) — resolved, not worked around, by the dataflow fix.
 
-## 4-bis. Real technical matrix A — wrong dataflow, found and fixed
+## 4-bis. Real technical matrix A (fixed: wrong dataflow)
+
+**In short:** `A` is built from Eurostat's symmetric input-output table
+(`NAIO_10_CP1700`, domestic use), after an audit found an earlier version
+reading a trade-margins satellite table. The table exists only for
+benchmark years (Portugal: 2010, 2013, 2015, 2017, 2020); other years use
+the nearest one, with a warning.
 
 **Bug history (2026-07/08):** an audit requested during external review
 (meant to quantify the effect of a margin-clipping step, reconcile
@@ -432,7 +500,10 @@ sectors — see item 5) and, aggregated via `aggregate_io_matrix`, by
 reconciliation, domestic/imported question) in `paper/matrix_audit.jl`,
 run manually against the live API.
 
-## 5. `aggregation` in the INE calibration was not fully wired up (fixed)
+## 5. `aggregation` in the INE calibration (fixed)
+
+**In short:** `:detailed` (19), `:medium` (10, NACE A10) and `:macro` (3)
+all work, on synthetic and real data.
 
 `calibrate_portugal_model` accepted the `aggregation` (aggregation)
 argument but only ran `:detailed` (19 sectors); the `:medium` and
@@ -449,7 +520,11 @@ works with both `data_source=:synthetic` (random A) and `:eurostat`
 6 combinations (`:detailed`/`:macro`/`:medium` ×
 `:synthetic`/`:eurostat`) produce non-negative matrices with ρ(A)<1.
 
-## 6. All default data are SYNTHETIC (real data now optional)
+## 6. Default data are synthetic; real data are opt-in
+
+**In short:** without options, both calibration paths use generated
+data, for demonstration and offline tests. Real data must be requested
+explicitly.
 
 Both the INE and AMECO paths use, **by default**, **generated** data
 with plausible patterns. They serve demonstration, testing, and
@@ -469,7 +544,13 @@ with historical behavior and to keep the test suite fully offline (see
 `check_eurostat_sectoral()` for a manual check, outside the
 automated tests).
 
-## 7. Capital stock and depreciation are approximated (fixed, with caveat; optionally by asset type)
+## 7. Capital stock and depreciation
+
+**In short:** constant capital is proxied by the net capital stock, and
+depreciation comes from reported consumption of fixed capital on every
+real-data path. An optional perpetual inventory by asset type tracks the
+reported stock closely (2022 aggregate gap −1.9%); construction and
+finance keep the largest gaps.
 
 Constant capital is approximated by capital stock. Depreciation comes
 from data wherever data exist: the real-data paths and the AMECO
@@ -532,18 +613,14 @@ not reach the requested year, or the estimated `δ` is not valid, that
 sector individually falls back to the value reported by Eurostat,
 without affecting the others.
 
----
+## 8. The floor on `e` in the sectoral calibration (mitigated)
 
-The test suite (`test/runtests.jl`, 639 tests) runs locally and in CI
-(GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
-`.github/workflows/test.yml`. It covers the default synthetic/opt-in
-paths; the real-data paths (`data_source=:eurostat`,
-`sector_data=:eurostat`, `method=:sdmx`) require network access and
-do not run in CI — check them manually with `check_ameco_sdmx()`,
-`check_eurostat_sectoral()`, and `paper/matrix_audit.jl` before using
-them in a real analysis.
-
-## 8. Imposed floor on `e` (rate of exploitation) in the sectoral calibration (mitigated, opt-in)
+**In short:** the model needs `e > 0`, so the calibration floors `e`
+(at 0.1 by default) and reports the raw value in `e_raw`. Options separate
+the causes: non-market sectors (`sectors = :market`), one-off years
+(`e_years`) and the imputation of the self-employed. With the market
+sectors, a five-year `e` and the self-employed imputed, the floor still
+binds in 5 of 15 sectors.
 
 `estimate_sector_parameters` (`src/calibration_pt.jl`) imposes `e =
 max(0.1, surplus_value_rate)`: sectors whose business income (net of CCF)
@@ -593,7 +670,12 @@ open is a department with `e ≤ 0`, which the model does not allow: the
 floored value in those five sectors is a modeling choice, and `e_raw`
 keeps the measured one.
 
-## 9. AMECO exploitation/depreciation series format (fixed)
+## 9. Deflating the AMECO time series (fixed)
+
+**In short:** the series use AMECO's real depreciation, and the rate of
+exploitation is identical under every consistent valuation. Current cost
+is the reference valuation; `:consistent_gfcf`, which mixed deflators, is
+deprecated.
 
 `analyze_time_series_with_data` (`src/ameco.jl`) used, in an earlier
 version, a flat 10% deduction from the (constant-price) capital stock as
@@ -616,6 +698,11 @@ well gives exactly the `e`, `k` and `r` of `:current_cost`, so
 `:consistent_gfcf` is now a deprecated alias of it, with a warning.
 
 ## 10. Automatic differentiation, TSSI and bifurcations — scope
+
+**In short:** rationing converges locally (proved) but global
+convergence is not proved; Jacobians and Hessians through rationing are
+exact; TSSI can drive the dynamics (opt-in); balanced growth and its
+bifurcations exist only in the cross-dual model.
 
 - **Rationing convergence: local proved, global not.** The exact
   Jacobian (`rationing_jacobian`) is triangular with sectors ordered
@@ -693,6 +780,13 @@ well gives exactly the `e`, `k` and `r` of `:current_cost`, so
   check, not a stability proof for every `A`.
 
 ## 11. Cross-dual dynamics (market prices) and accumulation cycles — scope
+
+**In short:** the accumulation parameters are now estimated on the EU
+sectoral panel (μ, η, the investment floor θ, μ_v and σ_v). The cycles
+appear only at a mobility of variable capital far above the estimate
+(33 times in Portugal's calibrated economy). Chaos rests on numerical
+evidence, not proof, and the cross-dual model cannot be combined with
+rationing.
 
 - **Assumptions of the cross-dual model.** Market prices respond to
   relative excess demand with a single speed `β`; capital goods are
@@ -834,6 +928,10 @@ well gives exactly the `e`, `k` and `r` of `:current_cost`, so
   horizons.
 
 ## 12. AMECO forecast years (fixed)
+
+**In short:** AMECO's forecast years are dropped on the SDMX path, with
+a warning (`include_forecasts = true` keeps them). Legacy TXT/CSV files
+carry no release date, so nothing is dropped there.
 
 AMECO publishes the Commission's forecasts for the release year and the
 next one in the same series as the observed data, and nothing in the
