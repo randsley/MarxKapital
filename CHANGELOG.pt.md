@@ -6,7 +6,7 @@
 
 Formato baseado em Keep a Changelog. Versionamento semântico.
 
-## [Não publicado]
+## [1.2.0] — 2026-11-13
 
 ### Acrescentado
 - `capital_goods` e `benchmark_output` em `simulate_Ndept(_custom)` (com

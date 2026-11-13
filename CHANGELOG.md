@@ -6,7 +6,7 @@
 
 Format based on Keep a Changelog. Semantic versioning.
 
-## [Unreleased]
+## [1.2.0] — 2026-11-13
 
 ### Added
 - `capital_goods` and `benchmark_output` in `simulate_Ndept(_custom)`
