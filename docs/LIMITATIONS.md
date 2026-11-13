@@ -347,7 +347,7 @@ fell with every year of inflation after 2020: for 2024 it was 17–25% too
 low in Germany, Portugal and Poland. The stock is now revalued to current
 replacement cost with the GFCF deflator (`PIGT`, 2020 = 100), the price
 basis of Eurostat's stock on the `:eurostat` path, and the calibrated `k`
-equals `analyze_time_series_with_data(...; valuation = :consistent_gfcf)`
+equals `analyze_time_series_with_data(...; valuation = :current_cost)`
 exactly. **Self-employment (optional):** compensation of employees leaves
 out the self-employed, whose income then counts as surplus value and
 overstates `e` (in 2024 by a factor of about 1.8 in Greece and Italy).
@@ -534,7 +534,7 @@ without affecting the others.
 
 ---
 
-The test suite (`test/runtests.jl`, 635 tests) runs locally and in CI
+The test suite (`test/runtests.jl`, 639 tests) runs locally and in CI
 (GitHub Actions, Julia 1.10 and 1, on every push to `main`) — see
 `.github/workflows/test.yml`. It covers the default synthetic/opt-in
 paths; the real-data paths (`data_source=:eurostat`,
@@ -603,12 +603,17 @@ of fixed capital (CCF) — this broke the algebraic invariance that
 and CCF together, since the flat 10% term did not scale with the
 deflator. **Fixed:** the real AMECO CCF series is now used (item `UKCT`,
 chapter 03-05), deflated consistently with `V` and `Y` in each valuation
-convention (`valuation=:current`, `:consistent`, or
-`:consistent_gfcf`, the last of which uses the investment deflator
-instead of the GDP deflator, to test sensitivity to the choice of
-deflator). Verified directly: `e` is now identical across conventions
-for every year, for both Portugal and Spain — not merely asserted
-algebraically.
+convention (`valuation=:current`, `:consistent` or `:current_cost`, the
+last of which revalues the stock with the investment deflator instead of
+deflating the flows by the GDP deflator). Verified directly: `e` is now
+identical across conventions for every year, for both Portugal and Spain
+— not merely asserted algebraically. **Fixed (mixed deflators):** a
+fourth convention, `:consistent_gfcf`, deflated `V` and CCF by the
+investment deflator but output by the GDP deflator, so its `e` was not
+the current-price one (1.02 against 0.785 for Portugal in 1996) and its
+profit rate was too high. Deflating output by the investment deflator as
+well gives exactly the `e`, `k` and `r` of `:current_cost`, so
+`:consistent_gfcf` is now a deprecated alias of it, with a warning.
 
 ## 10. Automatic differentiation, TSSI and bifurcations — scope
 

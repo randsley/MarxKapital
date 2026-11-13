@@ -344,7 +344,7 @@ depois de 2020: em 2024 ficava 17–25% abaixo do valor certo na Alemanha, em
 Portugal e na Polónia. O stock é agora revalorizado ao custo de substituição
 corrente com o deflator da FBCF (`PIGT`, 2020 = 100), a base de preços do
 stock do Eurostat no caminho `:eurostat`, e o `k` calibrado é igual a
-`analyze_time_series_with_data(...; valuation = :consistent_gfcf)`.
+`analyze_time_series_with_data(...; valuation = :current_cost)`.
 **Trabalhadores por conta própria (opcional):** as remunerações dos
 empregados deixam de fora os trabalhadores por conta própria, cujo
 rendimento passa a contar como mais-valia e sobrestima `e` (em 2024, cerca
@@ -530,7 +530,7 @@ restantes.
 
 ---
 
-A suite de testes (`test/runtests.jl`, 635 testes) corre localmente e em CI
+A suite de testes (`test/runtests.jl`, 639 testes) corre localmente e em CI
 (GitHub Actions, Julia 1.10 e 1, em cada push a `main`) — ver
 `.github/workflows/test.yml`. Cobre os caminhos sintéticos/opt-in
 por omissão; os caminhos de dados reais (`data_source=:eurostat`,
@@ -602,11 +602,18 @@ a `Y`, `V` e CCF em conjunto, já que o termo de 10% não escalava com o
 deflator. **Corrigido:** usa-se agora a série real de CCF da AMECO
 (item `UKCT`, capítulo 03-05), deflacionada de forma consistente com `V`
 e `Y` em cada convenção de valorização (`valuation=:current`,
-`:consistent` ou `:consistent_gfcf`, este último usando o deflator do
-investimento em vez do deflator do PIB, para testar sensibilidade à
-escolha do deflator). Verificado diretamente: `e` é agora idêntico entre
-convenções para todos os anos, para Portugal e Espanha — não apenas
-afirmado algebricamente.
+`:consistent` ou `:current_cost`, esta última revalorizando o stock com o
+deflator do investimento em vez de deflacionar os fluxos pelo deflator do
+PIB). Verificado diretamente: `e` é agora idêntico entre convenções para
+todos os anos, para Portugal e Espanha — não apenas afirmado
+algebricamente. **Corrigido (deflatores misturados):** uma quarta
+convenção, `:consistent_gfcf`, deflacionava `V` e o CCF pelo deflator do
+investimento mas o produto pelo deflator do PIB, pelo que o seu `e` não
+era o de preços correntes (1,02 contra 0,785 para Portugal em 1996) e a
+sua taxa de lucro ficava alta demais. Deflacionar também o produto pelo
+deflator do investimento dá exatamente o `e`, o `k` e o `r` de
+`:current_cost`, pelo que `:consistent_gfcf` é agora um sinónimo
+obsoleto deste, com um aviso.
 
 ## 10. Diferenciação automática, TSSI e bifurcações — alcance
 

@@ -490,23 +490,22 @@ current-price capital stock equivalent. `compensation` (`UWCD`) and `GDP`
   `GDP` (current), putting `C`, `V` and `GVA` on the same constant-price
   basis. This is the right comparison to tell whether the fall in `k` is a
   real effect or a valuation artifact.
-- `valuation=:consistent_gfcf`: a variant of `:consistent` that deflates `V`
-  by the `GFCF_deflator` (item `PIGT`, "Price deflator gross fixed capital
-  formation", also indexed to 2020=100) instead of the GDP deflator.
+- `valuation=:current_cost`: everything at current prices, with `C` revalued
+  to current replacement cost, `C × GFCF_deflator / 100` (item `PIGT`,
+  "Price deflator gross fixed capital formation", 2020=100).
   `total_capital_stock` is built by accumulating GFCF at constant prices
   (AMECO's implicit perpetual inventory), so the investment deflator, not
-  the general GDP deflator, is what actually sets the price basis of `C`.
-  This variant tests whether the conclusion of `:consistent` is sensitive to
-  that choice (capital goods prices have historically tended to fall
-  relative to the general GDP deflator). Because `GVA` is deflated by the
-  GDP deflator and `V` by the investment deflator, `e` here differs from
-  its current-price value.
-- `valuation=:current_cost`: everything at current prices, with `C` revalued
-  to current replacement cost, `C × GFCF_deflator / 100`. `e` and the wage
-  share are exactly their current-price values, `k` equals the
-  `:consistent_gfcf` one, and `e`, `k` and `r` are the ones
-  `calibrate_with_ameco_data` uses on its `:fixed` path. This is the
-  valuation of the model's own profit rate.
+  the general GDP deflator, is what sets the price basis of `C`. `e` and the
+  wage share are exactly their current-price values, and `e`, `k` and `r`
+  are the ones `calibrate_with_ameco_data` uses on its `:fixed` path. This is
+  the valuation of the model's own profit rate. It differs from
+  `:consistent` only in the index that puts `C` and the flows on one basis
+  (investment deflator instead of GDP deflator).
+- `valuation=:consistent_gfcf` is deprecated and now means `:current_cost`,
+  with a warning. It used to deflate `V` and `CFC` by the investment
+  deflator but `GVA` by the GDP deflator, so its `e` and `r` were not on one
+  price basis; deflating `GVA` by the investment deflator as well gives
+  exactly the `e`, `k` and `r` of `:current_cost`.
 
 A period's surplus/surplus value uses `inc = GVA - V - CFC`, where `CFC`
 (AMECO item `UKCT`, "Consumption of fixed capital... total economy") is the
@@ -531,6 +530,11 @@ income of the self-employed counts as surplus value.
 function analyze_time_series_with_data(data::AMECOData; valuation::Symbol = :current,
                                        self_employed::Symbol = :excluded)
     _check_self_employed(self_employed)
+    if valuation == :consistent_gfcf
+        @warn "valuation = :consistent_gfcf is deprecated and now means :current_cost " *
+              "(identical e, k and r; the old variant deflated GVA and V by different indices)" maxlog = 1
+        valuation = :current_cost
+    end
     n = length(data.years)
     e_t = fill(NaN, n); k_t = fill(NaN, n); r_t = fill(NaN, n); q_t = fill(NaN, n)
     for i in 1:n
@@ -545,17 +549,12 @@ function analyze_time_series_with_data(data::AMECOData; valuation::Symbol = :cur
             def = data.GDP_deflator[i]
             factor = (!isnan(def) && def > 0) ? 100 / def : NaN
             V, GVA, CFC = comp * factor, data.real_GDP[i], data.CFC[i] * factor
-        elseif valuation == :consistent_gfcf
-            def = data.GFCF_deflator[i]
-            factor = (!isnan(def) && def > 0) ? 100 / def : NaN
-            V, GVA, CFC = comp * factor, data.real_GDP[i], data.CFC[i] * factor
         elseif valuation == :current_cost
             def = data.GFCF_deflator[i]
             C = (!isnan(def) && def > 0) ? C * def / 100 : NaN
             V, GVA, CFC = comp, data.GDP[i], data.CFC[i]
         else
-            error("unknown valuation: $valuation (use :current, :consistent, :consistent_gfcf " *
-                  "or :current_cost)")
+            error("unknown valuation: $valuation (use :current, :consistent or :current_cost)")
         end
         if !isnan(V) && !isnan(C) && !isnan(GVA) && !isnan(CFC) && V > 0 && C > 0
             inc = GVA - V - CFC

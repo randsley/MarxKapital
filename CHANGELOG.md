@@ -247,6 +247,14 @@ Format based on Keep a Changelog. Semantic versioning.
   prices with the capital stock at current replacement cost, the
   calibration's own price basis.
 
+### Deprecated
+- `valuation = :consistent_gfcf` in `analyze_time_series_with_data` now
+  means `:current_cost`, with a warning. It deflated wages and depreciation
+  by the investment deflator but output by the GDP deflator, so its `e`
+  was not the current-price rate and its `r` was too high; deflating
+  output by the investment deflator too gives exactly the `e`, `k` and `r`
+  of `:current_cost`. Its `k` is unchanged (`docs/LIMITATIONS.md` §9).
+
 ### Changed
 - The paper (`paper/main.tex`) is brought up to date with the work since
   it was frozen:

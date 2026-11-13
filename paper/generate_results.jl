@@ -30,14 +30,26 @@ data_pt = fetch_ameco_data("Portugal", years = years, method = :sdmx)
 data_es = fetch_ameco_data("Spain", years = years, method = :sdmx)
 # :current mixes constant-price C with current-price V, Y (the inconsistency);
 # :consistent deflates V, Y, CFC by the GDP deflator; :current_cost revalues C
-# with the investment deflator (the reference); :consistent_gfcf deflates V,
-# CFC by the investment deflator but Y by the GDP deflator, so its e is not the
-# current-price e (reported to explain the earlier draft's 15.1% upper bound).
-conventions = (Cur = :current, Gdp = :consistent, Cc = :current_cost, Mix = :consistent_gfcf)
-series = Dict((c, v, se) => analyze_time_series_with_data(d; valuation = conventions[v],
-                                                          self_employed = se)
+# with the investment deflator (the reference). Mix is the "investment-deflated"
+# variant an earlier draft reported (the package's old :consistent_gfcf, now a
+# deprecated alias of :current_cost): V and CFC deflated by the investment
+# deflator but Y by the GDP deflator, so its e is not the current-price e.
+# Section 5.2 quotes it to explain that draft's 15.1% upper bound.
+function mixed_index_series(d::AMECOData; self_employed = :excluded)
+    ratio = self_employed == :imputed ?
+        [_self_employed_ratio(d.employment[i], d.employees[i]) for i in eachindex(d.years)] : 1.0
+    f = 100 ./ d.GFCF_deflator
+    V, CFC, C = d.compensation .* ratio .* f, d.CFC .* f, d.total_capital_stock
+    inc = d.real_GDP .- V .- CFC
+    return (years = d.years, e = inc ./ V, k = C ./ V, r = inc ./ (C .+ V),
+            wage_share = V ./ d.real_GDP)
+end
+conventions = (Cur = :current, Gdp = :consistent, Cc = :current_cost)
+series = Dict((c, v, se) => v == :Mix ? mixed_index_series(d; self_employed = se) :
+                                analyze_time_series_with_data(d; valuation = conventions[v],
+                                                              self_employed = se)
               for (c, d) in (("Pt", data_pt), ("Es", data_es)),
-                  v in keys(conventions), se in (:excluded, :imputed))
+                  v in (keys(conventions)..., :Mix), se in (:excluded, :imputed))
 st_current    = series[("Pt", :Cur, :excluded)]
 st_consistent = series[("Pt", :Gdp, :excluded)]
 st_cc         = series[("Pt", :Cc, :excluded)]

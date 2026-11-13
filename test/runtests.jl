@@ -968,19 +968,18 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         @test p125.k ≈ 1.25 .* p100.k
         @test p125.e ≈ p100.e
         # self-employed imputed: V scales by employment/employees, and the
-        # calibration's k matches the :consistent_gfcf time series exactly
+        # calibration's k matches the :current_cost time series exactly
         pim, _ = calibrate_with_ameco_data(data, 2020, :macro; self_employed = :imputed)
         ratio = data.employment[i] / data.employees[i]
         @test sum(pim.V) ≈ ratio * sum(p125.V)
         @test pim.e_raw[1] < p125.e_raw[1]
-        ts = analyze_time_series_with_data(data; valuation = :consistent_gfcf, self_employed = :imputed)
-        @test sum(pim.C) / sum(pim.V) ≈ ts.k[i]
         # :current_cost is the calibration's own valuation: e as at current
-        # prices, k as under :consistent_gfcf, and r = e/(1+k)
+        # prices, C revalued by the investment deflator, and r = e/(1+k)
         cc = analyze_time_series_with_data(data; valuation = :current_cost, self_employed = :imputed)
         cur = analyze_time_series_with_data(data; valuation = :current, self_employed = :imputed)
+        @test sum(pim.C) / sum(pim.V) ≈ cc.k[i]
         @test cc.e ≈ cur.e && cc.wage_share ≈ cur.wage_share
-        @test cc.k ≈ ts.k
+        @test cc.k ≈ cur.k .* data.GFCF_deflator ./ 100
         @test cc.r ≈ cc.e ./ (1 .+ cc.k)
         @test mean(pim.e_raw) ≈ cc.e[i] && sum(pim.C) / sum(pim.V) ≈ cc.k[i]
         ts0 = analyze_time_series_with_data(data; valuation = :current)
@@ -1009,13 +1008,18 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
 
         st_current = analyze_time_series_with_data(data; valuation = :current)
         st_consistent = analyze_time_series_with_data(data; valuation = :consistent)
-        st_gfcf = analyze_time_series_with_data(data; valuation = :consistent_gfcf)
+        st_cc = analyze_time_series_with_data(data; valuation = :current_cost)
+        # deprecated alias of :current_cost, with a warning
+        st_gfcf = @test_logs (:warn, r"deprecated") analyze_time_series_with_data(data; valuation = :consistent_gfcf)
 
         @test st_current.k[1] ≈ 400.0 / 80.0
         @test st_consistent.k[1] ≈ 400.0 / 40.0  # 80 deflated by 200/100
         @test st_consistent.k[1] ≈ 2 * st_current.k[1]
-        @test st_gfcf.k[1] ≈ 400.0 / 20.0          # 80 deflated by 400/100
-        @test st_gfcf.k[1] ≈ 4 * st_current.k[1]
+        @test st_cc.k[1] ≈ 400.0 * 4 / 80.0        # C revalued by 400/100
+        @test st_cc.k[1] ≈ 4 * st_current.k[1]
+        @test st_cc.r[1] ≈ (200.0 - 80.0 - 20.0) / (1600.0 + 80.0)
+        @test st_gfcf.e == st_cc.e && st_gfcf.k == st_cc.k && st_gfcf.r == st_cc.r
+        @test_throws ErrorException analyze_time_series_with_data(data; valuation = :other)
 
         # The (GVA-V)/V part of e is algebraically invariant under a common
         # deflator applied to V and GVA (CFC is deflated by the same index as
@@ -1023,11 +1027,9 @@ include(joinpath(@__DIR__, "..", "src", "MarxKapital.jl"))
         # both by a common factor does not change the ratio (Y-V)/V.
         @test st_current.e[1] ≈ (200.0 - 80.0 - 20.0) / 80.0  # = 1.25
         @test st_consistent.e[1] ≈ st_current.e[1]
-        # :consistent_gfcf uses a different index (GFCF_deflator) for V and
-        # CFC but keeps real_GDP (deflated by GDP_deflator) for GVA: they are
-        # not on the same basis, so the invariance does NOT apply here, on
-        # purpose (this is precisely the deflator sensitivity test).
-        @test !(st_gfcf.e[1] ≈ st_current.e[1])
+        # at current cost every flow stays at current prices, so e is the
+        # current-price rate too
+        @test st_cc.e[1] ≈ st_current.e[1]
     end
 
     # Central finite differences, an independent reference for automatic differentiation.

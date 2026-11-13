@@ -260,6 +260,15 @@ Formato baseado em Keep a Changelog. Versionamento semântico.
   correntes com o stock de capital ao custo de substituição corrente, a
   base de preços da própria calibração.
 
+### Obsoleto
+- `valuation = :consistent_gfcf` em `analyze_time_series_with_data` passa a
+  significar `:current_cost`, com um aviso. Deflacionava salários e
+  depreciação pelo deflator do investimento mas o produto pelo deflator do
+  PIB, pelo que o seu `e` não era a taxa a preços correntes e o seu `r`
+  ficava alto demais; deflacionar também o produto pelo deflator do
+  investimento dá exatamente o `e`, o `k` e o `r` de `:current_cost`. O
+  seu `k` não muda (`docs/LIMITATIONS.md` §9).
+
 ### Alterado
 - O artigo (`paper/main.tex`) é atualizado com o trabalho feito desde que
   foi congelado:
